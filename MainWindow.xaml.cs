@@ -16,6 +16,13 @@ namespace ETSOverlay
 {
     public partial class MainWindow : Window
     {
+        private enum GameType
+        {
+            Unknown,
+            Ets,
+            Ats
+        }
+
         private bool locked = false;
         private DispatcherTimer? tbTimer;
         private string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"TrucksBook\log.txt");
@@ -38,15 +45,18 @@ namespace ETSOverlay
         private float _lastTickOdometer = -1; // Предыдущее значение одометра для дельты
         private bool _cargoWasLoaded = false; // Флаг, чтобы засекать одометр именно в момент сцепки
         private bool _forceProfileUnloaded = false; // Жестко глушим телеметрию, если вышли из профиля
-        private string _lastJobId = ""; // Железобетонный идентификатор заказа
+        private string _lastJobIdEts = ""; // Железобетонный идентификатор заказа (ETS)
+        private string _lastJobIdAts = ""; // Железобетонный идентификатор заказа (ATS)
         private string _currentTelemetryJobId = "";
         private string _lastTelemetryJobId = "";
-        private string _tbJobId = "";
+        private string _tbJobIdEts = "";
+        private string _tbJobIdAts = "";
         private Dictionary<string, JobState> _jobStates = new();
         private bool _tbActiveFromFolders = false;
         private bool _tbLogSaysActive = false;
         private DateTime _lastDeliveredTimestamp = DateTime.MinValue;
-        private string _lastDeliveredJobId = "";
+        private string _lastDeliveredJobIdEts = "";
+        private string _lastDeliveredJobIdAts = "";
         private DateTime _deliveredIndicatorUntil = DateTime.MinValue;
         private DateTime _deliveredFromLogUntil = DateTime.MinValue;
 
@@ -68,6 +78,10 @@ namespace ETSOverlay
         private bool _tbHasActiveJob = false;
         private bool _isTbRunning = false;
         private bool _isRecordingBroken = false;
+
+        private const float KmToMiles = 0.621371f;
+        private GameType _currentGame = GameType.Unknown;
+        private bool _awaitingTelemetryJob = false;
 
         // Рассинхрон
         private int _desyncSeconds = 0;
@@ -99,7 +113,12 @@ namespace ETSOverlay
             public bool ShowProgress { get; set; }
             public double WindowOpacity { get; set; }
             public string UiLanguage { get; set; } = "en";
-            public string LastJobId { get; set; } = "";
+            public string LastJobIdEts { get; set; } = "";
+            public string LastJobIdAts { get; set; } = "";
+            public string TbJobIdEts { get; set; } = "";
+            public string TbJobIdAts { get; set; } = "";
+            public string LastDeliveredJobIdEts { get; set; } = "";
+            public string LastDeliveredJobIdAts { get; set; } = "";
             public Dictionary<string, JobState> JobStates { get; set; } = new();
         }
 
@@ -183,19 +202,21 @@ namespace ETSOverlay
                 if (isGameOnline)
                 {
                     float rawSpeed = data.TruckValues.CurrentValues.DashboardValues.Speed.Value;
-                    int currentSpeedKmh = isPaused ? 0 : (int)Math.Round(Math.Abs(rawSpeed) * 3.6f);
-                    SpeedValue.Text = currentSpeedKmh.ToString();
+                    int currentSpeed = isPaused ? 0 : (int)Math.Round(Math.Abs(rawSpeed) * (UseMiles ? 2.236936f : 3.6f));
+                    SpeedValue.Text = currentSpeed.ToString();
 
+                    float distanceFactor = UseMiles ? KmToMiles : 1f;
                     float plannedDistKm = data.JobValues.PlannedDistanceKm;
+                    float plannedDist = plannedDistKm * distanceFactor;
                     string currentJobId = $"{data.JobValues.CitySource}_{data.JobValues.CityDestination}_{(int)plannedDistKm}";
-                    string resolvedJobId = (_tbActiveFromFolders && !string.IsNullOrWhiteSpace(_tbJobId)) ? _tbJobId : currentJobId;
+                    string resolvedJobId = (!string.IsNullOrWhiteSpace(CurrentTbJobId)) ? CurrentTbJobId : currentJobId;
                     _lastTelemetryJobId = _currentTelemetryJobId;
                     _currentTelemetryJobId = currentJobId;
 
                     // --- ЛОГИКА ФАНТОМНЫХ ДАННЫХ (GHOST DATA) ---
                     if (_triggerGhostSnapshot)
                     {
-                        _ghostDistance = plannedDistKm;
+                        _ghostDistance = plannedDist;
                         _ghostDestination = data.JobValues.CityDestination ?? "";
                         _isGhostData = true;
                         _triggerGhostSnapshot = false;
@@ -205,14 +226,14 @@ namespace ETSOverlay
                     if (_isGhostData)
                     {
                         string currentDest = data.JobValues.CityDestination ?? "";
-                        if (Math.Abs(plannedDistKm - _ghostDistance) > 1.0f || currentDest != _ghostDestination)
+                        if (Math.Abs(plannedDist - _ghostDistance) > 1.0f || currentDest != _ghostDestination)
                         {
                             _isGhostData = false;
                             WriteLog("Telemetry updated (new route detected). Ghost data cleared.");
                         }
                     }
 
-                    bool hasJobInfo = plannedDistKm > 0.5f && !string.IsNullOrWhiteSpace(data.JobValues.CityDestination);
+                    bool hasJobInfo = plannedDist > 0.5f && !string.IsNullOrWhiteSpace(data.JobValues.CityDestination);
 
                     // ЖЁСТКАЯ ПРОВЕРКА ПРИЦЕПА (Игнорируем фейковый CargoLoaded от игры, пока прицепа нет физически на фаркопе)
                     bool isTrailerAttached = data.TrailerValues?.Any(t => t.Attached) ?? false;
@@ -229,6 +250,13 @@ namespace ETSOverlay
                     _telHasJobInfo = hasJobInfo;
                     _telHasActiveJob = hasJobInfo && isCargoLoaded;
 
+                    if (_awaitingTelemetryJob && hasJobInfo)
+                    {
+                        _awaitingTelemetryJob = false;
+                        CurrentLastJobId = resolvedJobId;
+                        LoadOrInitJobState(resolvedJobId);
+                    }
+
                     if (!hasJobInfo)
                     {
                         // Нет заказа вообще
@@ -236,7 +264,7 @@ namespace ETSOverlay
                         {
                             isDelivering = false;
                             _cargoWasLoaded = false;
-                            _lastJobId = ""; // ЖЕСТКО СБРАСЫВАЕМ ID ЗАКАЗА ПРИ ЕГО КОНЦЕ
+                            CurrentLastJobId = ""; // ЖЕСТКО СБРАСЫВАЕМ ID ЗАКАЗА ПРИ ЕГО КОНЦЕ
                             WriteLog("Job finished, cancelled or Profile Left. Switched to Free Roam / Menu.");
                             ClearJobUI();
                         }
@@ -250,11 +278,17 @@ namespace ETSOverlay
                         isDelivering = true;
 
                         // 1. ПЕРВАЯ ПРОВЕРКА: Железобетонный детект нового заказа по ID (города + дистанция)
-                        if (_lastJobId != resolvedJobId)
+                        if (CurrentLastJobId != resolvedJobId)
                         {
-                            WriteLog($"New job detected! (Job changed from '{_lastJobId}' to '{resolvedJobId}'). Resetting cargo flags.");
-                            _lastJobId = resolvedJobId;
-                            lastPlannedDistance = plannedDistKm;
+                            WriteLog($"New job detected! (Job changed from '{CurrentLastJobId}' to '{resolvedJobId}'). Resetting cargo flags.");
+                            CurrentLastJobId = resolvedJobId;
+                            _cargoWasLoaded = false;
+                            jobDrivenDistance = 0;
+                            maxSpeedKmh = 0;
+                            isRace = false;
+                            MaxSpeedValue.Text = "0";
+                            _lastTickOdometer = -1;
+                            lastPlannedDistance = plannedDist;
                             LoadOrInitJobState(resolvedJobId);
                             SaveJobState();
                         }
@@ -270,6 +304,14 @@ namespace ETSOverlay
 
                             if (!_cargoWasLoaded)
                             {
+                                if (jobDrivenDistance > 0 || maxSpeedKmh > 0 || isRace)
+                                {
+                                    jobDrivenDistance = 0;
+                                    maxSpeedKmh = 0;
+                                    isRace = false;
+                                    MaxSpeedValue.Text = "0";
+                                    SaveJobState();
+                                }
                                 // ФАЗА 1: Едем за грузом (ещё не брали)
                                 Route.Text = $"{data.JobValues.CitySource.ToUpper()} -> {data.JobValues.CityDestination.ToUpper()}";
                                 DistanceInfo.Text = uiLanguage == "uk" ? "Їду за вантажем..." : "Driving to pickup...";
@@ -280,7 +322,7 @@ namespace ETSOverlay
                                 // ФАЗА 3: Прицеп отцепили / Заказ приостановлен
                                 Route.Text = "ORDER SUSPENDED";
                                 int drivenInt = Math.Max(0, (int)Math.Round(jobDrivenDistance));
-                                DistanceInfo.Text = $"Trailer detached! ({drivenInt} km done)";
+                                DistanceInfo.Text = $"Trailer detached! ({drivenInt} {GetDistanceUnitShort()} done)";
                             }
                         }
                         else
@@ -291,7 +333,7 @@ namespace ETSOverlay
                                 // Флаг взводится только один раз при физическом контакте с прицепом
                                 _cargoWasLoaded = true;
                                 _lastTickOdometer = currentOdo; // Фиксируем одометр для старта дельты
-                                WriteLog($"Cargo physically loaded! Tracking started. Total Dist: {plannedDistKm}km, Dest: {data.JobValues.CityDestination.ToUpper()}");
+                                WriteLog($"Cargo physically loaded! Tracking started. Total Dist: {plannedDist}{GetDistanceUnitShort()}, Dest: {data.JobValues.CityDestination.ToUpper()}");
                                 SaveJobState();
                             }
 
@@ -301,7 +343,7 @@ namespace ETSOverlay
                                 float delta = currentOdo - _lastTickOdometer;
                                 if (delta < 500) // Защита от телеметрийных глюков (прыжков)
                                 {
-                                    jobDrivenDistance += delta;
+                                    jobDrivenDistance += delta * distanceFactor;
                                     if (delta > 0)
                                     {
                                         SaveJobState();
@@ -310,27 +352,29 @@ namespace ETSOverlay
                             }
                             _lastTickOdometer = currentOdo;
 
-                            if (currentSpeedKmh > maxSpeedKmh && !isPaused)
+                            if (currentSpeed > maxSpeedKmh && !isPaused)
                             {
-                                maxSpeedKmh = currentSpeedKmh; 
+                                maxSpeedKmh = currentSpeed;
                                 MaxSpeedValue.Text = maxSpeedKmh.ToString();
-                                if (maxSpeedKmh > 100)
+                                int raceThreshold = UseMiles ? 81 : 100;
+                                if (maxSpeedKmh > raceThreshold)
                                 {
-                                    if (!isRace) WriteLog("Speed exceeded 100km/h - marked as RACING");
+                                    if (!isRace) WriteLog($"Speed exceeded {raceThreshold}{GetSpeedUnitSuffix()} - marked as RACING");
                                     isRace = true;
                                 }
                                 SaveJobState();
                             }
-                            UpdateDeliveryTypeUI(currentSpeedKmh);
+                            UpdateDeliveryTypeUI(currentSpeed);
 
                             // Отрисовка прогресса
-                            float remainingKm = data.NavigationValues.NavigationDistance / 1000f;
+                            float remaining = (data.NavigationValues.NavigationDistance / 1000f) * distanceFactor;
                             int drivenInt = Math.Max(0, (int)Math.Round(jobDrivenDistance));
-                            int totalInt = (int)Math.Round(plannedDistKm);
+                            int totalInt = (int)Math.Round(plannedDist);
+                            int remainingInt = Math.Max(0, (int)Math.Floor(remaining));
 
                     DistanceInfo.Text = uiLanguage == "uk"
-                        ? $"{drivenInt} / {totalInt} км ({(int)Math.Round(remainingKm)} залишилось)"
-                        : $"{drivenInt} / {totalInt} км ({(int)Math.Round(remainingKm)} left)";
+                        ? $"{drivenInt} / {totalInt} {GetDistanceUnitShort()} ({remainingInt} залишилось)"
+                        : $"{drivenInt} / {totalInt} {GetDistanceUnitShort()} ({remainingInt} left)";
                             JobProgressBar.Value = Math.Max(0, Math.Min(1.0, (double)drivenInt / (totalInt > 0 ? totalInt : 1)));
 
                             if (!string.IsNullOrEmpty(data.JobValues.CitySource))
@@ -367,8 +411,22 @@ namespace ETSOverlay
 
         private void CheckStatusAndProcesses()
         {
-            var gameProcesses = Process.GetProcessesByName("eurotrucks2").Concat(Process.GetProcessesByName("amtrucks"));
-            bool isGameRunning = gameProcesses.Any();
+            bool isEtsRunning = Process.GetProcessesByName("eurotrucks2").Any();
+            bool isAtsRunning = Process.GetProcessesByName("amtrucks").Any();
+            bool isGameRunning = isEtsRunning || isAtsRunning;
+
+            if (isAtsRunning)
+            {
+                SetCurrentGame(GameType.Ats);
+            }
+            else if (isEtsRunning)
+            {
+                SetCurrentGame(GameType.Ets);
+            }
+            else
+            {
+                _currentGame = GameType.Unknown;
+            }
 
             if (isGameRunning && (DateTime.Now - lastTelemetryUpdate).TotalSeconds > 5)
             {
@@ -407,7 +465,9 @@ namespace ETSOverlay
             {
                 try
                 {
-                    _tbHasActiveJob = GetTbActiveJobFromFolders(out var folderJobId, out var deliveredInfo);
+                    _tbHasActiveJob = false;
+                    _tbActiveFromFolders = false;
+                    _ = GetTbActiveJobFromFolders(out var folderJobId, out var deliveredInfo);
                     _tbFoldersChecked = true;
                     if (deliveredInfo.HasValue)
                     {
@@ -415,25 +475,29 @@ namespace ETSOverlay
                         if (deliveredTime > _lastDeliveredTimestamp)
                         {
                             _lastDeliveredTimestamp = deliveredTime;
-                            _lastDeliveredJobId = deliveredId;
-                            _deliveredIndicatorUntil = DateTime.Now.AddSeconds(10);
-                            WriteLog($"TB delivered detected: {_lastDeliveredJobId}");
+                            if (deliveredId == _tbJobIdEts) _lastDeliveredJobIdEts = deliveredId;
+                            if (deliveredId == _tbJobIdAts) _lastDeliveredJobIdAts = deliveredId;
+                            if (deliveredId == CurrentTbJobId)
+                            {
+                                CurrentLastDeliveredJobId = deliveredId;
+                                _deliveredIndicatorUntil = DateTime.Now.AddSeconds(10);
+                                WriteLog($"TB delivered detected: {CurrentLastDeliveredJobId}");
+                            }
                         }
                     }
 
-                    if (!_tbHasActiveJob && !string.IsNullOrWhiteSpace(_lastDeliveredJobId))
+                    if (!_tbHasActiveJob && !string.IsNullOrWhiteSpace(CurrentLastDeliveredJobId))
                     {
-                        if (_lastJobId == _lastDeliveredJobId)
+                        if (CurrentLastJobId == CurrentLastDeliveredJobId)
                         {
-                            ClearAllJobData();
-                            _lastDeliveredJobId = "";
+                            ClearCurrentGameJobData();
+                            CurrentLastDeliveredJobId = "";
                         }
                     }
 
-                    _tbActiveFromFolders = _tbHasActiveJob;
                     if (!string.IsNullOrWhiteSpace(folderJobId))
                     {
-                        _tbJobId = folderJobId;
+                        _tbActiveFromFolders = true;
                     }
 
                     if (File.Exists(logFilePath))
@@ -450,50 +514,94 @@ namespace ETSOverlay
                             bool isRecordingBroken = false;
                             bool kmLostWarning = false;
 
-                            int lastStart = -1, lastFinish = -1, lastEmpty = -1;
-                            int lastProfileLoad = -1, lastProfileLeave = -1;
-                            string? latestDeliveryId = null;
+                            int lastStartEts = -1, lastFinishEts = -1, lastEmptyEts = -1;
+                            int lastStartAts = -1, lastFinishAts = -1, lastEmptyAts = -1;
+                            int lastProfileLoadEts = -1, lastProfileLeaveEts = -1;
+                            int lastProfileLoadAts = -1, lastProfileLeaveAts = -1;
+                            string? latestDeliveryIdEts = null;
+                            string? latestDeliveryIdAts = null;
+                            GameType logGame = _currentGame;
 
                             int lastEventIdx = Array.FindLastIndex(lines, l => l.Contains("Launched game") || l.Contains("Connected to telemetry") || l.Contains("TrucksBook Client launch"));
                             if (lastEventIdx == -1) lastEventIdx = 0;
 
+                            int lastAtsLaunch = Array.FindLastIndex(lines, l => l.Contains("Launched game (ats)", StringComparison.OrdinalIgnoreCase));
+                            int lastEtsLaunch = Array.FindLastIndex(lines, l => l.Contains("Launched game (ets)", StringComparison.OrdinalIgnoreCase));
+                            if (lastAtsLaunch > lastEtsLaunch)
+                            {
+                                SetCurrentGame(GameType.Ats);
+                                logGame = GameType.Ats;
+                            }
+                            else if (lastEtsLaunch > lastAtsLaunch)
+                            {
+                                SetCurrentGame(GameType.Ets);
+                                logGame = GameType.Ets;
+                            }
+
                             for (int i = lastEventIdx; i < lines.Length; i++)
                             {
                                 string line = lines[i];
+                                if (line.Contains("Launched game (ats)", StringComparison.OrdinalIgnoreCase)) logGame = GameType.Ats;
+                                else if (line.Contains("Launched game (ets)", StringComparison.OrdinalIgnoreCase)) logGame = GameType.Ets;
+                                else if (line.Contains("American Truck Simulator", StringComparison.OrdinalIgnoreCase)) logGame = GameType.Ats;
+                                else if (line.Contains("Euro Truck Simulator", StringComparison.OrdinalIgnoreCase)) logGame = GameType.Ets;
+
                                 if (line.Contains("Drive without Client")) kmLostWarning = true;
                                 if (line.Contains("Login failed") || line.Contains("could not be resolved")) { tbState = LocalizeStatus("TB_OFFLINE_NET"); tbColor = Brushes.Red; isRecordingBroken = true; }
                                 else if (line.Contains("Problem with processes thread") || line.Contains("turn off client") || line.Contains("Disconnected from telemetry")) { tbState = LocalizeStatus("TB_ERROR"); tbColor = Brushes.Red; isRecordingBroken = true; }
 
                                 // Отслеживаем старты и стопы заказов
+                                // Убедитесь, что парсинг логов является авторитетным источником для активного ID заказа
                                 if (line.Contains("- Starting delivery") || line.Contains("- Delivery exist"))
                                 {
-                                    lastStart = i;
+                                    if (logGame == GameType.Ats) lastStartAts = i;
+                                    else lastStartEts = i;
                                     var extracted = TryExtractTbJobId(line);
-                                    if (!string.IsNullOrWhiteSpace(extracted)) latestDeliveryId = extracted;
+                                    if (!string.IsNullOrWhiteSpace(extracted))
+                                    {
+                                        if (logGame == GameType.Ats) latestDeliveryIdAts = extracted;
+                                        else latestDeliveryIdEts = extracted;
+                                    }
                                 }
                                 if (line.Contains("- Delivered") || line.Contains("- Cancelled"))
                                 {
-                                    lastFinish = i;
+                                    if (logGame == GameType.Ats) lastFinishAts = i;
+                                    else lastFinishEts = i;
                                     if (line.Contains("- Delivered"))
                                     {
-                                        _deliveredFromLogUntil = DateTime.Now.AddSeconds(10);
+                                        if (logGame == _currentGame)
+                                        {
+                                            _deliveredFromLogUntil = DateTime.Now.AddSeconds(10);
+                                        }
                                     }
                                     else
                                     {
-                                        _deliveredFromLogUntil = DateTime.MinValue;
-                                        _deliveredIndicatorUntil = DateTime.MinValue;
-                                        _lastDeliveredTimestamp = DateTime.MinValue;
-                                        _lastDeliveredJobId = "";
+                                        if (logGame == _currentGame)
+                                        {
+                                            _deliveredFromLogUntil = DateTime.MinValue;
+                                            _deliveredIndicatorUntil = DateTime.MinValue;
+                                            _lastDeliveredTimestamp = DateTime.MinValue;
+                                            CurrentLastDeliveredJobId = "";
+                                        }
                                     }
                                 }
-                                if (line.Contains("Found owner files: 0") || line.Contains("Found files: 0")) lastEmpty = i;
-
-                                var idCandidate = TryExtractTbJobId(line);
-                                if (!string.IsNullOrWhiteSpace(idCandidate)) latestDeliveryId = idCandidate;
+                                if (line.Contains("Found owner files: 0") || line.Contains("Found files: 0"))
+                                {
+                                    if (logGame == GameType.Ats) lastEmptyAts = i;
+                                    else lastEmptyEts = i;
+                                }
 
                                 // Отслеживаем состояние профиля!
-                                if (line.Contains("New profile selected")) lastProfileLoad = i;
-                                if (line.Contains("Leave profile")) lastProfileLeave = i;
+                                if (line.Contains("New profile selected"))
+                                {
+                                    if (logGame == GameType.Ats) lastProfileLoadAts = i;
+                                    else lastProfileLoadEts = i;
+                                }
+                                if (line.Contains("Leave profile"))
+                                {
+                                    if (logGame == GameType.Ats) lastProfileLeaveAts = i;
+                                    else lastProfileLeaveEts = i;
+                                }
                             }
 
                             _isRecordingBroken = isRecordingBroken;
@@ -505,6 +613,12 @@ namespace ETSOverlay
                             }
 
                             // Вычисляем, есть ли сейчас работа по версии Тракбука
+                            int lastStart = _currentGame == GameType.Ats ? lastStartAts : lastStartEts;
+                            int lastFinish = _currentGame == GameType.Ats ? lastFinishAts : lastFinishEts;
+                            int lastEmpty = _currentGame == GameType.Ats ? lastEmptyAts : lastEmptyEts;
+                            int lastProfileLoad = _currentGame == GameType.Ats ? lastProfileLoadAts : lastProfileLoadEts;
+                            int lastProfileLeave = _currentGame == GameType.Ats ? lastProfileLeaveAts : lastProfileLeaveEts;
+
                             int maxEnd = Math.Max(lastFinish, lastEmpty);
                             maxEnd = Math.Max(maxEnd, lastProfileLeave);
                             maxEnd = Math.Max(maxEnd, lastProfileLoad); // Если загрузили профиль и не было старта
@@ -527,10 +641,19 @@ namespace ETSOverlay
                             if (_forceProfileUnloaded) logSaysActive = false;
                             _tbLogSaysActive = logSaysActive;
 
-                            if (!string.IsNullOrWhiteSpace(latestDeliveryId))
+                            if (!string.IsNullOrWhiteSpace(latestDeliveryIdEts)) _tbJobIdEts = latestDeliveryIdEts;
+                            if (!string.IsNullOrWhiteSpace(latestDeliveryIdAts)) _tbJobIdAts = latestDeliveryIdAts;
+
+                            if (_currentGame == GameType.Ats && !string.IsNullOrWhiteSpace(latestDeliveryIdAts))
                             {
-                                _tbJobId = latestDeliveryId;
+                                CurrentTbJobId = latestDeliveryIdAts;
                             }
+                            else if (_currentGame == GameType.Ets && !string.IsNullOrWhiteSpace(latestDeliveryIdEts))
+                            {
+                                CurrentTbJobId = latestDeliveryIdEts;
+                            }
+
+                            _tbHasActiveJob = logSaysActive && !string.IsNullOrWhiteSpace(CurrentTbJobId);
 
                             if (_tbHasActiveJob && !logSaysActive && _deliveredFromLogUntil <= DateTime.Now)
                             {
@@ -624,24 +747,50 @@ namespace ETSOverlay
         private void ClearAllJobData()
         {
             maxSpeedKmh = 0; isRace = false; lastPlannedDistance = 0; jobDrivenDistance = 0; _lastTickOdometer = -1; _cargoWasLoaded = false;
-            _lastJobId = ""; // Очищаем ID тоже
+            _lastJobIdEts = ""; _lastJobIdAts = ""; // Очищаем ID тоже
+            _tbJobIdEts = ""; _tbJobIdAts = "";
+            _lastDeliveredJobIdEts = ""; _lastDeliveredJobIdAts = "";
             _jobStates.Clear();
-            MaxSpeedValue.Text = "0"; Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED"; DistanceInfo.Text = uiLanguage == "uk" ? "0 / 0 км" : "0 / 0 km"; JobProgressBar.Value = 0;
+            MaxSpeedValue.Text = "0"; Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED"; DistanceInfo.Text = GetZeroDistanceText(); JobProgressBar.Value = 0;
             UpdateDeliveryTypeUI(0); SaveState();
         }
 
         private void ClearJobUI()
         {
             Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED";
-            DistanceInfo.Text = uiLanguage == "uk" ? "0 / 0 км" : "0 / 0 km";
+            DistanceInfo.Text = GetZeroDistanceText();
             JobProgressBar.Value = 0;
+        }
+
+        private void ClearCurrentGameJobData()
+        {
+            maxSpeedKmh = 0; isRace = false; lastPlannedDistance = 0; jobDrivenDistance = 0; _lastTickOdometer = -1; _cargoWasLoaded = false;
+            CurrentLastJobId = "";
+            MaxSpeedValue.Text = "0";
+            UpdateDeliveryTypeUI(0);
+            ClearJobUI();
+            SaveState();
+        }
+
+        private void ResetCurrentGameSessionState()
+        {
+            jobDrivenDistance = 0;
+            maxSpeedKmh = 0;
+            isRace = false;
+            _cargoWasLoaded = false;
+            _lastTickOdometer = -1;
+            MaxSpeedValue.Text = "0";
+            UpdateDeliveryTypeUI(0);
+            ClearJobUI();
         }
 
         private void LoadOrInitJobState(string jobId)
         {
             if (string.IsNullOrWhiteSpace(jobId)) return;
 
-            if (!_jobStates.TryGetValue(jobId, out var state))
+            string stateKey = GetJobStateKey(jobId);
+
+            if (!_jobStates.TryGetValue(stateKey, out var state))
             {
                 state = new JobState
                 {
@@ -651,7 +800,7 @@ namespace ETSOverlay
                     IsRace = false,
                     CargoWasLoaded = false
                 };
-                _jobStates[jobId] = state;
+                _jobStates[stateKey] = state;
             }
 
             jobDrivenDistance = state.DrivenDistance;
@@ -663,22 +812,35 @@ namespace ETSOverlay
             SaveJobState();
         }
 
+        private void LoadCurrentGameJobState()
+        {
+            if (!string.IsNullOrWhiteSpace(CurrentLastJobId))
+            {
+                LoadOrInitJobState(CurrentLastJobId);
+            }
+            else
+            {
+                ClearCurrentGameJobData();
+            }
+        }
+
         private void SaveJobState()
         {
-            if (!string.IsNullOrWhiteSpace(_tbJobId) && _currentTelemetryJobId == _lastJobId)
+                            if (!string.IsNullOrWhiteSpace(CurrentTbJobId) && _currentTelemetryJobId == CurrentLastJobId)
             {
-                _lastJobId = _tbJobId;
+                                CurrentLastJobId = CurrentTbJobId;
             }
 
-            if (string.IsNullOrWhiteSpace(_lastJobId))
+            if (string.IsNullOrWhiteSpace(CurrentLastJobId))
             {
                 SaveState();
                 return;
             }
 
-            _jobStates[_lastJobId] = new JobState
+            string stateKey = GetJobStateKey(CurrentLastJobId);
+            _jobStates[stateKey] = new JobState
             {
-                TelemetryId = _lastJobId,
+                TelemetryId = CurrentLastJobId,
                 DrivenDistance = jobDrivenDistance,
                 MaxSpeedKmh = maxSpeedKmh,
                 IsRace = isRace,
@@ -753,7 +915,12 @@ namespace ETSOverlay
                     ShowProgress = showProgress,
                     WindowOpacity = windowOpacity,
                     UiLanguage = uiLanguage,
-                    LastJobId = _lastJobId,
+                    LastJobIdEts = _lastJobIdEts,
+                    LastJobIdAts = _lastJobIdAts,
+                    TbJobIdEts = _tbJobIdEts,
+                    TbJobIdAts = _tbJobIdAts,
+                    LastDeliveredJobIdEts = _lastDeliveredJobIdEts,
+                    LastDeliveredJobIdAts = _lastDeliveredJobIdAts,
                     JobStates = _jobStates
                 };
 
@@ -787,12 +954,17 @@ namespace ETSOverlay
                             {
                                 windowOpacity = 0.85;
                             }
-                            _lastJobId = state.LastJobId ?? "";
+                            _lastJobIdEts = state.LastJobIdEts ?? "";
+                            _lastJobIdAts = state.LastJobIdAts ?? "";
+                            _tbJobIdEts = state.TbJobIdEts ?? "";
+                            _tbJobIdAts = state.TbJobIdAts ?? "";
+                            _lastDeliveredJobIdEts = state.LastDeliveredJobIdEts ?? "";
+                            _lastDeliveredJobIdAts = state.LastDeliveredJobIdAts ?? "";
                             _jobStates = state.JobStates ?? new Dictionary<string, JobState>();
 
-                            if (!string.IsNullOrWhiteSpace(_lastJobId))
+                            if (!string.IsNullOrWhiteSpace(CurrentLastJobId))
                             {
-                                LoadOrInitJobState(_lastJobId);
+                                LoadOrInitJobState(CurrentLastJobId);
                             }
                         }
                     }
@@ -801,7 +973,15 @@ namespace ETSOverlay
                         string[] parts = content.Split('|');
 
                         if (parts.Length >= 9) { bool.TryParse(parts[8], out _cargoWasLoaded); }
-                        if (parts.Length >= 10) { _lastJobId = parts[9]; }
+                        if (parts.Length >= 10)
+                        {
+                            _lastJobIdEts = parts[9];
+                            _lastJobIdAts = parts[9];
+                            _tbJobIdEts = parts[9];
+                            _tbJobIdAts = parts[9];
+                            _lastDeliveredJobIdEts = "";
+                            _lastDeliveredJobIdAts = "";
+                        }
 
                         if (parts.Length >= 4)
                         {
@@ -864,7 +1044,9 @@ namespace ETSOverlay
             if (clearJobState)
             {
                 _cargoWasLoaded = false;
-                _lastJobId = ""; // Сбрасываем и здесь на всякий
+                _lastJobIdEts = ""; _lastJobIdAts = ""; // Сбрасываем и здесь на всякий
+                _tbJobIdEts = ""; _tbJobIdAts = "";
+                _lastDeliveredJobIdEts = ""; _lastDeliveredJobIdAts = "";
                 ClearJobUI();
             }
 
@@ -966,8 +1148,8 @@ namespace ETSOverlay
             SpeedHeader.Text = isUk ? "ШВИДКІСТЬ" : "SPEED";
             MaxHeader.Text = isUk ? "МАКС" : "MAX";
             TypeHeader.Text = isUk ? "ТИП" : "TYPE";
-            SpeedUnit.Text = isUk ? "км/год" : "km/h";
-            MaxUnit.Text = isUk ? "км/год" : "km/h";
+            SpeedUnit.Text = GetSpeedUnitText();
+            MaxUnit.Text = GetSpeedUnitText();
 
             UpdateDeliveryTypeUI(0);
             UpdateDistanceInfoForLanguage();
@@ -1062,20 +1244,118 @@ namespace ETSOverlay
         {
             if (string.IsNullOrWhiteSpace(DistanceInfo.Text)) return;
 
+            if (DistanceInfo.Text == "0 / 0 km" || DistanceInfo.Text == "0 / 0 км" || DistanceInfo.Text == "0 / 0 mi" || DistanceInfo.Text == "0 / 0 миль")
+            {
+                DistanceInfo.Text = GetZeroDistanceText();
+                return;
+            }
+
             if (uiLanguage == "uk")
             {
                 DistanceInfo.Text = DistanceInfo.Text
                     .Replace(" km (", " км (")
+                    .Replace(" mi (", " миль (")
                     .Replace(" km ", " км ")
+                    .Replace(" mi ", " миль ")
                     .Replace(" left)", " залишилось)");
             }
             else
             {
                 DistanceInfo.Text = DistanceInfo.Text
                     .Replace(" км (", " km (")
+                    .Replace(" миль (", " mi (")
                     .Replace(" км ", " km ")
+                    .Replace(" миль ", " mi ")
                     .Replace(" залишилось)", " left)");
             }
+        }
+
+        private bool UseMiles => _currentGame == GameType.Ats;
+        private string CurrentLastJobId
+        {
+            get => _currentGame == GameType.Ats ? _lastJobIdAts : _lastJobIdEts;
+            set
+            {
+                if (_currentGame == GameType.Ats)
+                {
+                    _lastJobIdAts = value;
+                }
+                else
+                {
+                    _lastJobIdEts = value;
+                }
+            }
+        }
+
+        private string CurrentTbJobId
+        {
+            get => _currentGame == GameType.Ats ? _tbJobIdAts : _tbJobIdEts;
+            set
+            {
+                if (_currentGame == GameType.Ats)
+                {
+                    _tbJobIdAts = value;
+                }
+                else
+                {
+                    _tbJobIdEts = value;
+                }
+            }
+        }
+
+        private string CurrentLastDeliveredJobId
+        {
+            get => _currentGame == GameType.Ats ? _lastDeliveredJobIdAts : _lastDeliveredJobIdEts;
+            set
+            {
+                if (_currentGame == GameType.Ats)
+                {
+                    _lastDeliveredJobIdAts = value;
+                }
+                else
+                {
+                    _lastDeliveredJobIdEts = value;
+                }
+            }
+        }
+
+        private void SetCurrentGame(GameType game)
+        {
+            if (_currentGame == game || game == GameType.Unknown) return;
+            _currentGame = game;
+            SpeedUnit.Text = GetSpeedUnitText();
+            MaxUnit.Text = GetSpeedUnitText();
+            UpdateDistanceInfoForLanguage();
+            _awaitingTelemetryJob = true;
+            ResetCurrentGameSessionState();
+            WriteLog($"Detected game: {_currentGame}");
+        }
+
+        private string GetSpeedUnitText()
+        {
+            return UseMiles ? (uiLanguage == "uk" ? "м/год" : "mph") : (uiLanguage == "uk" ? "км/год" : "km/h");
+        }
+
+        private string GetSpeedUnitSuffix()
+        {
+            return UseMiles ? "mph" : "km/h";
+        }
+
+        private string GetDistanceUnitShort()
+        {
+            return UseMiles ? (uiLanguage == "uk" ? "миль" : "mi") : (uiLanguage == "uk" ? "км" : "km");
+        }
+
+        private string GetZeroDistanceText()
+        {
+            return $"0 / 0 {GetDistanceUnitShort()}";
+        }
+
+        private string GetJobStateKey(string jobId)
+        {
+            if (string.IsNullOrWhiteSpace(jobId)) return jobId;
+            string prefix = _currentGame == GameType.Ats ? "ats" : "ets";
+            return $"{prefix}:{jobId}";
         }
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) { _isManualMinimize = true; WindowState = WindowState.Minimized; }
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
