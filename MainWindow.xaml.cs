@@ -467,7 +467,7 @@ namespace ETSOverlay
                 _awaitingTbResponse = false;
                 _desyncSeconds = 0;
                 _isDesync = false;
-                return; // ВАЖНО: Выходим, так как игры нет
+                return;
             }
 
             if (!_isTbRunning)
@@ -529,8 +529,9 @@ namespace ETSOverlay
 
                     if (File.Exists(logFilePath))
                     {
+                        var logInfo = new FileInfo(logFilePath);
                         using var fs = new FileStream(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        using var sr = new StreamReader(fs);
+                        using var sr = new StreamReader(fs, System.Text.Encoding.UTF8, true);
                         string content = sr.ReadToEnd();
                         string[] lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
@@ -550,6 +551,15 @@ namespace ETSOverlay
                             GameType logGame = _currentGame;
                             int lastTbErrorIdx = -1;
                             int lastTbConnectedIdx = -1;
+                            int lastDisconnectIdx = -1;
+                            int lastTelemetryActivityIdx = -1;
+                            int lastDeliveredIdx = -1;
+                            int lastDecryptOkIdx = -1;
+                            int lastUploadedIdx = -1;
+                            int lastFoundFilesIdx = -1;
+                            int lastDeliveryNotStartedIdx = -1;
+                            int lastExitGameIdx = -1;
+                            int disconnectsAfterDelivery = 0;
 
                             int lastAtsLaunch = Array.FindLastIndex(lines, l => l.Contains("Launched game (ats)", StringComparison.OrdinalIgnoreCase));
                             int lastEtsLaunch = Array.FindLastIndex(lines, l => l.Contains("Launched game (ets)", StringComparison.OrdinalIgnoreCase));
@@ -579,15 +589,33 @@ namespace ETSOverlay
                                 if (isInScope)
                                 {
                                     if (line.Contains("Drive without Client")) kmLostWarning = true;
-                                    if (line.Contains("Connected to telemetry")) lastTbConnectedIdx = i;
+                                    if (Regex.IsMatch(line, "Connected\\s+to\\s+telemetry", RegexOptions.IgnoreCase))
+                                    {
+                                        lastTbConnectedIdx = i;
+                                        lastTelemetryActivityIdx = i;
+                                    }
+                                    if (line.Contains("Delivery not started with client", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        lastDeliveryNotStartedIdx = i;
+                                    }
                                     if (line.Contains("Login failed") || line.Contains("could not be resolved")) { tbState = LocalizeStatus("TB_OFFLINE_NET"); tbColor = Brushes.Red; isRecordingBroken = true; lastTbErrorIdx = i; }
-                                    else if (line.Contains("Problem with processes thread") || line.Contains("turn off client") || line.Contains("Disconnected from telemetry")) { tbState = LocalizeStatus("TB_ERROR"); tbColor = Brushes.Red; isRecordingBroken = true; lastTbErrorIdx = i; }
+                                    else if (line.Contains("Problem with processes thread", StringComparison.OrdinalIgnoreCase)
+                                        || line.Contains("turn off client", StringComparison.OrdinalIgnoreCase)
+                                        || Regex.IsMatch(line, "Disconnected\\s+from\\s+telemetry", RegexOptions.IgnoreCase))
+                                    {
+                                        lastDisconnectIdx = i;
+                                    }
+                                    if (line.Contains("Exit game", StringComparison.OrdinalIgnoreCase) || line.Contains("Exit the game", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        lastExitGameIdx = i;
+                                    }
                                 }
 
                                 // Отслеживаем старты и стопы заказов
                                 // Убедитесь, что парсинг логов является авторитетным источником для активного ID заказа
                                 if (line.Contains("- Starting delivery") || line.Contains("- Delivery exist"))
                                 {
+                                    lastTelemetryActivityIdx = i;
                                     if (logGame == GameType.Ats) lastStartAts = i;
                                     else lastStartEts = i;
                                     var extracted = TryExtractTbJobId(line);
@@ -608,6 +636,8 @@ namespace ETSOverlay
                                 }
                                 if (line.Contains("- Delivered") || line.Contains("- Cancelled"))
                                 {
+                                    lastDeliveredIdx = i;
+                                    lastTelemetryActivityIdx = i;
                                     if (logGame == GameType.Ats) lastFinishAts = i;
                                     else lastFinishEts = i;
                                     if (line.Contains("- Delivered"))
@@ -634,6 +664,32 @@ namespace ETSOverlay
                                     else lastEmptyEts = i;
                                 }
 
+                                if (line.Contains("Found files: 1", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    lastFoundFilesIdx = i;
+                                }
+
+                                if (line.Contains("Decrypt delivered ok", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    lastDecryptOkIdx = i;
+                                }
+
+                                if (line.Contains("File is uploaded", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    lastUploadedIdx = i;
+                                }
+
+                                if (line.Contains("Tollgate", StringComparison.OrdinalIgnoreCase)
+                                    || line.Contains("Ferry", StringComparison.OrdinalIgnoreCase))
+                                {
+                                    lastTelemetryActivityIdx = i;
+                                }
+
+                                if (lastDeliveredIdx >= 0 && Regex.IsMatch(line, "Disconnected\\s+from\\s+telemetry", RegexOptions.IgnoreCase) && i > lastDeliveredIdx)
+                                {
+                                    disconnectsAfterDelivery++;
+                                }
+
                                 // Отслеживаем состояние профиля!
                                 if (line.Contains("New profile selected"))
                                 {
@@ -647,7 +703,13 @@ namespace ETSOverlay
                                 }
                             }
 
-                            if (lastTbConnectedIdx > lastTbErrorIdx)
+                            int lastStart = _currentGame == GameType.Ats ? lastStartAts : lastStartEts;
+                            int lastFinish = _currentGame == GameType.Ats ? lastFinishAts : lastFinishEts;
+                            int lastEmpty = _currentGame == GameType.Ats ? lastEmptyAts : lastEmptyEts;
+                            int lastProfileLoad = _currentGame == GameType.Ats ? lastProfileLoadAts : lastProfileLoadEts;
+                            int lastProfileLeave = _currentGame == GameType.Ats ? lastProfileLeaveAts : lastProfileLeaveEts;
+
+                            if (lastTbConnectedIdx > Math.Max(lastTbErrorIdx, lastDisconnectIdx))
                             {
                                 isRecordingBroken = false;
                                 if (tbState != LocalizeStatus("TB_OFFLINE_NET"))
@@ -655,6 +717,44 @@ namespace ETSOverlay
                                     tbState = LocalizeStatus("TB_ONLINE");
                                     tbColor = new SolidColorBrush(Color.FromRgb(82, 193, 79));
                                 }
+                            }
+
+                            if (!isRecordingBroken && lastDisconnectIdx > Math.Max(lastTelemetryActivityIdx, lastTbConnectedIdx))
+                            {
+                                isRecordingBroken = true;
+                                tbState = LocalizeStatus("TB_ERROR");
+                                tbColor = Brushes.Red;
+                            }
+
+                            if (!isRecordingBroken && lastDeliveryNotStartedIdx > Math.Max(lastTelemetryActivityIdx, lastTbConnectedIdx))
+                            {
+                                isRecordingBroken = true;
+                                tbState = LocalizeStatus("TB_ERROR");
+                                tbColor = Brushes.Red;
+                            }
+
+                            if (!isRecordingBroken && lastDeliveredIdx >= 0 && lastDeliveredIdx > Math.Max(lastDecryptOkIdx, lastUploadedIdx)
+                                && lastDeliveredIdx >= lastStart && lastDeliveredIdx >= lastProfileLoad)
+                            {
+                                isRecordingBroken = true;
+                                tbState = LocalizeStatus("TB_ERROR");
+                                tbColor = Brushes.Red;
+                            }
+
+                            if (!isRecordingBroken && lastFoundFilesIdx > lastDeliveredIdx && lastDeliveredIdx >= 0 && lastDeliveredIdx >= lastStart)
+                            {
+                                isRecordingBroken = true;
+                                tbState = LocalizeStatus("TB_ERROR");
+                                tbColor = Brushes.Red;
+                            }
+
+                            if (!isRecordingBroken && lastExitGameIdx > lastDeliveredIdx && lastDeliveredIdx >= 0 && lastDeliveredIdx >= lastStart
+                                && lastUploadedIdx < lastDeliveredIdx && lastDecryptOkIdx < lastDeliveredIdx
+                                && disconnectsAfterDelivery >= 2)
+                            {
+                                isRecordingBroken = true;
+                                tbState = LocalizeStatus("TB_ERROR");
+                                tbColor = Brushes.Red;
                             }
 
                             _isRecordingBroken = isRecordingBroken;
@@ -666,12 +766,6 @@ namespace ETSOverlay
                             }
 
                             // Вычисляем, есть ли сейчас работа по версии Тракбука
-                            int lastStart = _currentGame == GameType.Ats ? lastStartAts : lastStartEts;
-                            int lastFinish = _currentGame == GameType.Ats ? lastFinishAts : lastFinishEts;
-                            int lastEmpty = _currentGame == GameType.Ats ? lastEmptyAts : lastEmptyEts;
-                            int lastProfileLoad = _currentGame == GameType.Ats ? lastProfileLoadAts : lastProfileLoadEts;
-                            int lastProfileLeave = _currentGame == GameType.Ats ? lastProfileLeaveAts : lastProfileLeaveEts;
-
                             int maxEnd = Math.Max(lastFinish, lastEmpty);
                             maxEnd = Math.Max(maxEnd, lastProfileLeave);
                             maxEnd = Math.Max(maxEnd, lastProfileLoad); // Если загрузили профиль и не было старта
@@ -718,9 +812,11 @@ namespace ETSOverlay
 
                             if (_tbHasActiveJob)
                             {
-                                _isRecordingBroken = false;
-                                tbState = LocalizeStatus("TB_ONLINE");
-                                tbColor = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                                if (!_isRecordingBroken)
+                                {
+                                    tbState = LocalizeStatus("TB_ONLINE");
+                                    tbColor = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                                }
                             }
                             else if (_tbHasActiveJob && !logSaysActive && _deliveredFromLogUntil <= DateTime.Now)
                             {
@@ -772,6 +868,12 @@ namespace ETSOverlay
                             TbStatus.Text = tbState;
                             TbStatus.Foreground = tbColor;
                         }
+                    }
+                    else
+                    {
+                        WriteLog($"TB log not found: {logFilePath}");
+                        TbStatus.Text = LocalizeStatus("TB_OFFLINE");
+                        TbStatus.Foreground = Brushes.Red;
                     }
                 }
                 catch (Exception ex)
