@@ -13,6 +13,9 @@
 
   <ItemGroup>
     <Content Include="favicon.ico" />
+    <Content Include="Resources\city_translations_uk.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
   <ItemGroup>

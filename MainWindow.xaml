@@ -196,6 +196,23 @@
                                 <ComboBoxItem Content="Українська" Tag="uk"/>
                             </ComboBox>
                         </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,20,0,0">
+                            <TextBlock x:Name="SpeedWarningLabel" Text="Speed warning" Foreground="White" FontSize="14" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <TextBox x:Name="SpeedWarningBox" Width="120" Height="24" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningBox_TextChanged"/>
+                            <Grid Margin="6,0,0,0" Width="26" Height="24" VerticalAlignment="Center">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="12"/>
+                                </Grid.RowDefinitions>
+                                <Button x:Name="SpeedWarningUp" Grid.Row="0" Height="13" Click="SpeedWarningUp_Click" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                                    <TextBlock Text="▲" FontSize="10" LineHeight="12" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Button>
+                                <Button x:Name="SpeedWarningDown" Grid.Row="1" Height="13" Click="SpeedWarningDown_Click" Padding="0" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                                    <TextBlock Text="▼" FontSize="10" LineHeight="12" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                                </Button>
+                            </Grid>
+                        </StackPanel>
                     </StackPanel>
 
                     <Button x:Name="SettingsDoneButton" Grid.Row="2" Content="Done" Click="BtnCloseSettings_Click" Background="#33FFFFFF" Foreground="White" BorderThickness="0" Height="30" Width="100" HorizontalAlignment="Center" Cursor="Hand">

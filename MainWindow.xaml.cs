@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Windows;
 using System.Windows.Input;
@@ -79,6 +80,9 @@ namespace ETSOverlay
         private bool _isTbRunning = false;
         private bool _isRecordingBroken = false;
         private bool _awaitingTbResponse = false;
+        private bool _awaitingTbUpload = false;
+        private int _speedWarningEts = 0;
+        private int _speedWarningAts = 0;
 
         private const float KmToMiles = 0.621371f;
         private GameType _currentGame = GameType.Unknown;
@@ -94,6 +98,9 @@ namespace ETSOverlay
         private bool showProgress = true;
         private double windowOpacity = 0.85;
         private string uiLanguage = "en";
+        private readonly Dictionary<string, string> _ets2CityTranslations = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, string> _atsCityTranslations = new(StringComparer.OrdinalIgnoreCase);
+        private bool _suppressSpeedWarningChange = false;
 
         private class JobState
         {
@@ -122,6 +129,25 @@ namespace ETSOverlay
             public string TbJobId { get; set; } = "";
             public string LastDeliveredJobId { get; set; } = "";
             public Dictionary<string, JobState> JobStates { get; set; } = new();
+            public int SpeedWarning { get; set; }
+        }
+
+        private class CityTranslationEntry
+        {
+            [JsonPropertyName("english")]
+            public string English { get; set; } = "";
+
+            [JsonPropertyName("ukrainian")]
+            public string Ukrainian { get; set; } = "";
+        }
+
+        private class CityTranslationFile
+        {
+            [JsonPropertyName("ets2")]
+            public List<CityTranslationEntry> Ets2 { get; set; } = new();
+
+            [JsonPropertyName("ats")]
+            public List<CityTranslationEntry> Ats { get; set; } = new();
         }
 
         public MainWindow()
@@ -143,10 +169,14 @@ namespace ETSOverlay
             WriteLog("=== OVERLAY STARTED ===");
 
             LoadState();
+            LoadGameState(GameType.Ets);
+            LoadGameState(GameType.Ats);
+            LoadCityTranslations();
             ResetStartupJobMemory();
             UpdatePinIcon();
             CheckStatusAndProcesses();
             ApplyLocalization();
+            UpdateSpeedWarningText();
 
             MouseLeftButtonDown += (s, e) => { if (!locked) DragMove(); };
             LocationChanged += (s, e) => { SaveState(); };
@@ -207,6 +237,7 @@ namespace ETSOverlay
                     float rawSpeed = data.TruckValues.CurrentValues.DashboardValues.Speed.Value;
                     int currentSpeed = isPaused ? 0 : (int)Math.Round(Math.Abs(rawSpeed) * (UseMiles ? 2.236936f : 3.6f));
                     SpeedValue.Text = currentSpeed.ToString();
+                    ApplySpeedWarningColor(currentSpeed);
 
                     float distanceFactor = UseMiles ? KmToMiles : 1f;
                     float plannedDistKm = data.JobValues.PlannedDistanceKm;
@@ -322,7 +353,7 @@ namespace ETSOverlay
                                     SaveJobState();
                                 }
                                 // ФАЗА 1: Едем за грузом (ещё не брали)
-                                Route.Text = $"{data.JobValues.CitySource.ToUpper()} -> {data.JobValues.CityDestination.ToUpper()}";
+                                Route.Text = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
                                 DistanceInfo.Text = uiLanguage == "uk" ? "Їду за вантажем..." : "Driving to pickup...";
                                 JobProgressBar.Value = 0;
                             }
@@ -342,7 +373,7 @@ namespace ETSOverlay
                                 // Флаг взводится только один раз при физическом контакте с прицепом
                                 _cargoWasLoaded = true;
                                 _lastTickOdometer = currentOdo; // Фиксируем одометр для старта дельты
-                                WriteLog($"Cargo physically loaded! Tracking started. Total Dist: {plannedDist}{GetDistanceUnitShort()}, Dest: {data.JobValues.CityDestination.ToUpper()}");
+                                WriteLog($"Cargo physically loaded! Tracking started. Total Dist: {plannedDist}{GetDistanceUnitShort()}, Dest: {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}");
                                 SaveJobState();
                             }
 
@@ -387,7 +418,7 @@ namespace ETSOverlay
                             JobProgressBar.Value = Math.Max(0, Math.Min(1.0, (double)drivenInt / (totalInt > 0 ? totalInt : 1)));
 
                             if (!string.IsNullOrEmpty(data.JobValues.CitySource))
-                                Route.Text = $"{data.JobValues.CitySource.ToUpper()} -> {data.JobValues.CityDestination.ToUpper()}";
+                                Route.Text = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
                         }
                     }
 
@@ -709,6 +740,12 @@ namespace ETSOverlay
                             int lastProfileLoad = _currentGame == GameType.Ats ? lastProfileLoadAts : lastProfileLoadEts;
                             int lastProfileLeave = _currentGame == GameType.Ats ? lastProfileLeaveAts : lastProfileLeaveEts;
 
+                            bool awaitingTbUpload = lastDeliveredIdx >= 0
+                                && lastDeliveredIdx >= lastStart
+                                && lastUploadedIdx < lastDeliveredIdx
+                                && lastExitGameIdx < lastDeliveredIdx;
+                            _awaitingTbUpload = _isTbRunning && awaitingTbUpload;
+
                             if (lastTbConnectedIdx > Math.Max(lastTbErrorIdx, lastDisconnectIdx))
                             {
                                 isRecordingBroken = false;
@@ -733,7 +770,7 @@ namespace ETSOverlay
                                 tbColor = Brushes.Red;
                             }
 
-                            if (!isRecordingBroken && lastDeliveredIdx >= 0 && lastDeliveredIdx > Math.Max(lastDecryptOkIdx, lastUploadedIdx)
+                            if (!isRecordingBroken && !_awaitingTbUpload && lastDeliveredIdx >= 0 && lastDeliveredIdx > Math.Max(lastDecryptOkIdx, lastUploadedIdx)
                                 && lastDeliveredIdx >= lastStart && lastDeliveredIdx >= lastProfileLoad)
                             {
                                 isRecordingBroken = true;
@@ -741,7 +778,7 @@ namespace ETSOverlay
                                 tbColor = Brushes.Red;
                             }
 
-                            if (!isRecordingBroken && lastFoundFilesIdx > lastDeliveredIdx && lastDeliveredIdx >= 0 && lastDeliveredIdx >= lastStart)
+                            if (!isRecordingBroken && !_awaitingTbUpload && lastFoundFilesIdx > lastDeliveredIdx && lastDeliveredIdx >= 0 && lastDeliveredIdx >= lastStart)
                             {
                                 isRecordingBroken = true;
                                 tbState = LocalizeStatus("TB_ERROR");
@@ -810,6 +847,13 @@ namespace ETSOverlay
                             _tbHasActiveJob = logSaysActive && !string.IsNullOrWhiteSpace(CurrentTbJobId);
                             _awaitingTbResponse = _isTbRunning && !_tbHasActiveJob && !_tbSaysNoJob && !_forceProfileUnloaded;
 
+                            if (_tbSaysNoJob && !_telHasJobInfo)
+                            {
+                                _isRecordingBroken = false;
+                                tbState = LocalizeStatus("TB_ONLINE");
+                                tbColor = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                            }
+
                             if (_tbHasActiveJob)
                             {
                                 if (!_isRecordingBroken)
@@ -835,7 +879,7 @@ namespace ETSOverlay
                             }
 
                             // Проверяем рассинхрон только если мы в профиле, иначе нам всё равно
-                            if (_awaitingTbResponse || !isProfileLoaded || _forceProfileUnloaded)
+                            if (_awaitingTbResponse || _awaitingTbUpload || !isProfileLoaded || _forceProfileUnloaded)
                             {
                                 _desyncSeconds = 0;
                             }
@@ -890,7 +934,7 @@ namespace ETSOverlay
             else if (_isRecordingBroken && _telHasActiveJob) UpdateStatusUI(LocalizeStatus("NOT_RECORDING"), Brushes.Red, false);
             else if (_awaitingTbResponse || (!isProfileLoaded && !_telHasActiveJob)) UpdateStatusUI(LocalizeStatus("PROFILE_MENU"), Brushes.Orange, false);
             else if (_isDesync) UpdateStatusUI(uiLanguage == "uk" ? "РОЗСИНХРОН: ГРА ≠ TB" : "DESYNC: GAME ≠ TB", Brushes.Red, false);
-            else if (_isRecordingBroken) UpdateStatusUI(LocalizeStatus("TB_ERROR_CHECK"), Brushes.Red, false);
+            else if (_isRecordingBroken && _telHasJobInfo) UpdateStatusUI(LocalizeStatus("TB_ERROR_CHECK"), Brushes.Red, false);
             else if (_forceProfileUnloaded) UpdateStatusUI(LocalizeStatus("PROFILE_MENU"), Brushes.Orange, false); // Показываем, что мы вышли из профиля
             else if ((_deliveredIndicatorUntil > DateTime.Now || _deliveredFromLogUntil > DateTime.Now) && isPaused && !_telHasActiveJob) UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), false);
             else if (_telHasActiveJob && !_tbHasActiveJob && _tbSaysNoJob) UpdateStatusUI(LocalizeStatus("KM_NOT_REC"), Brushes.Red, false);
@@ -903,6 +947,7 @@ namespace ETSOverlay
             }
             else if (isPaused && _telHasActiveJob) UpdateStatusUI(uiLanguage == "uk" ? "ПАУЗА (Меню)" : "PAUSED (Menu)", Brushes.Yellow, false);
             else if (_tbHasActiveJob) UpdateStatusUI(LocalizeStatus("RECORDING_KM"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), true);
+            else if (_awaitingTbUpload) UpdateStatusUI(LocalizeStatus("WAIT_TB_UPLOAD"), Brushes.Orange, false);
             else UpdateStatusUI(LocalizeStatus("WAIT_TB"), Brushes.Orange, false);
 
             if (StatusValue.Text != oldStatus)
@@ -1223,6 +1268,7 @@ namespace ETSOverlay
             ApplyLanguageSelection();
             ApplyLocalization();
             ApplyVisibilitySettings();
+            UpdateSpeedWarningText();
         }
 
         private void ResetDisplay(bool clearJobState = true)
@@ -1315,6 +1361,87 @@ namespace ETSOverlay
             SaveState();
         }
 
+        private int CurrentSpeedWarning
+        {
+            get => _currentGame == GameType.Ats ? _speedWarningAts : _speedWarningEts;
+            set
+            {
+                if (_currentGame == GameType.Ats)
+                {
+                    _speedWarningAts = value;
+                }
+                else
+                {
+                    _speedWarningEts = value;
+                }
+            }
+        }
+
+        private void UpdateSpeedWarningText()
+        {
+            if (SpeedWarningBox == null) return;
+            _suppressSpeedWarningChange = true;
+            SpeedWarningBox.Text = Math.Max(0, CurrentSpeedWarning).ToString();
+            _suppressSpeedWarningChange = false;
+        }
+
+        private void SpeedWarningBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        {
+            if (_suppressSpeedWarningChange || !IsLoaded) return;
+
+            if (!int.TryParse(SpeedWarningBox.Text, out var value))
+            {
+                return;
+            }
+
+            value = Math.Max(0, value);
+            if (CurrentSpeedWarning != value)
+            {
+                CurrentSpeedWarning = value;
+                SaveGameState(_currentGame);
+            }
+            ApplySpeedWarningColor();
+        }
+
+        private void SpeedWarningUp_Click(object sender, RoutedEventArgs e)
+        {
+            int value = Math.Max(0, CurrentSpeedWarning + 1);
+            CurrentSpeedWarning = value;
+            UpdateSpeedWarningText();
+            SaveGameState(_currentGame);
+            ApplySpeedWarningColor();
+        }
+
+        private void SpeedWarningDown_Click(object sender, RoutedEventArgs e)
+        {
+            int value = Math.Max(0, CurrentSpeedWarning - 1);
+            CurrentSpeedWarning = value;
+            UpdateSpeedWarningText();
+            SaveGameState(_currentGame);
+            ApplySpeedWarningColor();
+        }
+
+        private void ApplySpeedWarningColor()
+        {
+            if (int.TryParse(SpeedValue.Text, out var speed))
+            {
+                ApplySpeedWarningColor(speed);
+            }
+        }
+
+        private void ApplySpeedWarningColor(int currentSpeed)
+        {
+            int threshold = Math.Max(0, CurrentSpeedWarning);
+            if (threshold > 0 && currentSpeed >= threshold)
+            {
+                SpeedValue.Foreground = Brushes.Red;
+            }
+            else
+            {
+                SpeedValue.Foreground = Brushes.White;
+            }
+        }
+
         private void LanguageSelector_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
         {
             if (!IsLoaded) return;
@@ -1353,6 +1480,7 @@ namespace ETSOverlay
             ChkShowBottomInfo.Content = isUk ? "Показувати швидкість і тип доставки" : "Show speed and delivery type";
             ChkShowRoute.Content = isUk ? "Показувати маршрут" : "Show route";
             ChkShowProgress.Content = isUk ? "Показувати прогрес-бар" : "Show progress bar";
+            SpeedWarningLabel.Text = isUk ? "Поріг швидкості" : "Speed warning";
 
             StatusLabel.Text = isUk ? "Статус: " : "Status: ";
             SpeedHeader.Text = isUk ? "ШВИДКІСТЬ" : "SPEED";
@@ -1364,6 +1492,25 @@ namespace ETSOverlay
             UpdateDeliveryTypeUI(0);
             UpdateDistanceInfoForLanguage();
             UpdateStatusTextForLanguage();
+            UpdateRouteForLanguage();
+        }
+
+        private void UpdateRouteForLanguage()
+        {
+            if (string.IsNullOrWhiteSpace(Route.Text)) return;
+
+            if (Route.Text == "ROUTE: NOT DEFINED" || Route.Text == "МАРШРУТ: НЕ ВИЗНАЧЕНО")
+            {
+                Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED";
+                return;
+            }
+
+            var match = Regex.Match(Route.Text, @"^(?<from>.+?)\s*->\s*(?<to>.+)$");
+            if (!match.Success) return;
+
+            var from = match.Groups["from"].Value.Trim();
+            var to = match.Groups["to"].Value.Trim();
+            Route.Text = $"{GetLocalizedCity(from).ToUpper()} -> {GetLocalizedCity(to).ToUpper()}";
         }
 
         private string LocalizeStatus(string key)
@@ -1384,6 +1531,7 @@ namespace ETSOverlay
                 "DESYNC" => isUk ? "РОЗСИНХРОН!" : "DESYNC ALERT!",
                 "FREE_ROAM" => isUk ? "ВІЛЬНИЙ РЕЖИМ" : "Free Roam",
                 "WAIT_TB" => isUk ? "Очікування TB..." : "Waiting for TB...",
+                "WAIT_TB_UPLOAD" => isUk ? "Очікування відправки замовлення..." : "Waiting for order upload...",
                 "DRIVING_TO_PICKUP" => isUk ? "Їду за вантажем..." : "Driving to pickup...",
                 "TRAILER_DETACHED" => isUk ? "Причеп від'єднано!" : "Trailer detached!",
                 "RECORDING_KM" => isUk ? "Запис кілометрів" : "Recording km",
@@ -1413,6 +1561,7 @@ namespace ETSOverlay
                 "PAUSED (Menu)" => uiLanguage == "uk" ? "ПАУЗА (Меню)" : status,
                 "Recording km" => LocalizeStatus("RECORDING_KM"),
                 "Waiting for TB..." => LocalizeStatus("WAIT_TB"),
+                "Waiting for order upload..." => LocalizeStatus("WAIT_TB_UPLOAD"),
                 "KM NOT REC (TB)" => LocalizeStatus("KM_NOT_REC"),
                 "DELIVERED" => LocalizeStatus("DELIVERED"),
                 _ => status
@@ -1545,6 +1694,7 @@ namespace ETSOverlay
 
             SpeedUnit.Text = GetSpeedUnitText();
             MaxUnit.Text = GetSpeedUnitText();
+            UpdateSpeedWarningText();
             UpdateDistanceInfoForLanguage();
             _awaitingTelemetryJob = true;
             LoadCurrentGameJobState();
@@ -1585,6 +1735,59 @@ namespace ETSOverlay
             return $"0 / 0 {GetDistanceUnitShort()}";
         }
 
+        private void LoadCityTranslations()
+        {
+            try
+            {
+                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "city_translations_uk.json");
+                if (!File.Exists(path))
+                {
+                    WriteLog($"City translations not found: {path}");
+                    return;
+                }
+
+                var json = File.ReadAllText(path);
+                var data = JsonSerializer.Deserialize<CityTranslationFile>(json);
+                if (data == null)
+                {
+                    WriteLog("City translations file is empty or invalid.");
+                    return;
+                }
+
+                _ets2CityTranslations.Clear();
+                _atsCityTranslations.Clear();
+
+                foreach (var entry in data.Ets2)
+                {
+                    if (!string.IsNullOrWhiteSpace(entry.English) && !string.IsNullOrWhiteSpace(entry.Ukrainian))
+                    {
+                        _ets2CityTranslations[entry.English] = entry.Ukrainian;
+                    }
+                }
+
+                foreach (var entry in data.Ats)
+                {
+                    if (!string.IsNullOrWhiteSpace(entry.English) && !string.IsNullOrWhiteSpace(entry.Ukrainian))
+                    {
+                        _atsCityTranslations[entry.English] = entry.Ukrainian;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"Failed to load city translations: {ex.Message}");
+            }
+        }
+
+        private string GetLocalizedCity(string? city)
+        {
+            if (string.IsNullOrWhiteSpace(city)) return city ?? string.Empty;
+            if (uiLanguage != "uk") return city;
+
+            var translations = _currentGame == GameType.Ats ? _atsCityTranslations : _ets2CityTranslations;
+            return translations.TryGetValue(city, out var translated) ? translated : city;
+        }
+
         private string GetJobStateKey(string jobId)
         {
             if (string.IsNullOrWhiteSpace(jobId)) return jobId;
@@ -1614,6 +1817,7 @@ namespace ETSOverlay
                     LastJobId = game == GameType.Ats ? _lastJobIdAts : _lastJobIdEts,
                     TbJobId = game == GameType.Ats ? _tbJobIdAts : _tbJobIdEts,
                     LastDeliveredJobId = game == GameType.Ats ? _lastDeliveredJobIdAts : _lastDeliveredJobIdEts,
+                    SpeedWarning = game == GameType.Ats ? _speedWarningAts : _speedWarningEts,
                     // ВАЖНО: Сохраняем только активные заказы (с загруженным грузом)
                     JobStates = _jobStates
                         .Where(kvp => kvp.Key.StartsWith(game == GameType.Ats ? "ats:" : "ets:", StringComparison.Ordinal) && kvp.Value.CargoWasLoaded)
@@ -1644,12 +1848,14 @@ namespace ETSOverlay
                     _lastJobIdAts = state.LastJobId ?? "";
                     _tbJobIdAts = state.TbJobId ?? "";
                     _lastDeliveredJobIdAts = state.LastDeliveredJobId ?? "";
+                    _speedWarningAts = Math.Max(0, state.SpeedWarning);
                 }
                 else
                 {
                     _lastJobIdEts = state.LastJobId ?? "";
                     _tbJobIdEts = state.TbJobId ?? "";
                     _lastDeliveredJobIdEts = state.LastDeliveredJobId ?? "";
+                    _speedWarningEts = Math.Max(0, state.SpeedWarning);
                 }
 
                 if (state.JobStates != null)
