@@ -155,11 +155,11 @@
                     </StackPanel>
 
                     <!-- MAX Value -->
-                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Vertical" VerticalAlignment="Bottom" HorizontalAlignment="Center">
-                        <TextBlock x:Name="MaxSpeedValue" Text="0" Foreground="#F39C12" FontSize="36" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,-10"/>
-                        <TextBlock x:Name="MaxUnit" Text="km/h" Foreground="White" FontSize="12"/>
+                    <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Vertical" VerticalAlignment="Bottom" HorizontalAlignment="Center" Width="80">
+                        <TextBlock x:Name="MaxSpeedValue" Text="0" Foreground="#F39C12" FontSize="36" FontWeight="Bold" TextAlignment="Center" HorizontalAlignment="Stretch" Margin="0,0,0,-6"/>
+                        <TextBlock x:Name="MaxUnit" Text="km/h" Foreground="White" FontSize="12" TextAlignment="Center" HorizontalAlignment="Stretch"/>
                     </StackPanel>
-
+                    
                     <!-- TYPE Value -->
                     <TextBlock Grid.Row="1" Grid.Column="2" x:Name="DeliveryType" Text="N/A" Foreground="#52C14F" FontSize="26" FontWeight="Heavy" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="57,0,0,0"/>
                 </Grid>
