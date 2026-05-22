@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/icon.png" width="100" />
+</p>
+
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
@@ -5,9 +9,13 @@
 </p>
 
 <p align="center">
-  <a href="https://trucksim.maksym.uk">Website</a> •
-  <a href="https://github.com/TheVarmax/TruckSim-Widget/releases">Download</a> •
-  <a href="https://send.monobank.ua/8Q2FKkJr3B">Donate</a>
+  🚛 Live telemetry • 📦 Delivery tracking • 📊 TrucksBook integration
+</p>
+
+<p align="center">
+  <a href="https://trucksim.maksym.uk">🌐 Website</a> •
+  <a href="https://github.com/TheVarmax/TruckSim-Widget/releases">⬇️ Download</a> •
+  <a href="https://send.monobank.ua/8Q2FKkJr3B">❤️ Donate</a>
 </p>
 
 <p align="center">
@@ -15,6 +23,7 @@
   <img src="https://img.shields.io/github/downloads/TheVarmax/TruckSim-Widget/total?style=for-the-badge">
   <img src="https://img.shields.io/github/license/TheVarmax/TruckSim-Widget?style=for-the-badge">
 </p>
+
 
 ---
 
