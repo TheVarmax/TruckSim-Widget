@@ -34,11 +34,16 @@
   </ItemGroup>
 
   <!-- Build and copy updater.exe to output directory -->
-  <Target Name="BuildAndCopyUpdater" AfterTargets="Build">
+  <Target Name="BuildAndCopyUpdater" AfterTargets="Build;Publish">
     <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) --nologo -v q"
           ContinueOnError="true" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\$(TargetFramework)\updater.exe"
           DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\$(TargetFramework)\updater.exe"
+          DestinationFolder="$(PublishDir)"
+          Condition="'$(PublishDir)' != ''"
           SkipUnchangedFiles="true"
           ContinueOnError="true" />
   </Target>

@@ -2081,13 +2081,63 @@ namespace ETSOverlay
             }
         }
 
+        private DateTime _lastUpdateCheck = DateTime.MinValue;
+        private bool _isCooldownActive = false;
+
+        private async void StartCooldownTimer()
+        {
+            if (_isCooldownActive) return;
+            _isCooldownActive = true;
+            
+            try
+            {
+                Dispatcher.Invoke(() => BtnCheckUpdate.IsEnabled = false);
+                
+                while (true)
+                {
+                    double elapsed = (DateTime.Now - _lastUpdateCheck).TotalSeconds;
+                    if (elapsed >= 30) break;
+                    
+                    int remaining = (int)Math.Ceiling(30 - elapsed);
+                    Dispatcher.Invoke(() =>
+                    {
+                        BtnCheckUpdate.Content = uiLanguage == "uk" 
+                            ? $"⏳ {remaining} сек." 
+                            : $"⏳ {remaining} sec";
+                    });
+                    
+                    await Task.Delay(500);
+                }
+                
+                Dispatcher.Invoke(() =>
+                {
+                    BtnCheckUpdate.IsEnabled = true;
+                    BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Green (#43A047)
+                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                });
+            }
+            catch { }
+            finally
+            {
+                _isCooldownActive = false;
+            }
+        }
+
         /// <summary>
         /// Проверяет наличие обновлений через GitHub API
         /// </summary>
         private async Task CheckForUpdatesAsync(bool silent)
         {
-            if (_isCheckingUpdate || _isDownloadingUpdate) return;
+            if (_isCheckingUpdate || _isDownloadingUpdate || _isCooldownActive) return;
+            
+            // Защита от лимитов GitHub API (60 запросов в час)
+            // При тихой проверке (старт приложения) проверяем не чаще раз в 15 минут
+            if (silent && (DateTime.Now - _lastUpdateCheck).TotalMinutes < 15) return;
+            // При ручной проверке обрабатывается через StartCooldownTimer (кнопка заблокирована)
+
             _isCheckingUpdate = true;
+            bool isError = false;
+            _lastUpdateCheck = DateTime.Now;
 
             try
             {
@@ -2182,6 +2232,7 @@ namespace ETSOverlay
             }
             catch (Exception ex)
             {
+                isError = true;
                 WriteLog($"Update check failed: {ex.Message}");
                 if (!silent)
                 {
@@ -2191,17 +2242,40 @@ namespace ETSOverlay
                         UpdateStatusText.Text = uiLanguage == "uk"
                             ? "❌ Помилка перевірки оновлень"
                             : "❌ Update check failed";
+                            
+                        BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(211, 47, 47)); // Red
                     });
                 }
             }
             finally
             {
                 _isCheckingUpdate = false;
-                Dispatcher.Invoke(() =>
+                
+                if (!isError)
                 {
-                    BtnCheckUpdate.IsEnabled = true;
-                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
-                });
+                    _lastUpdateCheck = DateTime.Now;
+                    if (!silent) 
+                    {
+                        StartCooldownTimer();
+                    }
+                    else
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            BtnCheckUpdate.IsEnabled = true;
+                            BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Green
+                            BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                        });
+                    }
+                }
+                else
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        BtnCheckUpdate.IsEnabled = true;
+                        BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                    });
+                }
             }
         }
 

@@ -227,7 +227,7 @@
                             </Grid.ColumnDefinitions>
                             
                             <Button x:Name="BtnCheckUpdate" Grid.Column="0" Content="🔄 Check for updates" Click="BtnCheckUpdate_Click"
-                                    Background="#33FFFFFF" Foreground="White" BorderThickness="0"
+                                    Background="#43A047" Foreground="White" BorderThickness="0"
                                     Height="32" HorizontalAlignment="Stretch" Cursor="Hand">
                                 <Button.Template>
                                     <ControlTemplate TargetType="Button">
@@ -236,10 +236,10 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="#55FFFFFF"/>
+                                                <Setter TargetName="border" Property="Opacity" Value="0.85"/>
                                             </Trigger>
                                             <Trigger Property="IsEnabled" Value="False">
-                                                <Setter TargetName="border" Property="Background" Value="#22FFFFFF"/>
+                                                <Setter TargetName="border" Property="Background" Value="#2A2C31"/>
                                                 <Setter Property="Foreground" Value="#888888"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
@@ -257,7 +257,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="#FFCC29"/>
+                                                <Setter TargetName="border" Property="Opacity" Value="0.85"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
