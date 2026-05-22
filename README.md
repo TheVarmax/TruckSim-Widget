@@ -22,7 +22,7 @@
 <p align="center">
   <a href="https://github.com/TheVarmax/TruckSim-Widget/releases"><img src="https://img.shields.io/github/v/release/TheVarmax/TruckSim-Widget?style=flat-square" /></a>
   <a href="https://github.com/TheVarmax/TruckSim-Widget/releases"><img src="https://img.shields.io/github/downloads/TheVarmax/TruckSim-Widget/total?style=flat-square" /></a>
-  <a href="https://github.com/TheVarmax/TruckSim-Widget/blob/main/LICENSE"><img src="https://img.shields.io/github/license/TheVarmax/TruckSim-Widget?style=flat-square" /></a>
+  <a href="https://github.com/TheVarmax/TruckSim-Widget/blob/master/LICENSE"><img src="https://img.shields.io/github/license/TheVarmax/TruckSim-Widget?style=flat-square" /></a>
 </p>
 
 ---
