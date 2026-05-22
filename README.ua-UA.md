@@ -4,7 +4,7 @@
 
 <p align="center">
   <sub>
-    🌐 Change language →
+    🌐 Змінити мову →
     <a href="README.md">🇺🇸 EN</a>
   </sub>
 </p>
