@@ -4,9 +4,8 @@
 
 <p align="center">
   <sub>
-    🌐 Language:
-    <a href="README.md">🇺🇸 EN</a> |
-    <a href="README_UA.md">🇺🇦 UA</a>
+    🌐 Change language →
+    <a href="README.ua-UA.md">🇺🇦 UA</a>
   </sub>
 </p>
 
