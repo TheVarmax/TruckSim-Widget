@@ -25,3 +25,10 @@ City translation is currently in beta. Some cities may contain incorrect transla
      (If the `plugins` folder doesn't exist, just create it.)
 3. Launch **Euro Truck Simulator 2** or **American Truck Simulator**.
 4. Start **TruckSim Widget** to see the overlay in game.
+
+## Support the project
+
+TruckSim Widget is developed in free time and completely free to use.  
+If you enjoy the project and want to support future updates, bug fixes, and new features, you can donate here ❤️
+
+☕ [Support via Monobank](https://send.monobank.ua/8Q2FKkJr3B)
