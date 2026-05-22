@@ -26,6 +26,8 @@ City translation is currently in beta. Some cities may contain incorrect transla
 3. Launch **Euro Truck Simulator 2** or **American Truck Simulator**.
 4. Start **TruckSim Widget** to see the overlay in game.
 
+---
+
 ## Support the project
 
 TruckSim Widget is developed in free time and completely free to use.  
