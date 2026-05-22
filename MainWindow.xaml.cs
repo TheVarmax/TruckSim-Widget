@@ -1,11 +1,15 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Net.Http;
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -23,6 +27,13 @@ namespace ETSOverlay
             Ets,
             Ats
         }
+
+        // Auto-update constants
+        private const string GitHubApiUrl = "https://api.github.com/repos/TheVarmax/TruckSim-Widget/releases/latest";
+        private const string DonateUrl = "https://donate.maksym.uk";
+        private const string SupportEmail = "info@maksym.uk";
+        private bool _isCheckingUpdate = false;
+        private bool _isDownloadingUpdate = false;
 
         private bool locked = false;
         private DispatcherTimer? tbTimer;
@@ -188,6 +199,12 @@ namespace ETSOverlay
             tbTimer.Interval = TimeSpan.FromSeconds(1);
             tbTimer.Tick += (s, e) => { CheckStatusAndProcesses(); };
             tbTimer.Start();
+
+            // Display version in settings
+            VersionLabel.Text = $"v{GetCurrentVersion()}";
+
+            // Auto-check for updates on startup (silent mode)
+            _ = CheckForUpdatesAsync(silent: true);
         }
 
         // Метод для записи логов
@@ -1482,6 +1499,14 @@ namespace ETSOverlay
             ChkShowProgress.Content = isUk ? "Показувати прогрес-бар" : "Show progress bar";
             SpeedWarningLabel.Text = isUk ? "Поріг швидкості" : "Speed warning";
 
+            // Update button localization
+            if (!_isCheckingUpdate && !_isDownloadingUpdate)
+            {
+                BtnCheckUpdate.Content = isUk ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+            }
+            BtnDonate.Content = isUk ? "💛 Підтримати" : "💛 Donate";
+            VersionLabel.Text = $"v{GetCurrentVersion()}";
+
             StatusLabel.Text = isUk ? "Статус: " : "Status: ";
             SpeedHeader.Text = isUk ? "ШВИДКІСТЬ" : "SPEED";
             MaxHeader.Text = isUk ? "МАКС" : "MAX";
@@ -1985,5 +2010,425 @@ namespace ETSOverlay
         private void BtnTopmost_Click(object sender, RoutedEventArgs e) { Topmost = !Topmost; UpdatePinIcon(); }
         private void UpdatePinIcon() => BtnTopmost.Opacity = Topmost ? 1.0 : 0.4;
         protected override void OnClosed(EventArgs e) { WriteLog("=== OVERLAY CLOSED ==="); SaveState(); telemetry?.Dispose(); base.OnClosed(e); }
+
+        // ==================== AUTO-UPDATE ====================
+
+        /// <summary>
+        /// Получает текущую версию приложения из сборки
+        /// </summary>
+        private static string GetCurrentVersion()
+        {
+            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            if (version == null) return "0.0.0";
+            return $"{version.Major}.{version.Minor}.{version.Build}";
+        }
+
+        /// <summary>
+        /// Извлекает номер версии из тега релиза GitHub (например "v1.0.4-stable" -> "1.0.4")
+        /// </summary>
+        private static string ExtractVersionFromTag(string tag)
+        {
+            if (string.IsNullOrWhiteSpace(tag)) return "0.0.0";
+            var match = Regex.Match(tag, @"(\d+\.\d+\.\d+)");
+            return match.Success ? match.Groups[1].Value : "0.0.0";
+        }
+
+        /// <summary>
+        /// Сравнивает две версии. Возвращает true, если remote новее current
+        /// </summary>
+        private static bool IsNewerVersion(string remote, string current)
+        {
+            try
+            {
+                var remoteParts = remote.Split('.').Select(int.Parse).ToArray();
+                var currentParts = current.Split('.').Select(int.Parse).ToArray();
+
+                for (int i = 0; i < Math.Min(remoteParts.Length, currentParts.Length); i++)
+                {
+                    if (remoteParts[i] > currentParts[i]) return true;
+                    if (remoteParts[i] < currentParts[i]) return false;
+                }
+                return remoteParts.Length > currentParts.Length;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Обработчик кнопки "Проверить обновления" в настройках
+        /// </summary>
+        private void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isCheckingUpdate || _isDownloadingUpdate) return;
+            _ = CheckForUpdatesAsync(silent: false);
+        }
+
+        private void BtnDonate_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = DonateUrl,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"Failed to open donate page: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Проверяет наличие обновлений через GitHub API
+        /// </summary>
+        private async Task CheckForUpdatesAsync(bool silent)
+        {
+            if (_isCheckingUpdate || _isDownloadingUpdate) return;
+            _isCheckingUpdate = true;
+
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    BtnCheckUpdate.IsEnabled = false;
+                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "⏳ Перевірка..." : "⏳ Checking...";
+                    UpdateStatusText.Text = "";
+                });
+
+                WriteLog("Checking for updates...");
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget/" + GetCurrentVersion());
+                client.Timeout = TimeSpan.FromSeconds(15);
+
+                var response = await client.GetStringAsync(GitHubApiUrl);
+                using var doc = JsonDocument.Parse(response);
+                var root = doc.RootElement;
+
+                string tagName = root.GetProperty("tag_name").GetString() ?? "";
+                string releaseName = root.GetProperty("name").GetString() ?? tagName;
+                string remoteVersion = ExtractVersionFromTag(tagName);
+                string currentVersion = GetCurrentVersion();
+
+                WriteLog($"Current version: {currentVersion}, Latest: {remoteVersion} ({tagName})");
+
+                if (IsNewerVersion(remoteVersion, currentVersion))
+                {
+                    // Ищем ZIP-ассет в релизе
+                    string? downloadUrl = null;
+                    string? assetName = null;
+
+                    if (root.TryGetProperty("assets", out var assets))
+                    {
+                        foreach (var asset in assets.EnumerateArray())
+                        {
+                            string name = asset.GetProperty("name").GetString() ?? "";
+                            if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                            {
+                                downloadUrl = asset.GetProperty("browser_download_url").GetString();
+                                assetName = name;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (downloadUrl != null && assetName != null)
+                    {
+                        WriteLog($"Update available: {releaseName}, asset: {assetName}");
+
+                        Dispatcher.Invoke(() =>
+                        {
+                            UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                            UpdateStatusText.Text = uiLanguage == "uk"
+                                ? $"🆕 Доступне оновлення: {releaseName}"
+                                : $"🆕 Update available: {releaseName}";
+                        });
+
+                        // Показываем диалог подтверждения
+                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName);
+                    }
+                    else
+                    {
+                        WriteLog("Update found but no ZIP asset available");
+                        if (!silent)
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(243, 156, 18));
+                                UpdateStatusText.Text = uiLanguage == "uk"
+                                    ? "⚠ Оновлення знайдено, але файл недоступний"
+                                    : "⚠ Update found but file not available";
+                            });
+                        }
+                    }
+                }
+                else
+                {
+                    WriteLog("No updates available");
+                    if (!silent)
+                    {
+                        Dispatcher.Invoke(() =>
+                        {
+                            UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                            UpdateStatusText.Text = uiLanguage == "uk"
+                                ? "✅ У вас остання версія"
+                                : "✅ You have the latest version";
+                        });
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"Update check failed: {ex.Message}");
+                if (!silent)
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        UpdateStatusText.Foreground = Brushes.Red;
+                        UpdateStatusText.Text = uiLanguage == "uk"
+                            ? "❌ Помилка перевірки оновлень"
+                            : "❌ Update check failed";
+                    });
+                }
+            }
+            finally
+            {
+                _isCheckingUpdate = false;
+                Dispatcher.Invoke(() =>
+                {
+                    BtnCheckUpdate.IsEnabled = true;
+                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                });
+            }
+        }
+
+        /// <summary>
+        /// Показывает диалог подтверждения обновления
+        /// </summary>
+        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                string title = uiLanguage == "uk" ? "Оновлення доступне" : "Update Available";
+                string message = uiLanguage == "uk"
+                    ? $"Доступна нова версія: {releaseName}\n\nВстановити оновлення?\n\nПрограма буде закрита для оновлення файлів."
+                    : $"A new version is available: {releaseName}\n\nInstall update?\n\nThe application will close to update files.";
+
+                var result = MessageBox.Show(this, message, title,
+                    MessageBoxButton.YesNo, MessageBoxImage.Information);
+
+                if (result == MessageBoxResult.Yes)
+                {
+                    _ = DownloadAndApplyUpdateAsync(downloadUrl, assetName);
+                }
+            });
+        }
+
+        /// <summary>
+        /// Скачивает ZIP-архив обновления и запускает updater.exe
+        /// </summary>
+        private async Task DownloadAndApplyUpdateAsync(string downloadUrl, string assetName)
+        {
+            if (_isDownloadingUpdate) return;
+            _isDownloadingUpdate = true;
+
+            try
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    BtnCheckUpdate.IsEnabled = false;
+                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "⬇ Завантаження..." : "⬇ Downloading...";
+                    UpdateProgressPanel.Visibility = Visibility.Visible;
+                    UpdateProgressBar.Value = 0;
+                    UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(122, 197, 205));
+                    UpdateStatusText.Text = uiLanguage == "uk" ? "Завантаження оновлення..." : "Downloading update...";
+                });
+
+                // Подготавливаем временную папку
+                string tempDir = Path.Combine(Path.GetTempPath(), "TruckSimWidget_Update");
+                if (Directory.Exists(tempDir))
+                    Directory.Delete(tempDir, true);
+                Directory.CreateDirectory(tempDir);
+
+                string zipPath = Path.Combine(tempDir, assetName);
+
+                WriteLog($"Downloading update from: {downloadUrl}");
+                WriteLog($"Saving to: {zipPath}");
+
+                // Скачиваем с отображением прогресса
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget/" + GetCurrentVersion());
+                client.Timeout = TimeSpan.FromMinutes(10);
+
+                using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
+                response.EnsureSuccessStatusCode();
+
+                long totalBytes = response.Content.Headers.ContentLength ?? -1;
+                long downloadedBytes = 0;
+
+                using var contentStream = await response.Content.ReadAsStreamAsync();
+                using var fileStream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+
+                var buffer = new byte[8192];
+                int bytesRead;
+                DateTime lastProgressUpdate = DateTime.Now;
+
+                while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                {
+                    await fileStream.WriteAsync(buffer, 0, bytesRead);
+                    downloadedBytes += bytesRead;
+
+                    // Обновляем прогресс-бар не чаще раза в 100ms
+                    if ((DateTime.Now - lastProgressUpdate).TotalMilliseconds > 100)
+                    {
+                        lastProgressUpdate = DateTime.Now;
+                        if (totalBytes > 0)
+                        {
+                            double progress = (double)downloadedBytes / totalBytes * 100;
+                            Dispatcher.Invoke(() =>
+                            {
+                                UpdateProgressBar.Value = progress;
+                                string sizeMb = (downloadedBytes / 1024.0 / 1024.0).ToString("F1");
+                                string totalMb = (totalBytes / 1024.0 / 1024.0).ToString("F1");
+                                UpdateStatusText.Text = uiLanguage == "uk"
+                                    ? $"Завантаження: {sizeMb} / {totalMb} MB ({progress:F0}%)"
+                                    : $"Downloading: {sizeMb} / {totalMb} MB ({progress:F0}%)";
+                            });
+                        }
+                    }
+                }
+
+                Dispatcher.Invoke(() =>
+                {
+                    UpdateProgressBar.Value = 100;
+                    UpdateStatusText.Text = uiLanguage == "uk" ? "Запуск оновлення..." : "Starting update...";
+                });
+
+                WriteLog($"Download complete: {downloadedBytes} bytes");
+
+                // Проверяем, что updater.exe существует
+                string updaterPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "updater.exe");
+                if (!File.Exists(updaterPath))
+                {
+                    // Если updater.exe не найден в папке приложения, пробуем рядом с exe
+                    string? exeDir = Path.GetDirectoryName(Environment.ProcessPath);
+                    if (exeDir != null)
+                        updaterPath = Path.Combine(exeDir, "updater.exe");
+                }
+
+                if (!File.Exists(updaterPath))
+                {
+                    throw new FileNotFoundException(
+                        uiLanguage == "uk"
+                            ? "updater.exe не знайдено. Переконайтеся, що файл знаходиться в папці програми."
+                            : "updater.exe not found. Make sure the file is in the application folder.");
+                }
+
+                string appDir = AppDomain.CurrentDomain.BaseDirectory;
+                string appExe = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
+                string logPath = appLogFilePath;
+
+                WriteLog($"Launching updater: {updaterPath}");
+                WriteLog($"Args: \"{zipPath}\" \"{appDir}\" \"{appExe}\" \"{logPath}\"");
+
+                // Запускаем updater.exe
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = updaterPath,
+                    Arguments = $"\"{zipPath}\" \"{appDir}\" \"{appExe}\" \"{logPath}\"",
+                    UseShellExecute = false
+                });
+
+                WriteLog("Updater launched, shutting down for update...");
+
+                // Закрываем приложение
+                Dispatcher.Invoke(() =>
+                {
+                    SaveState();
+                    telemetry?.Dispose();
+                    Application.Current.Shutdown();
+                });
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"Update download/apply failed: {ex.Message}");
+
+                Dispatcher.Invoke(() =>
+                {
+                    UpdateProgressPanel.Visibility = Visibility.Collapsed;
+                    UpdateStatusText.Foreground = Brushes.Red;
+                    UpdateStatusText.Text = uiLanguage == "uk"
+                        ? $"❌ Помилка оновлення: {ex.Message}"
+                        : $"❌ Update error: {ex.Message}";
+                    BtnCheckUpdate.IsEnabled = true;
+                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+
+                    ShowUpdateErrorDialog(ex.Message);
+                });
+            }
+            finally
+            {
+                _isDownloadingUpdate = false;
+            }
+        }
+
+        /// <summary>
+        /// Показывает диалог ошибки обновления с кнопками копирования почты и сохранения лога
+        /// </summary>
+        private void ShowUpdateErrorDialog(string errorMessage)
+        {
+            bool isUk = uiLanguage == "uk";
+            string title = isUk ? "Помилка оновлення" : "Update Error";
+            string body = isUk
+                ? $"Під час оновлення виникла помилка:\n{errorMessage}\n\n" +
+                  $"Будь ласка, надішліть лог на {SupportEmail}\n\n" +
+                  $"Скопіювати email у буфер обміну?"
+                : $"An error occurred during update:\n{errorMessage}\n\n" +
+                  $"Please send the log to {SupportEmail}\n\n" +
+                  $"Copy email to clipboard?";
+
+            var result = MessageBox.Show(this, body, title,
+                MessageBoxButton.YesNo, MessageBoxImage.Error);
+
+            if (result == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    Clipboard.SetText(SupportEmail);
+                    string copied = isUk ? "Email скопійовано!" : "Email copied!";
+                    UpdateStatusText.Text = $"📋 {copied}";
+                }
+                catch { }
+
+                // Предлагаем сохранить лог
+                try
+                {
+                    var dialog = new Microsoft.Win32.SaveFileDialog
+                    {
+                        Filter = isUk ? "Текстові файли (*.txt)|*.txt|Усі файли (*.*)|*.*"
+                                      : "Text files (*.txt)|*.txt|All files (*.*)|*.*",
+                        FileName = "trucksim_widget_log.txt",
+                        Title = isUk ? "Зберегти лог" : "Save log file"
+                    };
+
+                    if (dialog.ShowDialog(this) == true)
+                    {
+                        if (File.Exists(appLogFilePath))
+                        {
+                            File.Copy(appLogFilePath, dialog.FileName, overwrite: true);
+                            string saved = isUk ? "Лог збережено!" : "Log saved!";
+                            UpdateStatusText.Text = $"💾 {saved}";
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"Failed to save log copy: {ex.Message}");
+                }
+            }
+        }
     }
 }

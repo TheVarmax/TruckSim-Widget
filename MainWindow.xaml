@@ -1,4 +1,4 @@
-﻿<Window x:Class="ETSOverlay.MainWindow"
+<Window x:Class="ETSOverlay.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="TruckSim Widget"
@@ -173,6 +173,8 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock x:Name="SettingsTitle" Grid.Row="0" Text="SETTINGS" Foreground="White" FontSize="18" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,20"/>
@@ -215,7 +217,78 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <Button x:Name="SettingsDoneButton" Grid.Row="2" Content="Done" Click="BtnCloseSettings_Click" Background="#33FFFFFF" Foreground="White" BorderThickness="0" Height="30" Width="100" HorizontalAlignment="Center" Cursor="Hand">
+                    <!-- Update Section -->
+                    <StackPanel Grid.Row="2" Margin="0,0,0,15">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <Button x:Name="BtnCheckUpdate" Grid.Column="0" Content="🔄 Check for updates" Click="BtnCheckUpdate_Click"
+                                    Background="#33FFFFFF" Foreground="White" BorderThickness="0"
+                                    Height="32" HorizontalAlignment="Stretch" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="3">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#55FFFFFF"/>
+                                            </Trigger>
+                                            <Trigger Property="IsEnabled" Value="False">
+                                                <Setter TargetName="border" Property="Background" Value="#22FFFFFF"/>
+                                                <Setter Property="Foreground" Value="#888888"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+
+                            <Button x:Name="BtnDonate" Grid.Column="2" Content="💛 Donate" Click="BtnDonate_Click"
+                                    Background="#E8BA23" Foreground="Black" BorderThickness="0"
+                                    Height="32" HorizontalAlignment="Stretch" Cursor="Hand" FontWeight="Bold">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="3">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="#FFCC29"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                        
+                        <TextBlock x:Name="UpdateStatusText" Text="" Foreground="#888888"
+                                   FontSize="12" HorizontalAlignment="Center"
+                                   TextWrapping="Wrap" Margin="0,6,0,0"/>
+
+                        <!-- Download Progress -->
+                        <Grid x:Name="UpdateProgressPanel" Visibility="Collapsed" Margin="0,6,0,0">
+                            <Border Background="#2A2C31" CornerRadius="3" Height="8">
+                                <ProgressBar x:Name="UpdateProgressBar" Minimum="0" Maximum="100" Value="0"
+                                             Background="Transparent" Foreground="#52C14F" BorderThickness="0">
+                                    <ProgressBar.Template>
+                                        <ControlTemplate TargetType="ProgressBar">
+                                            <Grid>
+                                                <Border x:Name="PART_Track" Background="Transparent"/>
+                                                <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="3" HorizontalAlignment="Left"/>
+                                            </Grid>
+                                        </ControlTemplate>
+                                    </ProgressBar.Template>
+                                </ProgressBar>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+
+                    <!-- Done Button -->
+                    <Button x:Name="SettingsDoneButton" Grid.Row="3" Content="Done" Click="BtnCloseSettings_Click" Background="#33FFFFFF" Foreground="White" BorderThickness="0" Height="30" Width="100" HorizontalAlignment="Center" Cursor="Hand">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="3">
@@ -229,6 +302,10 @@
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
+
+                    <!-- Version Label -->
+                    <TextBlock x:Name="VersionLabel" Grid.Row="4" Text="" Foreground="#555555"
+                               FontSize="10" HorizontalAlignment="Center" Margin="0,10,0,0"/>
                 </Grid>
             </Border>
         </Grid>
