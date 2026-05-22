@@ -2,6 +2,14 @@
   <img src="assets/icon.png" width="100" />
 </p>
 
+<p align="center">
+  <sub>
+    🌐 Language:
+    <a href="README.md">🇺🇸 EN</a> |
+    <a href="README_UA.md">🇺🇦 UA</a>
+  </sub>
+</p>
+
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
