@@ -12,7 +12,7 @@
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
-  Lightweight, real-time telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator
+  Lightweight, telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator
 </p>
 
 <p align="center">
