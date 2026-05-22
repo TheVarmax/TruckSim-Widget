@@ -12,7 +12,7 @@
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
-  Легкий оверлей телеметрії в реальному часі для Euro Truck Simulator 2 та American Truck Simulator
+  Легкий оверлей телеметрії для Euro Truck Simulator 2 та American Truck Simulator
 </p>
 
 <p align="center">
