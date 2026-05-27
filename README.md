@@ -1,88 +1,143 @@
+<p align="center">
+  <img src="assets/icon.png" width="100" />
+</p>
+
+<p align="center">
+  <sub>
+    🌐 Change language →
+    <a href="README.ua-UA.md">🇺🇦 UA</a>
+  </sub>
+</p>
+
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
-  Lightweight telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator
+  Lightweight, telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator
 </p>
 
 <p align="center">
-  <a href="https://trucksim.maksym.uk">Website</a> •
-  <a href="https://github.com/TheVarmax/TruckSim-Widget/releases">Download</a> •
-  <a href="https://send.monobank.ua/8Q2FKkJr3B">Donate</a>
+  <strong>Live telemetry • Delivery tracking • TrucksBook sync • Minimal overlay</strong>
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/github/v/release/TheVarmax/TruckSim-Widget?style=for-the-badge">
-  <img src="https://img.shields.io/github/downloads/TheVarmax/TruckSim-Widget/total?style=for-the-badge">
-  <img src="https://img.shields.io/github/license/TheVarmax/TruckSim-Widget?style=for-the-badge">
+  <a href="https://trucksim.maksym.uk"><img src="https://img.shields.io/badge/Website-trucksim.maksym.uk-2ea44f?style=flat-square"></a>
+  <a href="https://t.me/thevarmax"><img src="https://img.shields.io/badge/Telegram-@thevarmax-26A5E4?style=flat-square&logo=telegram&logoColor=white"></a>
+  <a href="https://github.com/TheVarmax/TruckSim-Widget/releases"><img src="https://img.shields.io/badge/Download-Latest_Release-5865F2?style=flat-square&logo=github&logoColor=white"></a>
+  <a href="https://send.monobank.ua/8Q2FKkJr3B"><img src="https://img.shields.io/badge/Donate-Monobank-ff5f5f?style=flat-square&logo=buymeacoffee&logoColor=white"></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/TheVarmax/TruckSim-Widget/releases/latest"><img src="https://img.shields.io/github/v/release/TheVarmax/TruckSim-Widget?display_name=release" /></a>
+  <a href="https://github.com/TheVarmax/TruckSim-Widget/releases"><img src="https://img.shields.io/github/downloads/TheVarmax/TruckSim-Widget/total?style=flat-square&color=blue" /></a>
+  <a href="https://github.com/TheVarmax/TruckSim-Widget/blob/master/LICENSE"><img src="https://img.shields.io/github/license/TheVarmax/TruckSim-Widget?style=flat-square" /></a>
 </p>
 
 ---
 
-## 📌 About
+## What is this?
 
-TruckSim Widget is a lightweight overlay for Euro Truck Simulator 2 and American Truck Simulator that shows live driving data from the game.
+TruckSim Widget is a lightweight overlay that runs alongside Euro Truck Simulator 2 and American Truck Simulator.
 
-It displays speed, max speed, route information, delivery status, and progress while recording kilometers with TrucksBook.
-
----
-
-## ✨ Features
-
-- 🚛 Live speed and route information
-- 📦 Delivery progress tracking
-- 📊 TrucksBook kilometer tracking support
-- ⚠️ Configurable speed warning with color alerts
-- 🌍 English to Ukrainian city name localization
-- 🎮 Lightweight in-game overlay
-- 🔄 Built-in auto-updater
+It displays real-time telemetry like speed, route, delivery status, and trip progress while staying minimal and non-intrusive.
 
 ---
 
-## 📝 Notes
+## Features
 
-> City translation is currently in beta.  
-> Some cities may contain incorrect translations or may not be translated yet, since ETS 2 and ATS contain a very large number of cities across all DLCs.
+### 🚛 Live telemetry
+
+Real-time speed, gear, cruise control, and route information.
+
+### 📦 Delivery tracking
+
+Cargo status, distance, ETA, and progress visualization.
+
+### 📊 TrucksBook integration
+
+Automatic kilometer tracking synced with your profile.
+
+### ⚠️ Smart alerts
+
+Configurable speed warnings with visual indicators.
+
+### 🌍 Localization
+
+City name translation (English → Ukrainian, beta).
+
+### 🎮 In-game overlay
+
+Lightweight overlay with minimal performance impact.
+
+### 🔄 Auto updates
+
+Built-in updater keeps the app always up to date.
 
 ---
 
-## 🚀 How to use
+## Installation
 
-1. Make sure the **TrucksBook Client** is installed and running.
+### Requirements
 
-2. Copy the `scs-telemetry.dll` file from your plugin folder into the game's plugins folder:
+* TrucksBook Client (required for mileage tracking)
 
-### Euro Truck Simulator 2
-```text
-..\Steam\steamapps\common\Euro Truck Simulator 2\bin\win_x64\plugins
-````
+### Plugin setup
 
-### American Truck Simulator
+Copy `scs-telemetry.dll` into the game folder:
 
-```text
-..\Steam\steamapps\common\American Truck Simulator\bin\win_x64\plugins
+#### Euro Truck Simulator 2
+
+```
+...\Steam\steamapps\common\Euro Truck Simulator 2\bin\win_x64\plugins
 ```
 
-> If the `plugins` folder doesn't exist, just create it.
+#### American Truck Simulator
 
-3. Launch **Euro Truck Simulator 2** or **American Truck Simulator**
+```
+...\Steam\steamapps\common\American Truck Simulator\bin\win_x64\plugins
+```
 
-4. Start **TruckSim Widget** to see the overlay in game
+If the `plugins` folder does not exist, create it manually.
 
 ---
 
-## ❤️ Support the project
+## Run
 
-TruckSim Widget is developed in free time and completely free to use.
+1. Launch ETS2 or ATS
+2. Start TruckSim Widget
+3. Drive
+4. Enjoy the overlay
 
-If you enjoy the project and want to support future updates, bug fixes, and new features, you can donate here:
+---
 
-☕ **Monobank:**
-https://send.monobank.ua/8Q2FKkJr3B
+## Notes
+
+City localization is still in beta.
+
+Some city names may be missing or inaccurate due to the large amount of DLC content in ETS2 and ATS. Coverage is actively improving.
+
+---
+
+## Philosophy
+
+> Show only what matters. Nothing more.
+
+Minimal, fast, and focused on driving experience.
+
+---
+
+## Support
+
+If you want to support development:
+
+☕ Monobank donation
+[https://send.monobank.ua/8Q2FKkJr3B](https://send.monobank.ua/8Q2FKkJr3B)
 
 ---
 
 <p align="center">
-  Made with ❤️ for the Truck Simulator community
-  <br><br>
-  🌐 https://trucksim.maksym.uk
+  Built with ❤️ for the Truck Simulator community
+</p>
+
+<p align="center">
+  https://trucksim.maksym.uk
 </p>
