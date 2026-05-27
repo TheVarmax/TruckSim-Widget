@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using SCSSdkClient;
 using SCSSdkClient.Object;
@@ -32,8 +33,8 @@ namespace ETSOverlay
         private const string GitHubApiUrl = "https://api.github.com/repos/TheVarmax/TruckSim-Widget/releases/latest";
         private const string DonateUrl = "https://donate.maksym.uk";
         private const string SupportEmail = "info@maksym.uk";
-        private bool _isCheckingUpdate = false;
-        private bool _isDownloadingUpdate = false;
+        public bool _isCheckingUpdate = false;
+        public bool _isDownloadingUpdate = false;
 
         private bool locked = false;
         private DispatcherTimer? tbTimer;
@@ -103,15 +104,21 @@ namespace ETSOverlay
         private int _desyncSeconds = 0;
         private bool _isDesync = false;
 
-        private bool showDistance = true;
-        private bool showBottomInfo = true;
-        private bool showRoute = true;
-        private bool showProgress = true;
+        private string _uiMode = "full";
         private double windowOpacity = 0.85;
         private string uiLanguage = "en";
         private readonly Dictionary<string, string> _ets2CityTranslations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _atsCityTranslations = new(StringComparer.OrdinalIgnoreCase);
         private bool _suppressSpeedWarningChange = false;
+
+        // Settings window
+        private SettingsWindow? _settingsWindow;
+        private double _savedSettingsLeft = double.NaN;
+        private double _savedSettingsTop = double.NaN;
+
+        // UI Scale
+        private const double BASE_SCALE = 1.15; // default "100%" is 15% larger than design
+        private int _uiScale = 100; // user-selected scale percentage
 
         private class JobState
         {
@@ -126,12 +133,15 @@ namespace ETSOverlay
         {
             public double Left { get; set; }
             public double Top { get; set; }
-            public bool ShowDistance { get; set; }
-            public bool ShowBottomInfo { get; set; }
-            public bool ShowRoute { get; set; }
-            public bool ShowProgress { get; set; }
+            public bool ShowDistance { get; set; } = true;
+            public bool ShowBottomInfo { get; set; } = true;
+            public bool ShowRoute { get; set; } = true;
+            public string UIMode { get; set; } = "full";
             public double WindowOpacity { get; set; }
             public string UiLanguage { get; set; } = "en";
+            public double SettingsLeft { get; set; } = double.NaN;
+            public double SettingsTop { get; set; } = double.NaN;
+            public int UiScale { get; set; } = 100;
         }
 
         private class GameState
@@ -152,6 +162,30 @@ namespace ETSOverlay
             public string Ukrainian { get; set; } = "";
         }
 
+        private string _currentRouteText = "NOT DEFINED";
+        private string RouteText
+        {
+            get => _currentRouteText;
+            set
+            {
+                _currentRouteText = value;
+                Route.Text = value;
+                RouteMulti.Text = value;
+                
+                if (value.Length > 24 && value != "ORDER SUSPENDED" && value != "ЗАМОВЛЕННЯ ПРИЗУПИНЕНО" && value != "NOT DEFINED" && value != "НЕ ВИЗНАЧЕНО")
+                {
+                    RouteSingleLineGrid.Visibility = Visibility.Collapsed;
+                    RouteMultiLineGrid.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    RouteSingleLineGrid.Visibility = Visibility.Visible;
+                    RouteMultiLineGrid.Visibility = Visibility.Collapsed;
+                }
+            }
+        }
+
+
         private class CityTranslationFile
         {
             [JsonPropertyName("ets2")]
@@ -165,16 +199,13 @@ namespace ETSOverlay
         {
             InitializeComponent();
 
-            SpeedValue.Width = double.NaN;
-            DeliveryType.Margin = new Thickness(0);
-            DeliveryType.HorizontalAlignment = HorizontalAlignment.Right;
             MainBorder.Opacity = windowOpacity;
 
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string folder = Path.Combine(appData, "TruckSimWidget");
             if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
 
-            stateFilePath = Path.Combine(Environment.CurrentDirectory, "state.dat");
+            stateFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "state.dat");
             appLogFilePath = Path.Combine(folder, "app_log.txt");
 
             WriteLog("=== OVERLAY STARTED ===");
@@ -188,6 +219,7 @@ namespace ETSOverlay
             CheckStatusAndProcesses();
             ApplyLocalization();
             UpdateSpeedWarningText();
+            ApplyScale();
 
             MouseLeftButtonDown += (s, e) => { if (!locked) DragMove(); };
             LocationChanged += (s, e) => { SaveState(); };
@@ -199,9 +231,6 @@ namespace ETSOverlay
             tbTimer.Interval = TimeSpan.FromSeconds(1);
             tbTimer.Tick += (s, e) => { CheckStatusAndProcesses(); };
             tbTimer.Start();
-
-            // Display version in settings
-            VersionLabel.Text = $"v{GetCurrentVersion()}";
 
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
@@ -370,16 +399,17 @@ namespace ETSOverlay
                                     SaveJobState();
                                 }
                                 // ФАЗА 1: Едем за грузом (ещё не брали)
-                                Route.Text = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
-                                DistanceInfo.Text = uiLanguage == "uk" ? "Їду за вантажем..." : "Driving to pickup...";
-                                JobProgressBar.Value = 0;
+                                RouteText = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
+                                DistanceInfo.Text = uiLanguage == "uk" ? "За вантажем..." : "To pickup...";
                             }
                             else
                             {
                                 // ФАЗА 3: Прицеп отцепили / Заказ приостановлен
-                                Route.Text = "ORDER SUSPENDED";
+                                RouteText = uiLanguage == "uk" ? "ЗАМОВЛЕННЯ ПРИЗУПИНЕНО" : "ORDER SUSPENDED";
                                 int drivenInt = Math.Max(0, (int)Math.Round(jobDrivenDistance));
-                                DistanceInfo.Text = $"Trailer detached! ({drivenInt} {GetDistanceUnitShort()} done)";
+                                DistanceInfo.Text = uiLanguage == "uk" 
+                                    ? $"Від'єднано! ({drivenInt} {GetDistanceUnitShort()} пройдено)" 
+                                    : $"Detached! ({drivenInt} {GetDistanceUnitShort()} done)";
                             }
                         }
                         else
@@ -430,12 +460,11 @@ namespace ETSOverlay
                             int remainingInt = Math.Max(0, (int)Math.Floor(remaining));
 
                     DistanceInfo.Text = uiLanguage == "uk"
-                        ? $"{drivenInt} / {totalInt} {GetDistanceUnitShort()} ({remainingInt} залишилось)"
-                        : $"{drivenInt} / {totalInt} {GetDistanceUnitShort()} ({remainingInt} left)";
-                            JobProgressBar.Value = Math.Max(0, Math.Min(1.0, (double)drivenInt / (totalInt > 0 ? totalInt : 1)));
+                        ? $"{drivenInt} / {totalInt} {GetDistanceUnitShort()}"
+                        : $"{drivenInt} / {totalInt} {GetDistanceUnitShort()}";
 
                             if (!string.IsNullOrEmpty(data.JobValues.CitySource))
-                                Route.Text = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
+                                RouteText = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
                         }
                     }
 
@@ -977,25 +1006,23 @@ namespace ETSOverlay
         {
             StatusValue.Text = text;
             StatusValue.Foreground = color ?? Brushes.White;
-            StatusCheckIconContainer.Visibility = showCheck ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void ClearAllJobData()
         {
             maxSpeedKmh = 0; isRace = false; lastPlannedDistance = 0; jobDrivenDistance = 0; _lastTickOdometer = -1; _cargoWasLoaded = false;
-            _lastJobIdEts = ""; _lastJobIdAts = ""; // Очищаем ID тоже
+            _lastJobIdEts = ""; _lastJobIdAts = "";
             _tbJobIdEts = ""; _tbJobIdAts = "";
             _lastDeliveredJobIdEts = ""; _lastDeliveredJobIdAts = "";
             _jobStates.Clear();
-            MaxSpeedValue.Text = "0"; Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED"; DistanceInfo.Text = GetZeroDistanceText(); JobProgressBar.Value = 0;
+            MaxSpeedValue.Text = "0"; RouteText = uiLanguage == "uk" ? "НЕ ВИЗНАЧЕНО" : "NOT DEFINED"; DistanceInfo.Text = GetZeroDistanceText();
             UpdateDeliveryTypeUI(0); SaveState();
         }
 
         private void ClearJobUI()
         {
-            Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED";
+            RouteText = uiLanguage == "uk" ? "НЕ ВИЗНАЧЕНО" : "NOT DEFINED";
             DistanceInfo.Text = GetZeroDistanceText();
-            JobProgressBar.Value = 0;
         }
 
         private void ClearCurrentGameJobData()
@@ -1183,12 +1210,15 @@ namespace ETSOverlay
                 {
                     Left = Left,
                     Top = Top,
-                    ShowDistance = showDistance,
-                    ShowBottomInfo = showBottomInfo,
-                    ShowRoute = showRoute,
-                    ShowProgress = showProgress,
+                    ShowDistance = true,
+                    ShowBottomInfo = true,
+                    ShowRoute = true,
+                    UIMode = _uiMode,
                     WindowOpacity = windowOpacity,
-                    UiLanguage = uiLanguage
+                    UiLanguage = uiLanguage,
+                    SettingsLeft = _settingsWindow?.Left ?? _savedSettingsLeft,
+                    SettingsTop = _settingsWindow?.Top ?? _savedSettingsTop,
+                    UiScale = _uiScale
                 };
 
                 var json = JsonSerializer.Serialize(state);
@@ -1214,15 +1244,18 @@ namespace ETSOverlay
                         {
                             Left = state.Left;
                             Top = state.Top;
-                            showDistance = state.ShowDistance;
-                            showBottomInfo = state.ShowBottomInfo;
-                            showRoute = state.ShowRoute;
-                            showProgress = state.ShowProgress;
+                            _uiMode = state.UIMode ?? "full";
                             windowOpacity = state.WindowOpacity;
                             uiLanguage = string.IsNullOrWhiteSpace(state.UiLanguage) ? "en" : state.UiLanguage;
                             if (windowOpacity <= 0 || windowOpacity > 1)
                             {
                                 windowOpacity = 0.85;
+                            }
+                            // Restore settings window position if available
+                            if (!double.IsNaN(state.SettingsLeft) && !double.IsNaN(state.SettingsTop))
+                            {
+                                _savedSettingsLeft = state.SettingsLeft;
+                                _savedSettingsTop = state.SettingsTop;
                             }
                             // При старте не загружаем сохранённые заказы, только настройки интерфейса.
                         }
@@ -1268,19 +1301,13 @@ namespace ETSOverlay
                         }
                         if (parts.Length >= 8)
                         {
-                            bool.TryParse(parts[6], out showDistance);
-                            bool.TryParse(parts[7], out showBottomInfo);
+                            // Legacy parsing omitted
                         }
                     }
                 }
             }
             catch { }
 
-            ChkShowDistance.IsChecked = showDistance; ChkShowBottomInfo.IsChecked = showBottomInfo;
-            ChkShowRoute.IsChecked = showRoute;
-            ChkShowProgress.IsChecked = showProgress;
-            OpacitySlider.Value = windowOpacity * 100;
-            OpacityValue.Text = $"{(int)Math.Round(windowOpacity * 100)}%";
             MainBorder.Opacity = windowOpacity;
             ApplyLanguageSelection();
             ApplyLocalization();
@@ -1296,7 +1323,8 @@ namespace ETSOverlay
             isProfileLoaded = false;
             GameStatus.Text = LocalizeStatus("GAME_OFFLINE"); 
             GameStatus.Foreground = Brushes.Gray;
-            UpdateStatusUI(uiLanguage == "uk" ? "Очікування гри..." : "Waiting for game...", Brushes.Gray, false);
+            UpdateStatusUI(uiLanguage == "uk" ? "Очікування гри..." : "Wait for game...", Brushes.Gray, false);
+            UpdateSimDisplay();
 
             // ВСЕГДА сбрасываем максимальную скорость при выходе из игры
             maxSpeedKmh = 0; 
@@ -1349,68 +1377,67 @@ namespace ETSOverlay
             }
         }
 
-        private void BtnSettings_Click(object sender, RoutedEventArgs e) => SettingsPanel.Visibility = Visibility.Visible;
-        private void BtnCloseSettings_Click(object sender, RoutedEventArgs e) { SettingsPanel.Visibility = Visibility.Collapsed; SaveState(); }
-        private void Settings_Changed(object sender, RoutedEventArgs e)
+        private void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
-            if (!IsLoaded) return;
-            showDistance = ChkShowDistance.IsChecked == true;
-            showBottomInfo = ChkShowBottomInfo.IsChecked == true;
-            showRoute = ChkShowRoute.IsChecked == true;
-            showProgress = ChkShowProgress.IsChecked == true;
-            ApplyVisibilitySettings();
+            if (_settingsWindow == null)
+            {
+                _settingsWindow = new SettingsWindow(this);
+                _settingsWindow.SetUIMode(_uiMode);
+                _settingsWindow.SetOpacity(windowOpacity * 100);
+                _settingsWindow.SetLanguage(uiLanguage);
+                _settingsWindow.SetSpeedWarningText(Math.Max(0, CurrentSpeedWarning).ToString());
+                _settingsWindow.SetVersionText($"v{GetCurrentVersion()}");
+                _settingsWindow.SetScale(_uiScale);
+                _settingsWindow.UpdateLocalization(uiLanguage == "uk");
+                // Restore saved position if available
+                if (!double.IsNaN(_savedSettingsLeft) && !double.IsNaN(_savedSettingsTop))
+                {
+                    _settingsWindow.Left = _savedSettingsLeft;
+                    _settingsWindow.Top = _savedSettingsTop;
+                }
+            }
+            _settingsWindow.Show();
+            _settingsWindow.Activate();
         }
 
-        private void ApplyVisibilitySettings()
+        private void ApplyScale()
         {
-            DistanceInfo.Visibility = showDistance ? Visibility.Visible : Visibility.Collapsed;
-            BottomInfoGrid.Visibility = showBottomInfo ? Visibility.Visible : Visibility.Collapsed;
-            Route.Visibility = showRoute ? Visibility.Visible : Visibility.Collapsed;
-            ProgressBorder.Visibility = showProgress ? Visibility.Visible : Visibility.Collapsed;
+            double effectiveScale = BASE_SCALE * (_uiScale / 100.0);
+            UIScaleTransform.ScaleX = effectiveScale;
+            UIScaleTransform.ScaleY = effectiveScale;
         }
 
-        private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        public void OnScaleChanged(int scalePercent)
         {
-            if (!IsLoaded) return;
-            windowOpacity = OpacitySlider.Value / 100.0; // Keep opacity mapping linear
-            MainBorder.Opacity = windowOpacity; // 100% means fully opaque
-            OpacityValue.Text = $"{(int)Math.Round(OpacitySlider.Value)}%";
+            _uiScale = scalePercent;
+            ApplyScale();
             SaveState();
         }
 
-        private int CurrentSpeedWarning
+        // Public methods called by SettingsWindow
+        public void OnUIModeChanged(string mode)
         {
-            get => _currentGame == GameType.Ats ? _speedWarningAts : _speedWarningEts;
-            set
-            {
-                if (_currentGame == GameType.Ats)
-                {
-                    _speedWarningAts = value;
-                }
-                else
-                {
-                    _speedWarningEts = value;
-                }
-            }
+            _uiMode = mode;
+            ApplyVisibilitySettings();
+            SaveState();
         }
 
-        private void UpdateSpeedWarningText()
+        public void OnOpacityChanged(double sliderValue)
         {
-            if (SpeedWarningBox == null) return;
-            _suppressSpeedWarningChange = true;
-            SpeedWarningBox.Text = Math.Max(0, CurrentSpeedWarning).ToString();
-            _suppressSpeedWarningChange = false;
+            windowOpacity = sliderValue / 100.0;
+            MainBorder.Opacity = windowOpacity;
+            SaveState();
         }
 
-        private void SpeedWarningBox_TextChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
+        public void OnLanguageChanged(string lang)
         {
-            if (_suppressSpeedWarningChange || !IsLoaded) return;
+            uiLanguage = lang;
+            ApplyLocalization();
+            SaveState();
+        }
 
-            if (!int.TryParse(SpeedWarningBox.Text, out var value))
-            {
-                return;
-            }
-
+        public void OnSpeedWarningChanged(int value)
+        {
             value = Math.Max(0, value);
             if (CurrentSpeedWarning != value)
             {
@@ -1420,68 +1447,63 @@ namespace ETSOverlay
             ApplySpeedWarningColor();
         }
 
-        private void SpeedWarningUp_Click(object sender, RoutedEventArgs e)
+        public void OnSpeedWarningUp()
         {
-            int value = Math.Max(0, CurrentSpeedWarning + 1);
-            CurrentSpeedWarning = value;
-            UpdateSpeedWarningText();
+            CurrentSpeedWarning = Math.Max(0, CurrentSpeedWarning + 1);
+            _settingsWindow?.SetSpeedWarningText(CurrentSpeedWarning.ToString());
             SaveGameState(_currentGame);
             ApplySpeedWarningColor();
         }
 
-        private void SpeedWarningDown_Click(object sender, RoutedEventArgs e)
+        public void OnSpeedWarningDown()
         {
-            int value = Math.Max(0, CurrentSpeedWarning - 1);
-            CurrentSpeedWarning = value;
-            UpdateSpeedWarningText();
+            CurrentSpeedWarning = Math.Max(0, CurrentSpeedWarning - 1);
+            _settingsWindow?.SetSpeedWarningText(CurrentSpeedWarning.ToString());
             SaveGameState(_currentGame);
             ApplySpeedWarningColor();
         }
 
-        private void ApplySpeedWarningColor()
+        public void OnCheckUpdate()
         {
-            if (int.TryParse(SpeedValue.Text, out var speed))
+            if (_isCheckingUpdate || _isDownloadingUpdate) return;
+            _ = CheckForUpdatesAsync(silent: false);
+        }
+
+        public void OnDonate()
+        {
+            try
             {
-                ApplySpeedWarningColor(speed);
+                Process.Start(new ProcessStartInfo { FileName = DonateUrl, UseShellExecute = true });
             }
+            catch (Exception ex) { WriteLog($"Failed to open donate page: {ex.Message}"); }
         }
 
-        private void ApplySpeedWarningColor(int currentSpeed)
+        private void ApplyVisibilitySettings()
         {
-            int threshold = Math.Max(0, CurrentSpeedWarning);
-            if (threshold > 0 && currentSpeed >= threshold)
+            if (_uiMode == "minimal")
             {
-                SpeedValue.Foreground = Brushes.Red;
+                SimCard.Visibility = Visibility.Collapsed;
+                DistanceCard.Visibility = Visibility.Collapsed;
+                RouteCard.Visibility = Visibility.Collapsed;
+                BottomInfoGrid.Visibility = Visibility.Collapsed;
+
+                System.Windows.Controls.Grid.SetRow(StatusCard, 0);
+                System.Windows.Controls.Grid.SetColumn(StatusCard, 2);
+                GameCard.Margin = new Thickness(0);
+                StatusCard.Margin = new Thickness(0);
             }
             else
             {
-                SpeedValue.Foreground = Brushes.White;
-            }
-        }
+                SimCard.Visibility = Visibility.Visible;
+                DistanceCard.Visibility = Visibility.Visible;
+                RouteCard.Visibility = Visibility.Visible;
+                BottomInfoGrid.Visibility = Visibility.Visible;
 
-        private void LanguageSelector_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
-        {
-            if (!IsLoaded) return;
-            if (LanguageSelector.SelectedItem is System.Windows.Controls.ComboBoxItem item && item.Tag is string tag)
-            {
-                uiLanguage = tag;
-                ApplyLocalization();
-                SaveState();
-            }
-        }
-
-        private void ApplyLanguageSelection()
-        {
-            foreach (var item in LanguageSelector.Items)
-            {
-                if (item is System.Windows.Controls.ComboBoxItem comboItem && comboItem.Tag is string tag)
-                {
-                    if (tag == uiLanguage)
-                    {
-                        LanguageSelector.SelectedItem = comboItem;
-                        break;
-                    }
-                }
+                System.Windows.Controls.Grid.SetRow(StatusCard, 1);
+                System.Windows.Controls.Grid.SetColumn(StatusCard, 0);
+                GameCard.Margin = new Thickness(0, 0, 0, 6);
+                SimCard.Margin = new Thickness(0, 0, 0, 6);
+                StatusCard.Margin = new Thickness(0);
             }
         }
 
@@ -1489,53 +1511,49 @@ namespace ETSOverlay
         {
             bool isUk = uiLanguage == "uk";
 
-            SettingsTitle.Text = isUk ? "НАЛАШТУВАННЯ" : "SETTINGS";
-            SettingsDoneButton.Content = isUk ? "Готово" : "Done";
-            LanguageLabel.Text = isUk ? "Мова" : "Language";
-            OpacityLabel.Text = isUk ? "Прозорість" : "Opacity";
-            ChkShowDistance.Content = isUk ? "Показувати пройдену дистанцію" : "Show driving distance";
-            ChkShowBottomInfo.Content = isUk ? "Показувати швидкість і тип доставки" : "Show speed and delivery type";
-            ChkShowRoute.Content = isUk ? "Показувати маршрут" : "Show route";
-            ChkShowProgress.Content = isUk ? "Показувати прогрес-бар" : "Show progress bar";
-            SpeedWarningLabel.Text = isUk ? "Поріг швидкості" : "Speed warning";
-
-            // Update button localization
-            if (!_isCheckingUpdate && !_isDownloadingUpdate)
-            {
-                BtnCheckUpdate.Content = isUk ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
-            }
-            BtnDonate.Content = isUk ? "💛 Підтримати" : "💛 Donate";
-            VersionLabel.Text = $"v{GetCurrentVersion()}";
-
-            StatusLabel.Text = isUk ? "Статус: " : "Status: ";
+            // Main window labels
+            GameLabel.Text = isUk ? "ГРА" : "GAME";
+            SimLabel.Text = isUk ? "СІМ" : "SIM";
+            DistanceLabel.Text = isUk ? "ДИСТАНЦІЯ" : "DISTANCE";
+            StatusLabel.Text = isUk ? "СТАТУС" : "STATUS";
+            RouteLabel.Text = isUk ? "МАРШРУТ" : "ROUTE";
+            RouteLabelMulti.Text = isUk ? "МАРШРУТ" : "ROUTE";
             SpeedHeader.Text = isUk ? "ШВИДКІСТЬ" : "SPEED";
             MaxHeader.Text = isUk ? "МАКС" : "MAX";
             TypeHeader.Text = isUk ? "ТИП" : "TYPE";
             SpeedUnit.Text = GetSpeedUnitText();
             MaxUnit.Text = GetSpeedUnitText();
 
+            // Settings window localization
+            _settingsWindow?.UpdateLocalization(isUk);
+
             UpdateDeliveryTypeUI(0);
             UpdateDistanceInfoForLanguage();
             UpdateStatusTextForLanguage();
             UpdateRouteForLanguage();
+            UpdateSimDisplay();
         }
 
         private void UpdateRouteForLanguage()
         {
-            if (string.IsNullOrWhiteSpace(Route.Text)) return;
+            bool isUk = uiLanguage == "uk";
+            RouteLabel.Text = isUk ? "МАРШРУТ" : "ROUTE";
+            RouteLabelMulti.Text = isUk ? "МАРШРУТ" : "ROUTE";
 
-            if (Route.Text == "ROUTE: NOT DEFINED" || Route.Text == "МАРШРУТ: НЕ ВИЗНАЧЕНО")
+            if (string.IsNullOrWhiteSpace(RouteText)) return;
+
+            if (RouteText == "ROUTE: NOT DEFINED" || RouteText == "МАРШРУТ: НЕ ВИЗНАЧЕНО")
             {
-                Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED";
+                RouteText = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED";
                 return;
             }
 
-            var match = Regex.Match(Route.Text, @"^(?<from>.+?)\s*->\s*(?<to>.+)$");
+            var match = Regex.Match(RouteText, @"^(?<from>.+?)\s*->\s*(?<to>.+)$");
             if (!match.Success) return;
 
             var from = match.Groups["from"].Value.Trim();
             var to = match.Groups["to"].Value.Trim();
-            Route.Text = $"{GetLocalizedCity(from).ToUpper()} -> {GetLocalizedCity(to).ToUpper()}";
+            RouteText = $"{GetLocalizedCity(from).ToUpper()} -> {GetLocalizedCity(to).ToUpper()}";
         }
 
         private string LocalizeStatus(string key)
@@ -1550,22 +1568,22 @@ namespace ETSOverlay
                 "TB_NOT_RECORDING" => isUk ? "TB • НЕ ЗАПИСУЄ" : "TB • NOT RECORDING",
                 "TB_ONLINE" => isUk ? "TB • ОНЛАЙН" : "TB • ONLINE",
                 "GAME_OFFLINE" => isUk ? "ОФЛАЙН" : "OFFLINE",
-                "GAME_ACTIVE" => isUk ? "ГРА: АКТИВНА" : "GAME: ACTIVE",
-                "GAME_START" => isUk ? "ГРА: СТАРТ" : "GAME: START",
+                "GAME_ACTIVE" => isUk ? "АКТИВНА" : "ACTIVE",
+                "GAME_START" => isUk ? "СТАРТ" : "START",
                 "PAUSE" => isUk ? "ПАУЗА" : "PAUSE",
                 "DESYNC" => isUk ? "РОЗСИНХРОН!" : "DESYNC ALERT!",
                 "FREE_ROAM" => isUk ? "ВІЛЬНИЙ РЕЖИМ" : "Free Roam",
-                "WAIT_TB" => isUk ? "Очікування TB..." : "Waiting for TB...",
-                "WAIT_TB_UPLOAD" => isUk ? "Очікування відправки замовлення..." : "Waiting for order upload...",
-                "DRIVING_TO_PICKUP" => isUk ? "Їду за вантажем..." : "Driving to pickup...",
-                "TRAILER_DETACHED" => isUk ? "Причеп від'єднано!" : "Trailer detached!",
+                "WAIT_TB" => isUk ? "Чекаю TB..." : "Wait for TB...",
+                "WAIT_TB_UPLOAD" => isUk ? "Відправка..." : "Uploading...",
+                "DRIVING_TO_PICKUP" => isUk ? "За вантажем..." : "To pickup...",
+                "TRAILER_DETACHED" => isUk ? "Від'єднано!" : "Detached!",
                 "RECORDING_KM" => isUk ? "Запис кілометрів" : "Recording km",
-                "TB_CLOSED_NO_REC" => isUk ? "TB ЗАКРИТИЙ! НЕ ЗАП." : "TB CLOSED! NO REC",
-                "NOT_RECORDING" => isUk ? "НЕ ЗАПИСУЄТЬСЯ!" : "NOT RECORDING!",
-                "TB_ERROR_CHECK" => isUk ? "Помилка TB: Перевірте клієнт" : "TB Error: Check Client",
-                "PROFILE_MENU" => isUk ? "Меню профілю" : "Profile Menu",
+                "TB_CLOSED_NO_REC" => isUk ? "TB ЗАКРИТО" : "TB CLOSED",
+                "NOT_RECORDING" => isUk ? "НЕ ЗАПИСУЄ!" : "NO REC!",
+                "TB_ERROR_CHECK" => isUk ? "Помилка TB" : "TB Error",
+                "PROFILE_MENU" => isUk ? "В меню" : "In Menu",
                 "DELIVERED" => isUk ? "ДОСТАВЛЕНО" : "DELIVERED",
-                "KM_NOT_REC" => isUk ? "КМ НЕ ЗАП (TB)" : "KM NOT REC (TB)",
+                "KM_NOT_REC" => isUk ? "КМ ВТРАЧЕНО (TB)" : "KM LOST (TB)",
                 _ => key
             };
         }
@@ -1575,28 +1593,27 @@ namespace ETSOverlay
             var status = StatusValue.Text;
             StatusValue.Text = status switch
             {
-                "TB CLOSED! NO REC" => LocalizeStatus("TB_CLOSED_NO_REC"),
-                "NOT RECORDING!" => LocalizeStatus("NOT_RECORDING"),
-                "DESYNC: GAME ≠ TB" => uiLanguage == "uk" ? "РОЗСИНХРОН: ГРА ≠ TB" : status,
-                "TB Error: Check Client" => LocalizeStatus("TB_ERROR_CHECK"),
-                "Profile Menu" => LocalizeStatus("PROFILE_MENU"),
-                "Free Roam" => LocalizeStatus("FREE_ROAM"),
-                "Trailer detached!" => LocalizeStatus("TRAILER_DETACHED"),
-                "Driving to pickup..." => LocalizeStatus("DRIVING_TO_PICKUP"),
-                "PAUSED (Menu)" => uiLanguage == "uk" ? "ПАУЗА (Меню)" : status,
-                "Recording km" => LocalizeStatus("RECORDING_KM"),
-                "Waiting for TB..." => LocalizeStatus("WAIT_TB"),
-                "Waiting for order upload..." => LocalizeStatus("WAIT_TB_UPLOAD"),
-                "KM NOT REC (TB)" => LocalizeStatus("KM_NOT_REC"),
-                "DELIVERED" => LocalizeStatus("DELIVERED"),
+                "TB CLOSED! NO REC" or "TB CLOSED" or "TB ЗАКРИТО" or "TB ЗАКРИТИЙ! НЕ ЗАП." => LocalizeStatus("TB_CLOSED_NO_REC"),
+                "NOT RECORDING!" or "NO REC!" or "НЕ ЗАПИСУЄ!" or "НЕ ЗАПИСУЄТЬСЯ!" => LocalizeStatus("NOT_RECORDING"),
+                "DESYNC: GAME ≠ TB" or "РОЗСИНХРОН: ГРА ≠ TB" => uiLanguage == "uk" ? "РОЗСИНХРОН: ГРА ≠ TB" : "DESYNC: GAME ≠ TB",
+                "TB Error: Check Client" or "TB Error" or "Помилка TB" or "Помилка TB: Перевірте клієнт" => LocalizeStatus("TB_ERROR_CHECK"),
+                "Profile Menu" or "In Menu" or "В меню" or "Меню профілю" => LocalizeStatus("PROFILE_MENU"),
+                "Free Roam" or "ВІЛЬНИЙ РЕЖИМ" => LocalizeStatus("FREE_ROAM"),
+                "Trailer detached!" or "Detached!" or "Від'єднано!" or "Причеп від'єднано!" => LocalizeStatus("TRAILER_DETACHED"),
+                "PAUSED (Menu)" or "ПАУЗА (Меню)" => uiLanguage == "uk" ? "ПАУЗА (Меню)" : "PAUSED (Menu)",
+                "Recording km" or "Запис кілометрів" => LocalizeStatus("RECORDING_KM"),
+                "Waiting for TB..." or "Wait for TB..." or "Чекаю TB..." or "Очікування TB..." => LocalizeStatus("WAIT_TB"),
+                "Waiting for order upload..." or "Uploading..." or "Відправка..." or "Очікування відправки замовлення..." => LocalizeStatus("WAIT_TB_UPLOAD"),
+                "KM NOT REC (TB)" or "KM LOST (TB)" or "КМ ВТРАЧЕНО (TB)" or "КМ НЕ ЗАП (TB)" => LocalizeStatus("KM_NOT_REC"),
+                "DELIVERED" or "ДОСТАВЛЕНО" => LocalizeStatus("DELIVERED"),
                 _ => status
             };
 
             GameStatus.Text = GameStatus.Text switch
             {
                 "OFFLINE" => LocalizeStatus("GAME_OFFLINE"),
-                "GAME: ACTIVE" => LocalizeStatus("GAME_ACTIVE"),
-                "GAME: START" => LocalizeStatus("GAME_START"),
+                "ACTIVE" => LocalizeStatus("GAME_ACTIVE"),
+                "START" => LocalizeStatus("GAME_START"),
                 "PAUSE" => LocalizeStatus("PAUSE"),
                 "DESYNC ALERT!" => LocalizeStatus("DESYNC"),
                 _ => GameStatus.Text
@@ -1613,9 +1630,13 @@ namespace ETSOverlay
                 _ => TbStatus.Text
             };
 
-            if (Route.Text == "ROUTE: NOT DEFINED" || Route.Text == "МАРШРУТ: НЕ ВИЗНАЧЕНО")
+            if (RouteText == "NOT DEFINED" || RouteText == "НЕ ВИЗНАЧЕНО")
             {
-                Route.Text = uiLanguage == "uk" ? "МАРШРУТ: НЕ ВИЗНАЧЕНО" : "ROUTE: NOT DEFINED";
+                RouteText = uiLanguage == "uk" ? "НЕ ВИЗНАЧЕНО" : "NOT DEFINED";
+            }
+            else if (RouteText == "ORDER SUSPENDED" || RouteText == "ЗАМОВЛЕННЯ ПРИЗУПИНЕНО")
+            {
+                RouteText = uiLanguage == "uk" ? "ЗАМОВЛЕННЯ ПРИЗУПИНЕНО" : "ORDER SUSPENDED";
             }
 
             if (DistanceInfo.Text == "0 / 0 km" || DistanceInfo.Text == "0 / 0 км")
@@ -1634,23 +1655,31 @@ namespace ETSOverlay
                 return;
             }
 
+            if (DistanceInfo.Text == "To pickup..." || DistanceInfo.Text == "За вантажем...")
+            {
+                DistanceInfo.Text = uiLanguage == "uk" ? "За вантажем..." : "To pickup...";
+                return;
+            }
+
             if (uiLanguage == "uk")
             {
                 DistanceInfo.Text = DistanceInfo.Text
                     .Replace(" km (", " км (")
                     .Replace(" mi (", " миль (")
-                    .Replace(" km ", " км ")
-                    .Replace(" mi ", " миль ")
-                    .Replace(" left)", " залишилось)");
+                    .Replace(" km", " км")
+                    .Replace(" mi", " миль")
+                    .Replace("Detached! ", "Від'єднано! ")
+                    .Replace(" done)", " пройдено)");
             }
             else
             {
                 DistanceInfo.Text = DistanceInfo.Text
                     .Replace(" км (", " km (")
                     .Replace(" миль (", " mi (")
-                    .Replace(" км ", " km ")
-                    .Replace(" миль ", " mi ")
-                    .Replace(" залишилось)", " left)");
+                    .Replace(" км", " km")
+                    .Replace(" миль", " mi")
+                    .Replace("Від'єднано! ", "Detached! ")
+                    .Replace(" пройдено)", " done)");
             }
         }
 
@@ -1721,6 +1750,7 @@ namespace ETSOverlay
             MaxUnit.Text = GetSpeedUnitText();
             UpdateSpeedWarningText();
             UpdateDistanceInfoForLanguage();
+            UpdateSimDisplay();
             _awaitingTelemetryJob = true;
             LoadCurrentGameJobState();
             WriteLog($"Detected game: {_currentGame}");
@@ -1807,10 +1837,21 @@ namespace ETSOverlay
         private string GetLocalizedCity(string? city)
         {
             if (string.IsNullOrWhiteSpace(city)) return city ?? string.Empty;
-            if (uiLanguage != "uk") return city;
 
             var translations = _currentGame == GameType.Ats ? _atsCityTranslations : _ets2CityTranslations;
-            return translations.TryGetValue(city, out var translated) ? translated : city;
+
+            if (uiLanguage == "uk")
+            {
+                // Attempt to find the Ukrainian translation for the given English city (case-insensitive key match)
+                var pair = translations.FirstOrDefault(x => x.Key.Equals(city, StringComparison.OrdinalIgnoreCase));
+                return pair.Value != null ? pair.Value : city;
+            }
+            else
+            {
+                // Attempt to find the English original for the given Ukrainian city (case-insensitive value match)
+                var pair = translations.FirstOrDefault(x => x.Value.Equals(city, StringComparison.OrdinalIgnoreCase));
+                return pair.Key != null ? pair.Key : city;
+            }
         }
 
         private string GetJobStateKey(string jobId)
@@ -2056,30 +2097,7 @@ namespace ETSOverlay
             }
         }
 
-        /// <summary>
-        /// Обработчик кнопки "Проверить обновления" в настройках
-        /// </summary>
-        private void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
-        {
-            if (_isCheckingUpdate || _isDownloadingUpdate) return;
-            _ = CheckForUpdatesAsync(silent: false);
-        }
-
-        private void BtnDonate_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = DonateUrl,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                WriteLog($"Failed to open donate page: {ex.Message}");
-            }
-        }
+        // BtnCheckUpdate_Click and BtnDonate_Click are now handled via public OnCheckUpdate() / OnDonate() methods called from SettingsWindow
 
         private DateTime _lastUpdateCheck = DateTime.MinValue;
         private bool _isCooldownActive = false;
@@ -2091,7 +2109,7 @@ namespace ETSOverlay
             
             try
             {
-                Dispatcher.Invoke(() => BtnCheckUpdate.IsEnabled = false);
+                Dispatcher.Invoke(() => { if (_settingsWindow != null) _settingsWindow.BtnCheckUpdate.IsEnabled = false; });
                 
                 while (true)
                 {
@@ -2101,9 +2119,10 @@ namespace ETSOverlay
                     int remaining = (int)Math.Ceiling(30 - elapsed);
                     Dispatcher.Invoke(() =>
                     {
-                        BtnCheckUpdate.Content = uiLanguage == "uk" 
-                            ? $"⏳ {remaining} сек." 
-                            : $"⏳ {remaining} sec";
+                        if (_settingsWindow != null)
+                            _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" 
+                                ? $"⏳ {remaining} сек." 
+                                : $"⏳ {remaining} sec";
                     });
                     
                     await Task.Delay(500);
@@ -2111,9 +2130,12 @@ namespace ETSOverlay
                 
                 Dispatcher.Invoke(() =>
                 {
-                    BtnCheckUpdate.IsEnabled = true;
-                    BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Green (#43A047)
-                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                    if (_settingsWindow != null)
+                    {
+                        _settingsWindow.BtnCheckUpdate.IsEnabled = true;
+                        _settingsWindow.BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71));
+                        _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                    }
                 });
             }
             catch { }
@@ -2143,9 +2165,12 @@ namespace ETSOverlay
             {
                 Dispatcher.Invoke(() =>
                 {
-                    BtnCheckUpdate.IsEnabled = false;
-                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "⏳ Перевірка..." : "⏳ Checking...";
-                    UpdateStatusText.Text = "";
+                    if (_settingsWindow != null)
+                    {
+                        _settingsWindow.BtnCheckUpdate.IsEnabled = false;
+                        _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "⏳ Перевірка..." : "⏳ Checking...";
+                        _settingsWindow.UpdateStatusText.Text = "";
+                    }
                 });
 
                 WriteLog("Checking for updates...");
@@ -2191,10 +2216,13 @@ namespace ETSOverlay
 
                         Dispatcher.Invoke(() =>
                         {
-                            UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
-                            UpdateStatusText.Text = uiLanguage == "uk"
-                                ? $"🆕 Доступне оновлення: {releaseName}"
-                                : $"🆕 Update available: {releaseName}";
+                            if (_settingsWindow != null)
+                            {
+                                _settingsWindow.UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                                _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                                    ? $"🆕 Доступне оновлення: {releaseName}"
+                                    : $"🆕 Update available: {releaseName}";
+                            }
                         });
 
                         // Показываем диалог подтверждения
@@ -2207,10 +2235,13 @@ namespace ETSOverlay
                         {
                             Dispatcher.Invoke(() =>
                             {
-                                UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(243, 156, 18));
-                                UpdateStatusText.Text = uiLanguage == "uk"
-                                    ? "⚠ Оновлення знайдено, але файл недоступний"
-                                    : "⚠ Update found but file not available";
+                                if (_settingsWindow != null)
+                                {
+                                    _settingsWindow.UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(243, 156, 18));
+                                    _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                                        ? "⚠ Оновлення знайдено, але файл недоступний"
+                                        : "⚠ Update found but file not available";
+                                }
                             });
                         }
                     }
@@ -2222,10 +2253,13 @@ namespace ETSOverlay
                     {
                         Dispatcher.Invoke(() =>
                         {
-                            UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
-                            UpdateStatusText.Text = uiLanguage == "uk"
-                                ? "✅ У вас остання версія"
-                                : "✅ You have the latest version";
+                            if (_settingsWindow != null)
+                            {
+                                _settingsWindow.UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                                _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                                    ? "✅ У вас остання версія"
+                                    : "✅ You have the latest version";
+                            }
                         });
                     }
                 }
@@ -2236,15 +2270,17 @@ namespace ETSOverlay
                 WriteLog($"Update check failed: {ex.Message}");
                 if (!silent)
                 {
-                    Dispatcher.Invoke(() =>
+                Dispatcher.Invoke(() =>
+                {
+                    if (_settingsWindow != null)
                     {
-                        UpdateStatusText.Foreground = Brushes.Red;
-                        UpdateStatusText.Text = uiLanguage == "uk"
+                        _settingsWindow.UpdateStatusText.Foreground = Brushes.Red;
+                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
                             ? "❌ Помилка перевірки оновлень"
                             : "❌ Update check failed";
-                            
-                        BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(211, 47, 47)); // Red
-                    });
+                        _settingsWindow.BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(211, 47, 47));
+                    }
+                });
                 }
             }
             finally
@@ -2262,9 +2298,12 @@ namespace ETSOverlay
                     {
                         Dispatcher.Invoke(() =>
                         {
-                            BtnCheckUpdate.IsEnabled = true;
-                            BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71)); // Green
-                            BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                            if (_settingsWindow != null)
+                            {
+                                _settingsWindow.BtnCheckUpdate.IsEnabled = true;
+                                _settingsWindow.BtnCheckUpdate.Background = new SolidColorBrush(Color.FromRgb(67, 160, 71));
+                                _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                            }
                         });
                     }
                 }
@@ -2272,8 +2311,11 @@ namespace ETSOverlay
                 {
                     Dispatcher.Invoke(() =>
                     {
-                        BtnCheckUpdate.IsEnabled = true;
-                        BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                        if (_settingsWindow != null)
+                        {
+                            _settingsWindow.BtnCheckUpdate.IsEnabled = true;
+                            _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                        }
                     });
                 }
             }
@@ -2313,12 +2355,15 @@ namespace ETSOverlay
             {
                 Dispatcher.Invoke(() =>
                 {
-                    BtnCheckUpdate.IsEnabled = false;
-                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "⬇ Завантаження..." : "⬇ Downloading...";
-                    UpdateProgressPanel.Visibility = Visibility.Visible;
-                    UpdateProgressBar.Value = 0;
-                    UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(122, 197, 205));
-                    UpdateStatusText.Text = uiLanguage == "uk" ? "Завантаження оновлення..." : "Downloading update...";
+                    if (_settingsWindow != null)
+                    {
+                        _settingsWindow.BtnCheckUpdate.IsEnabled = false;
+                        _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "⬇ Завантаження..." : "⬇ Downloading...";
+                        _settingsWindow.UpdateProgressPanel.Visibility = Visibility.Visible;
+                        _settingsWindow.UpdateProgressBar.Value = 0;
+                        _settingsWindow.UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(122, 197, 205));
+                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk" ? "Завантаження оновлення..." : "Downloading update...";
+                    }
                 });
 
                 // Подготавливаем временную папку
@@ -2364,12 +2409,15 @@ namespace ETSOverlay
                             double progress = (double)downloadedBytes / totalBytes * 100;
                             Dispatcher.Invoke(() =>
                             {
-                                UpdateProgressBar.Value = progress;
-                                string sizeMb = (downloadedBytes / 1024.0 / 1024.0).ToString("F1");
-                                string totalMb = (totalBytes / 1024.0 / 1024.0).ToString("F1");
-                                UpdateStatusText.Text = uiLanguage == "uk"
-                                    ? $"Завантаження: {sizeMb} / {totalMb} MB ({progress:F0}%)"
-                                    : $"Downloading: {sizeMb} / {totalMb} MB ({progress:F0}%)";
+                                if (_settingsWindow != null)
+                                {
+                                    _settingsWindow.UpdateProgressBar.Value = progress;
+                                    string sizeMb = (downloadedBytes / 1024.0 / 1024.0).ToString("F1");
+                                    string totalMb = (totalBytes / 1024.0 / 1024.0).ToString("F1");
+                                    _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                                        ? $"Завантаження: {sizeMb} / {totalMb} MB ({progress:F0}%)"
+                                        : $"Downloading: {sizeMb} / {totalMb} MB ({progress:F0}%)";
+                                }
                             });
                         }
                     }
@@ -2377,8 +2425,11 @@ namespace ETSOverlay
 
                 Dispatcher.Invoke(() =>
                 {
-                    UpdateProgressBar.Value = 100;
-                    UpdateStatusText.Text = uiLanguage == "uk" ? "Запуск оновлення..." : "Starting update...";
+                    if (_settingsWindow != null)
+                    {
+                        _settingsWindow.UpdateProgressBar.Value = 100;
+                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk" ? "Запуск оновлення..." : "Starting update...";
+                    }
                 });
 
                 WriteLog($"Download complete: {downloadedBytes} bytes");
@@ -2432,13 +2483,16 @@ namespace ETSOverlay
 
                 Dispatcher.Invoke(() =>
                 {
-                    UpdateProgressPanel.Visibility = Visibility.Collapsed;
-                    UpdateStatusText.Foreground = Brushes.Red;
-                    UpdateStatusText.Text = uiLanguage == "uk"
-                        ? $"❌ Помилка оновлення: {ex.Message}"
-                        : $"❌ Update error: {ex.Message}";
-                    BtnCheckUpdate.IsEnabled = true;
-                    BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                    if (_settingsWindow != null)
+                    {
+                        _settingsWindow.UpdateProgressPanel.Visibility = Visibility.Collapsed;
+                        _settingsWindow.UpdateStatusText.Foreground = Brushes.Red;
+                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                            ? $"❌ Помилка оновлення: {ex.Message}"
+                            : $"❌ Update error: {ex.Message}";
+                        _settingsWindow.BtnCheckUpdate.IsEnabled = true;
+                        _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                    }
 
                     ShowUpdateErrorDialog(ex.Message);
                 });
@@ -2473,7 +2527,7 @@ namespace ETSOverlay
                 {
                     Clipboard.SetText(SupportEmail);
                     string copied = isUk ? "Email скопійовано!" : "Email copied!";
-                    UpdateStatusText.Text = $"📋 {copied}";
+                    if (_settingsWindow != null) _settingsWindow.UpdateStatusText.Text = $"📋 {copied}";
                 }
                 catch { }
 
@@ -2494,7 +2548,7 @@ namespace ETSOverlay
                         {
                             File.Copy(appLogFilePath, dialog.FileName, overwrite: true);
                             string saved = isUk ? "Лог збережено!" : "Log saved!";
-                            UpdateStatusText.Text = $"💾 {saved}";
+                            if (_settingsWindow != null) _settingsWindow.UpdateStatusText.Text = $"💾 {saved}";
                         }
                     }
                 }
@@ -2504,5 +2558,74 @@ namespace ETSOverlay
                 }
             }
         }
+
+        // ==================== NEW METHODS FOR REDESIGNED UI ====================
+
+        private int CurrentSpeedWarning
+        {
+            get => _currentGame == GameType.Ats ? _speedWarningAts : _speedWarningEts;
+            set
+            {
+                if (_currentGame == GameType.Ats)
+                    _speedWarningAts = value;
+                else
+                    _speedWarningEts = value;
+            }
+        }
+
+        private void UpdateSpeedWarningText()
+        {
+            _suppressSpeedWarningChange = true;
+            _settingsWindow?.SetSpeedWarningText(Math.Max(0, CurrentSpeedWarning).ToString());
+            _suppressSpeedWarningChange = false;
+        }
+
+        private void ApplySpeedWarningColor()
+        {
+            if (int.TryParse(SpeedValue.Text, out var speed))
+            {
+                ApplySpeedWarningColor(speed);
+            }
+        }
+
+        private void ApplySpeedWarningColor(int currentSpeed)
+        {
+            int threshold = Math.Max(0, CurrentSpeedWarning);
+            if (threshold > 0 && currentSpeed >= threshold)
+            {
+                SpeedValue.Foreground = Brushes.Red;
+            }
+            else
+            {
+                SpeedValue.Foreground = Brushes.White;
+            }
+        }
+
+        private void ApplyLanguageSelection()
+        {
+            _settingsWindow?.SetLanguage(uiLanguage);
+        }
+
+        private void UpdateSimDisplay()
+        {
+            bool isUk = uiLanguage == "uk";
+            switch (_currentGame)
+            {
+                case GameType.Ets:
+                    SimValue.Text = "ETS 2";
+                    SimValue.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                    break;
+                case GameType.Ats:
+                    SimValue.Text = "ATS";
+                    SimValue.Foreground = new SolidColorBrush(Color.FromRgb(243, 156, 18));
+                    break;
+                default:
+                    SimValue.Text = isUk ? "Н/Д" : "N/A";
+                    SimValue.Foreground = Brushes.Gray;
+                    break;
+            }
+        }
+
+
     }
-}
+}
