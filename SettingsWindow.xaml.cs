@@ -115,7 +115,7 @@ namespace ETSOverlay
             }
             SpeedWarningLabel.Text = isUk ? "Поріг швидкості" : "Speed warning";
             ScaleLabel.Text = isUk ? "Масштаб" : "Scale";
-            if (!_mainWindow._isCheckingUpdate && !_mainWindow._isDownloadingUpdate)
+            if (!_mainWindow._isCheckingUpdate)
             {
                 BtnCheckUpdate.Content = isUk ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
             }

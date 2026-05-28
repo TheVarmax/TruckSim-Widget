@@ -229,22 +229,7 @@
                        FontSize="12" HorizontalAlignment="Center"
                        TextWrapping="Wrap" Margin="0,8,0,0"/>
 
-            <!-- Download Progress -->
-            <Grid x:Name="UpdateProgressPanel" Visibility="Collapsed" Margin="0,6,0,0">
-                <Border Background="#2A2C31" CornerRadius="3" Height="8">
-                    <ProgressBar x:Name="UpdateProgressBar" Minimum="0" Maximum="100" Value="0"
-                                 Background="Transparent" Foreground="#52C14F" BorderThickness="0">
-                        <ProgressBar.Template>
-                            <ControlTemplate TargetType="ProgressBar">
-                                <Grid>
-                                    <Border x:Name="PART_Track" Background="Transparent"/>
-                                    <Border x:Name="PART_Indicator" Background="{TemplateBinding Foreground}" CornerRadius="3" HorizontalAlignment="Left"/>
-                                </Grid>
-                            </ControlTemplate>
-                        </ProgressBar.Template>
-                    </ProgressBar>
-                </Border>
-            </Grid>
+
 
             <!-- Version -->
             <TextBlock x:Name="VersionLabel" Text="" Foreground="#555555" FontSize="10" HorizontalAlignment="Center" Margin="0,15,0,0"/>

@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -35,13 +35,13 @@
 
   <!-- Build and copy updater.exe to output directory -->
   <Target Name="BuildAndCopyUpdater" AfterTargets="Build;Publish">
-    <Exec Command="dotnet build &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) --nologo -v q"
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q"
           ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\$(TargetFramework)\updater.exe"
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
           DestinationFolder="$(OutputPath)"
           SkipUnchangedFiles="true"
           ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\$(TargetFramework)\updater.exe"
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
           DestinationFolder="$(PublishDir)"
           Condition="'$(PublishDir)' != ''"
           SkipUnchangedFiles="true"

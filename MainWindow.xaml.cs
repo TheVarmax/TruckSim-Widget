@@ -34,7 +34,6 @@ namespace ETSOverlay
         private const string DonateUrl = "https://donate.maksym.uk";
         private const string SupportEmail = "info@maksym.uk";
         public bool _isCheckingUpdate = false;
-        public bool _isDownloadingUpdate = false;
 
         private bool locked = false;
         private DispatcherTimer? tbTimer;
@@ -1465,7 +1464,7 @@ namespace ETSOverlay
 
         public void OnCheckUpdate()
         {
-            if (_isCheckingUpdate || _isDownloadingUpdate) return;
+            if (_isCheckingUpdate) return;
             _ = CheckForUpdatesAsync(silent: false);
         }
 
@@ -2150,7 +2149,7 @@ namespace ETSOverlay
         /// </summary>
         private async Task CheckForUpdatesAsync(bool silent)
         {
-            if (_isCheckingUpdate || _isDownloadingUpdate || _isCooldownActive) return;
+            if (_isCheckingUpdate || _isCooldownActive) return;
             
             // Защита от лимитов GitHub API (60 запросов в час)
             // При тихой проверке (старт приложения) проверяем не чаще раз в 15 минут
@@ -2338,102 +2337,18 @@ namespace ETSOverlay
 
                 if (result == MessageBoxResult.Yes)
                 {
-                    _ = DownloadAndApplyUpdateAsync(downloadUrl, assetName);
+                    LaunchUpdaterAndShutdown(downloadUrl, assetName);
                 }
             });
         }
 
         /// <summary>
-        /// Скачивает ZIP-архив обновления и запускает updater.exe
+        /// Запускает updater.exe, передавая URL для скачивания, и сразу закрывает виджет
         /// </summary>
-        private async Task DownloadAndApplyUpdateAsync(string downloadUrl, string assetName)
+        private void LaunchUpdaterAndShutdown(string downloadUrl, string assetName)
         {
-            if (_isDownloadingUpdate) return;
-            _isDownloadingUpdate = true;
-
             try
             {
-                Dispatcher.Invoke(() =>
-                {
-                    if (_settingsWindow != null)
-                    {
-                        _settingsWindow.BtnCheckUpdate.IsEnabled = false;
-                        _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "⬇ Завантаження..." : "⬇ Downloading...";
-                        _settingsWindow.UpdateProgressPanel.Visibility = Visibility.Visible;
-                        _settingsWindow.UpdateProgressBar.Value = 0;
-                        _settingsWindow.UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(122, 197, 205));
-                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk" ? "Завантаження оновлення..." : "Downloading update...";
-                    }
-                });
-
-                // Подготавливаем временную папку
-                string tempDir = Path.Combine(Path.GetTempPath(), "TruckSimWidget_Update");
-                if (Directory.Exists(tempDir))
-                    Directory.Delete(tempDir, true);
-                Directory.CreateDirectory(tempDir);
-
-                string zipPath = Path.Combine(tempDir, assetName);
-
-                WriteLog($"Downloading update from: {downloadUrl}");
-                WriteLog($"Saving to: {zipPath}");
-
-                // Скачиваем с отображением прогресса
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget/" + GetCurrentVersion());
-                client.Timeout = TimeSpan.FromMinutes(10);
-
-                using var response = await client.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead);
-                response.EnsureSuccessStatusCode();
-
-                long totalBytes = response.Content.Headers.ContentLength ?? -1;
-                long downloadedBytes = 0;
-
-                using var contentStream = await response.Content.ReadAsStreamAsync();
-                using var fileStream = new FileStream(zipPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-
-                var buffer = new byte[8192];
-                int bytesRead;
-                DateTime lastProgressUpdate = DateTime.Now;
-
-                while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
-                {
-                    await fileStream.WriteAsync(buffer, 0, bytesRead);
-                    downloadedBytes += bytesRead;
-
-                    // Обновляем прогресс-бар не чаще раза в 100ms
-                    if ((DateTime.Now - lastProgressUpdate).TotalMilliseconds > 100)
-                    {
-                        lastProgressUpdate = DateTime.Now;
-                        if (totalBytes > 0)
-                        {
-                            double progress = (double)downloadedBytes / totalBytes * 100;
-                            Dispatcher.Invoke(() =>
-                            {
-                                if (_settingsWindow != null)
-                                {
-                                    _settingsWindow.UpdateProgressBar.Value = progress;
-                                    string sizeMb = (downloadedBytes / 1024.0 / 1024.0).ToString("F1");
-                                    string totalMb = (totalBytes / 1024.0 / 1024.0).ToString("F1");
-                                    _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
-                                        ? $"Завантаження: {sizeMb} / {totalMb} MB ({progress:F0}%)"
-                                        : $"Downloading: {sizeMb} / {totalMb} MB ({progress:F0}%)";
-                                }
-                            });
-                        }
-                    }
-                }
-
-                Dispatcher.Invoke(() =>
-                {
-                    if (_settingsWindow != null)
-                    {
-                        _settingsWindow.UpdateProgressBar.Value = 100;
-                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk" ? "Запуск оновлення..." : "Starting update...";
-                    }
-                });
-
-                WriteLog($"Download complete: {downloadedBytes} bytes");
-
                 // Проверяем, что updater.exe существует
                 string updaterPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "updater.exe");
                 if (!File.Exists(updaterPath))
@@ -2452,54 +2367,43 @@ namespace ETSOverlay
                             : "updater.exe not found. Make sure the file is in the application folder.");
                 }
 
-                string appDir = AppDomain.CurrentDomain.BaseDirectory;
+                string appDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\');
                 string appExe = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "";
                 string logPath = appLogFilePath;
 
                 WriteLog($"Launching updater: {updaterPath}");
-                WriteLog($"Args: \"{zipPath}\" \"{appDir}\" \"{appExe}\" \"{logPath}\"");
+                WriteLog($"Args: \"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\"");
 
-                // Запускаем updater.exe
+                // Запускаем updater.exe с URL для скачивания
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = updaterPath,
-                    Arguments = $"\"{zipPath}\" \"{appDir}\" \"{appExe}\" \"{logPath}\"",
-                    UseShellExecute = false
+                    Arguments = $"\"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\"",
+                    UseShellExecute = true
                 });
 
                 WriteLog("Updater launched, shutting down for update...");
 
-                // Закрываем приложение
-                Dispatcher.Invoke(() =>
-                {
-                    SaveState();
-                    telemetry?.Dispose();
-                    Application.Current.Shutdown();
-                });
+                // Сохраняем состояние и сразу закрываем приложение
+                SaveState();
+                telemetry?.Dispose();
+                Application.Current.Shutdown();
             }
             catch (Exception ex)
             {
-                WriteLog($"Update download/apply failed: {ex.Message}");
+                WriteLog($"Failed to launch updater: {ex.Message}");
 
-                Dispatcher.Invoke(() =>
+                if (_settingsWindow != null)
                 {
-                    if (_settingsWindow != null)
-                    {
-                        _settingsWindow.UpdateProgressPanel.Visibility = Visibility.Collapsed;
-                        _settingsWindow.UpdateStatusText.Foreground = Brushes.Red;
-                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
-                            ? $"❌ Помилка оновлення: {ex.Message}"
-                            : $"❌ Update error: {ex.Message}";
-                        _settingsWindow.BtnCheckUpdate.IsEnabled = true;
-                        _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
-                    }
+                    _settingsWindow.UpdateStatusText.Foreground = Brushes.Red;
+                    _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                        ? $"❌ Помилка: {ex.Message}"
+                        : $"❌ Error: {ex.Message}";
+                    _settingsWindow.BtnCheckUpdate.IsEnabled = true;
+                    _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
+                }
 
-                    ShowUpdateErrorDialog(ex.Message);
-                });
-            }
-            finally
-            {
-                _isDownloadingUpdate = false;
+                ShowUpdateErrorDialog(ex.Message);
             }
         }
 
