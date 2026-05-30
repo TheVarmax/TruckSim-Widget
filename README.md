@@ -141,3 +141,12 @@ If you enjoy TruckSim Widget and want to support its development, you can do so 
     <img src="https://img.shields.io/badge/Monobank-Donate-ff5f5f?style=for-the-badge">
   </a>
 </p>
+
+---
+
+<p align="center"> 
+  Built with ❤️ for the Truck Simulator community
+</p>
+<p align="center"> 
+  https://trucksim.maksym.uk 
+</p>
