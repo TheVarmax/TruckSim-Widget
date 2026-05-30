@@ -46,11 +46,11 @@ TruckSim Widget — це легкий оверлей, який працює ра
 
 ### 🚛 Телеметрія в реальному часі
 
-Швидкість, передача, круїз-контроль та інформація про маршрут у реальному часі.
+Швидкість та інформація про маршрут у реальному часі.
 
 ### 📦 Відстеження доставки
 
-Статус вантажу, відстань, ETA та візуалізація прогресу.
+Статус вантажу та відстань.
 
 ### 📊 Інтеграція з TrucksBook
 
@@ -127,10 +127,19 @@ TruckSim Widget — це легкий оверлей, який працює ра
 
 ## Підтримка
 
-Якщо хочеш підтримати розробку:
+Якщо вам подобається TruckSim Widget і ви хочете підтримати його розвиток, ви можете зробити це тут:
 
-☕ Донат Monobank  
-https://send.monobank.ua/8Q2FKkJr3B
+<p align="center">
+  <a href="https://buymeacoffee.com/thevarmax">
+    <img src="https://img.shields.io/badge/Buy_Me_A_Coffee-Підтримати-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=white">
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://send.monobank.ua/8Q2FKkJr3B">
+    <img src="https://img.shields.io/badge/Monobank-Донат-ff5f5f?style=for-the-badge">
+  </a>
+</p>
 
 ---
 
