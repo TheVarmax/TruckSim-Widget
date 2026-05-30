@@ -11,54 +11,7 @@
         WindowStartupLocation="Manual">
 
     <Window.Resources>
-        <Style x:Key="HeaderBtnStyle" TargetType="Button">
-            <Setter Property="Background" Value="#2A2D35"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="#B0B0B0"/>
-            <Setter Property="Width" Value="26"/>
-            <Setter Property="Height" Value="26"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#3A3D45"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <Style x:Key="CloseBtnStyle" TargetType="Button" BasedOn="{StaticResource HeaderBtnStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="5">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#E81123"/>
-                                <Setter Property="Foreground" Value="White"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
         <Style x:Key="InfoCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#252830"/>
-            <Setter Property="CornerRadius" Value="7"/>
-            <Setter Property="Padding" Value="10,8"/>
-        </Style>
-
-        <Style x:Key="SectionCardStyle" TargetType="Border">
             <Setter Property="Background" Value="#252830"/>
             <Setter Property="CornerRadius" Value="7"/>
             <Setter Property="BorderBrush" Value="#353840"/>
@@ -75,7 +28,8 @@
         </Style>
     </Window.Resources>
 
-    <Border x:Name="MainBorder" Width="340" Background="#1A1C20" CornerRadius="8" Padding="10" Margin="16">
+    <Border x:Name="MainBorder" Width="342" Background="#1A1C20" CornerRadius="8" Padding="6" Margin="16"
+            MouseEnter="MainBorder_MouseEnter" MouseMove="MainBorder_MouseMove" MouseLeave="MainBorder_MouseLeave">
         <Border.LayoutTransform>
             <ScaleTransform x:Name="UIScaleTransform" ScaleX="1.15" ScaleY="1.15"/>
         </Border.LayoutTransform>
@@ -83,78 +37,48 @@
             <DropShadowEffect Color="Black" BlurRadius="14" Opacity="0.5" Direction="270" ShadowDepth="3"/>
         </Border.Effect>
 
-        <Grid x:Name="MainUI">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-            </Grid.RowDefinitions>
+        <Grid>
+            <!-- Always-visible top hover trigger strip (used for floating header). Made 30px tall to catch fast movements -->
+            <Rectangle x:Name="HeaderHoverTrigger" Fill="Transparent"
+                       VerticalAlignment="Top" Height="30"
+                       IsHitTestVisible="False" Panel.ZIndex="10"
+                       MouseEnter="HeaderHover_Enter"/>
 
-            <!-- ROW 0: HEADER -->
-            <Grid Grid.Row="0" Margin="0,0,0,8">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
-                    <Ellipse x:Name="TbStatusDot" Width="7" Height="7" Fill="#4CAF50" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="TbStatus" Text="TB • ONLINE" Foreground="#4CAF50" FontWeight="Bold" FontSize="11" VerticalAlignment="Center"/>
-                </StackPanel>
-
-                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                    <Button Click="BtnSettings_Click" Style="{StaticResource HeaderBtnStyle}" ToolTip="Settings" Margin="0,0,4,0">
-                        <Path Data="M19.4 13c0-.33.05-.66.05-1s-.02-.67-.05-1l2.1-1.66c.2-.15.25-.42.13-.64l-2-3.46c-.12-.22-.4-.3-.6-.22l-2.5 1c-.5-.4-1.07-.73-1.68-.98l-.4-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.6.25-1.17.58-1.68.98l-2.5-1c-.22-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.03.33-.07.67-.07 1s.04.67.07 1l-2.1 1.66c-.2.15-.25.42-.12.64l2 3.46c.12.22.38.3.6.22l2.5-1c.5.4 1.07.73 1.68.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.5-.42l.37-2.65c.6-.25 1.17-.58 1.68-.98l2.5 1c.22.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64L19.4 13zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" Fill="#B0B0B0" Stretch="Uniform" Width="12" Height="12"/>
-                    </Button>
-                    <Button x:Name="BtnTopmost" Click="BtnTopmost_Click" Style="{StaticResource HeaderBtnStyle}" ToolTip="Pin" Margin="0,0,4,0">
-                        <Path x:Name="PinIcon" Data="M16,12V4H17V2H7V4H8V12L6,14V16H11V22H13V16H18V14L16,12Z" Fill="#B0B0B0" Stretch="Uniform" Width="10" Height="10"/>
-                    </Button>
-                    <Button Click="BtnMinimize_Click" Style="{StaticResource HeaderBtnStyle}" Margin="0,0,4,0">
-                        <Path Data="M0,0 L12,0" Stroke="#B0B0B0" StrokeThickness="2" Stretch="Uniform" Width="10" VerticalAlignment="Center"/>
-                    </Button>
-                    <Button Click="BtnClose_Click" Style="{StaticResource CloseBtnStyle}">
-                        <Path Data="M0,0 L10,10 M0,10 L10,0" Stroke="#B0B0B0" StrokeThickness="2" Stretch="Uniform" Width="8" Height="8" VerticalAlignment="Center"/>
-                    </Button>
-                </StackPanel>
-            </Grid>
+            <Grid x:Name="MainUI">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
             <!-- ROW 1 & 2: TOP INFO CARDS -->
-            <Grid Grid.Row="1" Margin="0,0,0,6" x:Name="CardsGrid">
+            <Grid Grid.Row="0" Margin="0,0,0,6" x:Name="CardsGrid">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="5"/>
+                    <ColumnDefinition Width="6"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- GAME Card -->
-                <Border x:Name="GameCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource InfoCardStyle}" Margin="0,0,0,6">
+                <!-- TB STATUS Card (replaces SIM Card, now at Row 0 Col 0) -->
+                <Border x:Name="SimCard" Grid.Row="0" Grid.Column="0" Style="{StaticResource InfoCardStyle}" Margin="0,0,0,6">
                     <StackPanel Orientation="Horizontal">
                         <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
-                            <Path Data="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" Fill="#7AC5CD" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Ellipse x:Name="TbStatusDot" Width="8" Height="8" Fill="#4CAF50" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="GameLabel" Text="GAME" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                            <TextBlock x:Name="GameStatus" Text="ACTIVE" Foreground="#4CAF50" FontSize="12" FontWeight="Bold"/>
+                            <TextBlock x:Name="SimLabel" Text="TRUCKSBOOK" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                            <TextBlock x:Name="TbStatus" Text="TB • ONLINE" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
 
-                <!-- SIM Card -->
-                <Border x:Name="SimCard" Grid.Row="0" Grid.Column="2" Style="{StaticResource InfoCardStyle}" Margin="0,0,0,6">
-                    <StackPanel Orientation="Horizontal">
-                        <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
-                            <Path Data="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9 1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" Fill="#90CAF9" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
-                            <TextBlock x:Name="SimLabel" Text="SIM" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                            <TextBlock x:Name="SimValue" Text="N/A" Foreground="White" FontSize="12" FontWeight="Bold"/>
-                        </StackPanel>
-                    </StackPanel>
-                </Border>
-
-                <!-- STATUS Card -->
-                <Border x:Name="StatusCard" Grid.Row="1" Grid.Column="0" Style="{StaticResource InfoCardStyle}">
+                <!-- STATUS Card (Mileage recording, now at Row 0 Col 2) -->
+                <Border x:Name="StatusCard" Grid.Row="0" Grid.Column="2" Style="{StaticResource InfoCardStyle}" Margin="0,0,0,6">
                     <StackPanel Orientation="Horizontal">
                         <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
                             <Path Data="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z" Fill="#7AC5CD" Stretch="Uniform" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -162,6 +86,19 @@
                         <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
                             <TextBlock x:Name="StatusLabel" Text="STATUS" Foreground="White" FontSize="10" FontWeight="Bold"/>
                             <TextBlock x:Name="StatusValue" Text="Wait for game..." Foreground="#A0A0A0" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- GAME Card (Game status, now at Row 1 Col 0) -->
+                <Border x:Name="GameCard" Grid.Row="1" Grid.Column="0" Style="{StaticResource InfoCardStyle}">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
+                            <Path Data="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" Fill="#7AC5CD" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
+                            <TextBlock x:Name="GameLabel" Text="GAME" Foreground="White" FontSize="10" FontWeight="Bold"/>
+                            <TextBlock x:Name="GameStatus" Text="ACTIVE" Foreground="#4CAF50" FontSize="12" FontWeight="Bold"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -181,7 +118,7 @@
             </Grid>
 
             <!-- ROW 3: ROUTE CARD -->
-            <Border x:Name="RouteCard" Grid.Row="3" Style="{StaticResource InfoCardStyle}" Margin="0,0,0,6">
+            <Border x:Name="RouteCard" Grid.Row="2" Style="{StaticResource InfoCardStyle}" Margin="0,0,0,6">
                 <Grid>
                     <!-- SINGLE LINE LAYOUT -->
                     <StackPanel x:Name="RouteSingleLineGrid" Orientation="Horizontal" VerticalAlignment="Center">
@@ -212,12 +149,12 @@
             </Border>
 
             <!-- ROW 4: BOTTOM GAUGES -->
-            <Grid Grid.Row="4" x:Name="BottomInfoGrid">
+            <Grid Grid.Row="3" x:Name="BottomInfoGrid">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="5"/>
+                    <ColumnDefinition Width="6"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="5"/>
+                    <ColumnDefinition Width="6"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
@@ -284,5 +221,6 @@
                 </Border>
             </Grid>
         </Grid>
+    </Grid>
     </Border>
 </Window>

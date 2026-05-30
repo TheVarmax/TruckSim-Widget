@@ -11,6 +11,7 @@ using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
@@ -119,6 +120,11 @@ namespace ETSOverlay
         private const double BASE_SCALE = 1.15; // default "100%" is 15% larger than design
         private int _uiScale = 100; // user-selected scale percentage
 
+        private bool _headerOverlayVisible = false;
+        private bool _overlayHover = false;
+        private HeaderOverlayWindow? _headerOverlay;
+        private DispatcherTimer? _overlayHideTimer;
+
         private class JobState
         {
             public string TelemetryId { get; set; } = "";
@@ -221,7 +227,12 @@ namespace ETSOverlay
             ApplyScale();
 
             MouseLeftButtonDown += (s, e) => { if (!locked) DragMove(); };
-            LocationChanged += (s, e) => { SaveState(); };
+            LocationChanged += (s, e) =>
+            {
+                SaveState();
+                UpdateHeaderOverlayPosition();
+            };
+            SizeChanged += (s, e) => { UpdateHeaderOverlayPosition(); };
 
             telemetry = new SCSSdkTelemetry();
             telemetry.Data += Telemetry_Data;
@@ -233,6 +244,13 @@ namespace ETSOverlay
 
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
+
+            Loaded += (s, e) =>
+            {
+                EnsureHeaderOverlay();
+                UpdateHeaderOverlayPosition();
+                HideHeaderOverlay();
+            };
         }
 
         // Метод для записи логов
@@ -1308,6 +1326,7 @@ namespace ETSOverlay
             catch { }
 
             MainBorder.Opacity = windowOpacity;
+            ApplyDualLayerOpacity();
             ApplyLanguageSelection();
             ApplyLocalization();
             ApplyVisibilitySettings();
@@ -1376,7 +1395,7 @@ namespace ETSOverlay
             }
         }
 
-        private void BtnSettings_Click(object sender, RoutedEventArgs e)
+        public void BtnSettings_Click(object sender, RoutedEventArgs e)
         {
             if (_settingsWindow == null)
             {
@@ -1404,6 +1423,8 @@ namespace ETSOverlay
             double effectiveScale = BASE_SCALE * (_uiScale / 100.0);
             UIScaleTransform.ScaleX = effectiveScale;
             UIScaleTransform.ScaleY = effectiveScale;
+            _headerOverlay?.SetScale(effectiveScale);
+            UpdateHeaderOverlayPosition();
         }
 
         public void OnScaleChanged(int scalePercent)
@@ -1424,8 +1445,48 @@ namespace ETSOverlay
         public void OnOpacityChanged(double sliderValue)
         {
             windowOpacity = sliderValue / 100.0;
-            MainBorder.Opacity = windowOpacity;
+            ApplyDualLayerOpacity();
             SaveState();
+        }
+
+        public bool IsLocked => locked;
+
+        /// <summary>
+        /// Applies opacity so the overall widget uses windowOpacity, but text elements
+        /// use only half of the opacity delta (50% less opacity change for better readability).
+        /// E.g. widget at 90% -> text at 95%.
+        /// </summary>
+        private void ApplyDualLayerOpacity()
+        {
+            // The background/border gets the full user opacity
+            MainBorder.Opacity = windowOpacity;
+            
+            if (_headerOverlay != null && _headerOverlayVisible)
+            {
+                _headerOverlay.AnimateOpacity(windowOpacity, 0.1);
+            }
+
+            // Text opacity: midpoint between 1.0 and windowOpacity (half as much change)
+            double textOpacity = windowOpacity + (1.0 - windowOpacity) * 0.5;
+            textOpacity = Math.Max(0.0, Math.Min(1.0, textOpacity));
+
+            // Apply to all named text elements
+            TextBlock[] textBlocks = new TextBlock[]
+            {
+                GameLabel, GameStatus,
+                SimLabel, TbStatus,
+                StatusLabel, StatusValue,
+                DistanceLabel, DistanceInfo,
+                RouteLabel, RouteLabelMulti,
+                Route, RouteMulti,
+                SpeedHeader, SpeedValue, SpeedUnit,
+                MaxHeader, MaxSpeedValue, MaxUnit,
+                TypeHeader, DeliveryType
+            };
+            foreach (var tb in textBlocks)
+            {
+                if (tb != null) tb.Opacity = textOpacity;
+            }
         }
 
         public void OnLanguageChanged(string lang)
@@ -1479,30 +1540,36 @@ namespace ETSOverlay
 
         private void ApplyVisibilitySettings()
         {
+            // Unlock window size so SizeToContent can resize the window 
+            // naturally when the bottom cards appear or disappear.
+            this.Height = double.NaN;
+            this.SizeToContent = SizeToContent.WidthAndHeight;
+
             if (_uiMode == "minimal")
             {
-                SimCard.Visibility = Visibility.Collapsed;
+                // In minimal mode, top row (SimCard/TB Process and StatusCard/Mileage) stays visible.
+                GameCard.Visibility = Visibility.Collapsed;
                 DistanceCard.Visibility = Visibility.Collapsed;
                 RouteCard.Visibility = Visibility.Collapsed;
                 BottomInfoGrid.Visibility = Visibility.Collapsed;
 
-                System.Windows.Controls.Grid.SetRow(StatusCard, 0);
-                System.Windows.Controls.Grid.SetColumn(StatusCard, 2);
-                GameCard.Margin = new Thickness(0);
+                // Remove bottom margins from visible cards since there's nothing below them
+                SimCard.Margin = new Thickness(0);
                 StatusCard.Margin = new Thickness(0);
+                CardsGrid.Margin = new Thickness(0);
             }
             else
             {
-                SimCard.Visibility = Visibility.Visible;
+                GameCard.Visibility = Visibility.Visible;
                 DistanceCard.Visibility = Visibility.Visible;
                 RouteCard.Visibility = Visibility.Visible;
                 BottomInfoGrid.Visibility = Visibility.Visible;
 
-                System.Windows.Controls.Grid.SetRow(StatusCard, 1);
-                System.Windows.Controls.Grid.SetColumn(StatusCard, 0);
-                GameCard.Margin = new Thickness(0, 0, 0, 6);
+                // Restore bottom margins
                 SimCard.Margin = new Thickness(0, 0, 0, 6);
-                StatusCard.Margin = new Thickness(0);
+                StatusCard.Margin = new Thickness(0, 0, 0, 6);
+                GameCard.Margin = new Thickness(0); // GameCard has 0 margin in its standard position (Row 1)
+                CardsGrid.Margin = new Thickness(0, 0, 0, 6);
             }
         }
 
@@ -1512,7 +1579,7 @@ namespace ETSOverlay
 
             // Main window labels
             GameLabel.Text = isUk ? "ГРА" : "GAME";
-            SimLabel.Text = isUk ? "СІМ" : "SIM";
+            SimLabel.Text = isUk ? "TRUCKSBOOK" : "TRUCKSBOOK"; // Always TRUCKSBOOK (card header)
             DistanceLabel.Text = isUk ? "ДИСТАНЦІЯ" : "DISTANCE";
             StatusLabel.Text = isUk ? "СТАТУС" : "STATUS";
             RouteLabel.Text = isUk ? "МАРШРУТ" : "ROUTE";
@@ -1525,6 +1592,7 @@ namespace ETSOverlay
 
             // Settings window localization
             _settingsWindow?.UpdateLocalization(isUk);
+            ;
 
             UpdateDeliveryTypeUI(0);
             UpdateDistanceInfoForLanguage();
@@ -2045,10 +2113,28 @@ namespace ETSOverlay
             }
         }
 
-        private void BtnMinimize_Click(object sender, RoutedEventArgs e) { _isManualMinimize = true; WindowState = WindowState.Minimized; }
-        private void BtnClose_Click(object sender, RoutedEventArgs e) => Application.Current.Shutdown();
-        private void BtnTopmost_Click(object sender, RoutedEventArgs e) { Topmost = !Topmost; UpdatePinIcon(); }
-        private void UpdatePinIcon() => BtnTopmost.Opacity = Topmost ? 1.0 : 0.4;
+        public void BtnMinimize_Click(object sender, RoutedEventArgs e)
+        {
+            _isManualMinimize = true;
+            WindowState = WindowState.Minimized;
+        }
+
+        public void BtnClose_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
+        public void BtnTopmost_Click(object sender, RoutedEventArgs e)
+        {
+            Topmost = !Topmost;
+            UpdatePinIcon();
+            SaveState();
+        }
+
+        private void UpdatePinIcon()
+        {
+            _headerOverlay?.UpdatePinIcon(Topmost);
+        }
         protected override void OnClosed(EventArgs e) { WriteLog("=== OVERLAY CLOSED ==="); SaveState(); telemetry?.Dispose(); base.OnClosed(e); }
 
         // ==================== AUTO-UPDATE ====================
@@ -2512,24 +2598,136 @@ namespace ETSOverlay
 
         private void UpdateSimDisplay()
         {
-            bool isUk = uiLanguage == "uk";
-            switch (_currentGame)
+            // SimCard now shows TrucksBook status (dot + TbStatus text).
+            // The TbStatusDot and TbStatus are updated in CheckStatusAndProcesses.
+            // This method is retained as a no-op for backward compatibility with callers.
+        }
+
+        // ==================== HEADER AUTO-HIDE ====================
+
+        public bool AutoHideHeader => true;
+
+        private const double HeaderHoverZoneHeight = 30;
+        private const double HeaderOverlayOffset = 6;
+        private const double HeaderOverlayFadeSeconds = 0.2;
+
+        private void EnsureHeaderOverlay()
+        {
+            if (_headerOverlay != null) return;
+            _headerOverlay = new HeaderOverlayWindow(this);
+            _headerOverlay.Owner = this;
+            double effectiveScale = BASE_SCALE * (_uiScale / 100.0);
+            _headerOverlay.SetScale(effectiveScale);
+            _headerOverlay.Opacity = 1;
+            _headerOverlay.SetOpacity(0);
+            _headerOverlay.IsHitTestVisible = false;
+            _headerOverlay.Show();
+            _overlayHideTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(180) };
+            _overlayHideTimer.Tick += (s, e) =>
             {
-                case GameType.Ets:
-                    SimValue.Text = "ETS 2";
-                    SimValue.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
-                    break;
-                case GameType.Ats:
-                    SimValue.Text = "ATS";
-                    SimValue.Foreground = new SolidColorBrush(Color.FromRgb(243, 156, 18));
-                    break;
-                default:
-                    SimValue.Text = isUk ? "Н/Д" : "N/A";
-                    SimValue.Foreground = Brushes.Gray;
-                    break;
+                _overlayHideTimer?.Stop();
+                if (!_overlayHover && !IsPointerInHoverZone())
+                {
+                    HideHeaderOverlay();
+                }
+            };
+        }
+
+        private void UpdateHeaderOverlayPosition()
+        {
+            if (_headerOverlay == null) return;
+            var width = MainBorder.Width > 0 ? MainBorder.Width : (MainBorder.ActualWidth / Math.Max(0.1, UIScaleTransform.ScaleX));
+            _headerOverlay.UpdateWidth(width);
+            _headerOverlay.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+            var overlayHeight = _headerOverlay.DesiredSize.Height;
+            var borderTopLeft = MainBorder.TranslatePoint(new Point(0, 0), this);
+            var headerMargin = 16.0;
+            var left = Left + borderTopLeft.X - headerMargin;
+            var top = Top + borderTopLeft.Y - overlayHeight + headerMargin - HeaderOverlayOffset;
+            _headerOverlay.Left = left;
+            _headerOverlay.Top = top;
+        }
+
+        private void ShowHeaderOverlay()
+        {
+            EnsureHeaderOverlay();
+            UpdateHeaderOverlayPosition();
+            if (_headerOverlay == null) return;
+            if (_headerOverlayVisible) return;
+            _headerOverlayVisible = true;
+            _headerOverlay.IsHitTestVisible = true;
+            _headerOverlay.AnimateOpacity(windowOpacity, HeaderOverlayFadeSeconds);
+        }
+
+        private void HideHeaderOverlay()
+        {
+            if (_headerOverlay == null) return;
+            if (!_headerOverlayVisible) return;
+            _headerOverlayVisible = false;
+            _headerOverlay.IsHitTestVisible = false;
+            _headerOverlay.AnimateOpacity(0, HeaderOverlayFadeSeconds);
+        }
+
+        public void NotifyOverlayHover(bool isHovering)
+        {
+            _overlayHover = isHovering;
+            if (!isHovering)
+            {
+                StartOverlayHideTimer();
             }
+        }
+
+        private void HeaderHover_Enter(object sender, MouseEventArgs e)
+        {
+            ShowHeaderOverlay();
+        }
+
+        private void MainBorder_MouseEnter(object sender, MouseEventArgs e)
+        {
+            UpdateOverlayVisibility(e.GetPosition(MainBorder));
+        }
+
+        private void MainBorder_MouseMove(object sender, MouseEventArgs e)
+        {
+            UpdateOverlayVisibility(e.GetPosition(MainBorder));
+        }
+
+        private void MainBorder_MouseLeave(object sender, MouseEventArgs e)
+        {
+            if (_overlayHover) return;
+            StartOverlayHideTimer();
+        }
+
+        private void UpdateOverlayVisibility(Point position)
+        {
+            bool inHeaderZone = position.Y >= 0 && position.Y <= HeaderHoverZoneHeight;
+            if (inHeaderZone)
+            {
+                if (!_headerOverlayVisible)
+                {
+                    ShowHeaderOverlay();
+                }
+            }
+            else if (!_overlayHover)
+            {
+                StartOverlayHideTimer();
+            }
+        }
+
+        private bool IsPointerInHoverZone()
+        {
+            var position = Mouse.GetPosition(MainBorder);
+            return position.Y >= 0 && position.Y <= HeaderHoverZoneHeight;
+        }
+
+        private void StartOverlayHideTimer()
+        {
+            if (_overlayHideTimer == null) return;
+            _overlayHideTimer.Stop();
+            _overlayHideTimer.Start();
         }
 
 
     }
-}
+}
+

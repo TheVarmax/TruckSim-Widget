@@ -85,6 +85,7 @@ namespace ETSOverlay
             _mainWindow.OnDonate();
         }
 
+
         private void ScaleSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return;
@@ -184,5 +185,6 @@ namespace ETSOverlay
             }
             _suppressEvents = false;
         }
+
     }
 }
