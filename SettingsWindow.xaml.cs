@@ -18,16 +18,22 @@ namespace ETSOverlay
             _suppressEvents = false;
         }
 
-        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             e.Cancel = true;
+            var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
+            this.BeginAnimation(Window.OpacityProperty, fadeOut);
+            await System.Threading.Tasks.Task.Delay(200);
             Hide();
         }
 
         // --- Event Handlers (delegate to MainWindow) ---
 
-        private void BtnCloseSettings_Click(object sender, RoutedEventArgs e)
+        private async void BtnCloseSettings_Click(object sender, RoutedEventArgs e)
         {
+            var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
+            this.BeginAnimation(Window.OpacityProperty, fadeOut);
+            await System.Threading.Tasks.Task.Delay(200);
             Hide();
         }
 

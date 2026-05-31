@@ -229,7 +229,6 @@ namespace ETSOverlay
             LoadGameState(GameType.Ats);
             LoadCityTranslations();
             ResetStartupJobMemory();
-            UpdatePinIcon();
             CheckStatusAndProcesses();
             ApplyLocalization();
             UpdateSpeedWarningText();
@@ -257,11 +256,56 @@ namespace ETSOverlay
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
 
-            Loaded += (s, e) =>
+            Loaded += async (s, e) =>
             {
                 EnsureHeaderOverlay();
+                UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
                 HideHeaderOverlay();
+
+                // 1. Анимация появления виджета + Интро
+                MainUI.Opacity = 0;
+                IntroOverlay.Visibility = Visibility.Visible;
+                IntroOverlay.Opacity = 1;
+
+                // Плавно проявляем главное окно от 0 до windowOpacity
+                MainBorder.Opacity = 0;
+                var windowFade = new DoubleAnimation(windowOpacity, TimeSpan.FromSeconds(0.4));
+                MainBorder.BeginAnimation(OpacityProperty, windowFade);
+
+                // Ждем 1.5 секунды, чтобы пользователь прочитал интро
+                await Task.Delay(1500);
+
+                // Кросс-фейд: затухаем интро, проявляем интерфейс
+                var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.3));
+                var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3));
+
+                fadeOut.Completed += (s, ev) => IntroOverlay.Visibility = Visibility.Collapsed;
+
+                IntroOverlay.BeginAnimation(OpacityProperty, fadeOut);
+                MainUI.BeginAnimation(OpacityProperty, fadeIn);
+            };
+
+            // Восстановление после сворачивания в трей
+            StateChanged += (s, e) =>
+            {
+                if (WindowState == WindowState.Normal)
+                {
+                    MainBorder.Opacity = 0;
+                    MainBorder.BeginAnimation(OpacityProperty, new DoubleAnimation(windowOpacity, TimeSpan.FromSeconds(0.3)));
+                    
+                    if (_settingsWindow != null && _settingsWindow.IsVisible)
+                    {
+                        _settingsWindow.Opacity = 0;
+                        _settingsWindow.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromSeconds(0.3)));
+                    }
+                    
+                    if (_headerOverlay != null && _headerOverlayVisible)
+                    {
+                        _headerOverlay.SetOpacity(0);
+                        _headerOverlay.AnimateOpacity(1, 0.3);
+                    }
+                }
             };
         }
         private bool _jobCancelledOrDeliveredFlag = false;
@@ -1547,7 +1591,7 @@ namespace ETSOverlay
             ApplyDualLayerOpacity();
             ApplyLanguageSelection();
             ApplyLocalization();
-            ApplyVisibilitySettings();
+            ApplyUIMode(false);
             UpdateSpeedWarningText();
         }
 
@@ -1632,8 +1676,76 @@ namespace ETSOverlay
                     _settingsWindow.Top = _savedSettingsTop;
                 }
             }
-            _settingsWindow.Show();
+            if (!_settingsWindow.IsVisible)
+            {
+                _settingsWindow.Opacity = 0;
+                _settingsWindow.Show();
+                var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.2));
+                _settingsWindow.BeginAnimation(Window.OpacityProperty, fadeIn);
+            }
             _settingsWindow.Activate();
+        }
+
+        private void ApplyUIMode(bool animate = true)
+        {
+            if (_uiMode == "minimal")
+            {
+                if (animate)
+                {
+                    var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
+                    var currentHeight = CollapsibleSection.ActualHeight;
+                    var shrink = new DoubleAnimation(currentHeight, 0, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+
+                    shrink.Completed += (s, ev) => 
+                    {
+                        CollapsibleSection.Visibility = Visibility.Collapsed;
+                    };
+
+                    CollapsibleSection.BeginAnimation(OpacityProperty, fadeOut);
+                    CollapsibleSection.BeginAnimation(HeightProperty, shrink);
+                }
+                else
+                {
+                    CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                    CollapsibleSection.BeginAnimation(HeightProperty, null);
+                    CollapsibleSection.Opacity = 0;
+                    CollapsibleSection.Visibility = Visibility.Collapsed;
+                    CollapsibleSection.Height = double.NaN;
+                }
+            }
+            else
+            {
+                CollapsibleSection.Visibility = Visibility.Visible;
+                
+                if (animate)
+                {
+                    CollapsibleSection.Height = double.NaN;
+                    CollapsibleSection.UpdateLayout();
+                    var targetHeight = CollapsibleSection.ActualHeight;
+
+                    CollapsibleSection.Height = 0;
+                    CollapsibleSection.Opacity = 0;
+
+                    var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3)) { BeginTime = TimeSpan.FromSeconds(0.1) };
+                    var grow = new DoubleAnimation(0, targetHeight, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+
+                    grow.Completed += (s, ev) => 
+                    {
+                        CollapsibleSection.BeginAnimation(HeightProperty, null);
+                        CollapsibleSection.Height = double.NaN;
+                    };
+
+                    CollapsibleSection.BeginAnimation(OpacityProperty, fadeIn);
+                    CollapsibleSection.BeginAnimation(HeightProperty, grow);
+                }
+                else
+                {
+                    CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                    CollapsibleSection.BeginAnimation(HeightProperty, null);
+                    CollapsibleSection.Opacity = 1;
+                    CollapsibleSection.Height = double.NaN;
+                }
+            }
         }
 
         private void ApplyScale()
@@ -1656,7 +1768,7 @@ namespace ETSOverlay
         public void OnUIModeChanged(string mode)
         {
             _uiMode = mode;
-            ApplyVisibilitySettings();
+            ApplyUIMode();
             SaveState();
         }
 
@@ -1676,6 +1788,9 @@ namespace ETSOverlay
         /// </summary>
         private void ApplyDualLayerOpacity()
         {
+            // Remove any active animation that might block local value updates
+            MainBorder.BeginAnimation(OpacityProperty, null);
+            
             // The background/border gets the full user opacity
             MainBorder.Opacity = windowOpacity;
             
@@ -1756,40 +1871,6 @@ namespace ETSOverlay
             catch (Exception ex) { WriteLog($"Failed to open donate page: {ex.Message}"); }
         }
 
-        private void ApplyVisibilitySettings()
-        {
-            // Unlock window size so SizeToContent can resize the window 
-            // naturally when the bottom cards appear or disappear.
-            this.Height = double.NaN;
-            this.SizeToContent = SizeToContent.WidthAndHeight;
-
-            if (_uiMode == "minimal")
-            {
-                // In minimal mode, top row (SimCard/TB Process and StatusCard/Mileage) stays visible.
-                GameCard.Visibility = Visibility.Collapsed;
-                DistanceCard.Visibility = Visibility.Collapsed;
-                RouteCard.Visibility = Visibility.Collapsed;
-                BottomInfoGrid.Visibility = Visibility.Collapsed;
-
-                // Remove bottom margins from visible cards since there's nothing below them
-                SimCard.Margin = new Thickness(0);
-                StatusCard.Margin = new Thickness(0);
-                CardsGrid.Margin = new Thickness(0);
-            }
-            else
-            {
-                GameCard.Visibility = Visibility.Visible;
-                DistanceCard.Visibility = Visibility.Visible;
-                RouteCard.Visibility = Visibility.Visible;
-                BottomInfoGrid.Visibility = Visibility.Visible;
-
-                // Restore bottom margins
-                SimCard.Margin = new Thickness(0, 0, 0, 6);
-                StatusCard.Margin = new Thickness(0, 0, 0, 6);
-                GameCard.Margin = new Thickness(0); // GameCard has 0 margin in its standard position (Row 1)
-                CardsGrid.Margin = new Thickness(0, 0, 0, 6);
-            }
-        }
 
         private void ApplyLocalization()
         {
@@ -2331,10 +2412,29 @@ namespace ETSOverlay
             }
         }
 
-        public void BtnMinimize_Click(object? sender, RoutedEventArgs e)
+        public async void BtnMinimize_Click(object? sender, RoutedEventArgs e)
         {
             _isManualMinimize = true;
+            
+            var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
+            MainBorder.BeginAnimation(OpacityProperty, fadeOut);
+            
+            if (_settingsWindow != null && _settingsWindow.IsVisible)
+            {
+                _settingsWindow.BeginAnimation(OpacityProperty, fadeOut);
+            }
+            
+            if (_headerOverlay != null && _headerOverlayVisible)
+            {
+                _headerOverlay.AnimateOpacity(0, 0.2);
+            }
+            
+            await Task.Delay(200);
             WindowState = WindowState.Minimized;
+            
+            // Восстанавливаем анимацию, чтобы при StateChanged виджет проявился нормально
+            MainBorder.BeginAnimation(OpacityProperty, null);
+            MainBorder.Opacity = windowOpacity;
         }
 
         public void BtnClose_Click(object? sender, RoutedEventArgs e)
@@ -2636,8 +2736,10 @@ namespace ETSOverlay
                     ? $"Доступна нова версія: {releaseName}\n\nВстановити оновлення?\n\nПрограма буде закрита для оновлення файлів."
                     : $"A new version is available: {releaseName}\n\nInstall update?\n\nThe application will close to update files.";
 
-                var result = MessageBox.Show(this, message, title,
-                    MessageBoxButton.YesNo, MessageBoxImage.Information);
+                string yesBtn = uiLanguage == "uk" ? "Так" : "Yes";
+                string noBtn = uiLanguage == "uk" ? "Ні" : "No";
+
+                var result = CustomMessageBox.Show(this, message, title, yesBtn, noBtn);
 
                 if (result == MessageBoxResult.Yes)
                 {
@@ -2726,8 +2828,10 @@ namespace ETSOverlay
                   $"Please send the log to {SupportEmail}\n\n" +
                   $"Copy email to clipboard?";
 
-            var result = MessageBox.Show(this, body, title,
-                MessageBoxButton.YesNo, MessageBoxImage.Error);
+            string yesBtn = isUk ? "Так" : "Yes";
+            string noBtn = isUk ? "Ні" : "No";
+
+            var result = CustomMessageBox.Show(this, body, title, yesBtn, noBtn);
 
             if (result == MessageBoxResult.Yes)
             {
