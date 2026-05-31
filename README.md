@@ -23,7 +23,8 @@
   <a href="https://trucksim.maksym.uk"><img src="https://img.shields.io/badge/Website-trucksim.maksym.uk-2ea44f?style=flat-square"></a>
   <a href="https://t.me/thevarmax"><img src="https://img.shields.io/badge/Telegram-@thevarmax-26A5E4?style=flat-square&logo=telegram&logoColor=white"></a>
   <a href="https://github.com/TheVarmax/TruckSim-Widget/releases"><img src="https://img.shields.io/badge/Download-Latest_Release-5865F2?style=flat-square&logo=github&logoColor=white"></a>
-  <a href="https://send.monobank.ua/8Q2FKkJr3B"><img src="https://img.shields.io/badge/Donate-Monobank-ff5f5f?style=flat-square&logo=buymeacoffee&logoColor=white"></a>
+  <a href="https://send.monobank.ua/8Q2FKkJr3B"><img src="https://img.shields.io/badge/Donate-Monobank-ff5f5f?style=flat-square"></a>
+  <a href="https://buymeacoffee.com/thevarmax"><img src="https://img.shields.io/badge/Buy_Me_A_Coffee-Support-FFDD00?style=flat-square&logo=buymeacoffee&logoColor=000000"></a>
 </p>
 
 <p align="center">
@@ -46,11 +47,11 @@ It displays real-time telemetry like speed, route, delivery status, and trip pro
 
 ### 🚛 Live telemetry
 
-Real-time speed, gear, cruise control, and route information.
+Real-time speed and route information.
 
 ### 📦 Delivery tracking
 
-Cargo status, distance, ETA, and progress visualization.
+Cargo status and distance.
 
 ### 📊 TrucksBook integration
 
@@ -127,17 +128,25 @@ Minimal, fast, and focused on driving experience.
 
 ## Support
 
-If you want to support development:
-
-☕ Monobank donation
-[https://send.monobank.ua/8Q2FKkJr3B](https://send.monobank.ua/8Q2FKkJr3B)
-
----
+If you enjoy TruckSim Widget and want to support its development, you can do so here:
 
 <p align="center">
-  Built with ❤️ for the Truck Simulator community
+  <a href="https://buymeacoffee.com/thevarmax">
+    <img src="https://img.shields.io/badge/Buy_Me_A_Coffee-Support-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=white">
+  </a>
 </p>
 
 <p align="center">
-  https://trucksim.maksym.uk
+  <a href="https://send.monobank.ua/8Q2FKkJr3B">
+    <img src="https://img.shields.io/badge/Monobank-Donate-ff5f5f?style=for-the-badge">
+  </a>
+</p>
+
+---
+
+<p align="center"> 
+  Built with ❤️ for the Truck Simulator community
+</p>
+<p align="center"> 
+  https://trucksim.maksym.uk 
 </p>
