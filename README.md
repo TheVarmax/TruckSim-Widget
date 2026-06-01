@@ -144,6 +144,21 @@ If you enjoy TruckSim Widget and want to support its development, you can do so 
 
 ---
 
+## License
+
+TruckSim Widget is licensed under the Mozilla Public License 2.0 (MPL-2.0).
+
+You are free to use, modify, and distribute this software, including for commercial purposes, provided that modifications to MPL-covered files remain available under the same license when distributed.
+
+The MPL-2.0 license does not grant rights to use the TruckSim Widget name, logo, branding, or other project trademarks.
+
+This project is not affiliated with, endorsed by, or associated with SCS Software, Euro Truck Simulator 2, American Truck Simulator, or TrucksBook.
+
+For full license details, see the [LICENSE](LICENSE) file.
+
+
+---
+
 <p align="center"> 
   Built with ❤️ for the Truck Simulator community
 </p>
