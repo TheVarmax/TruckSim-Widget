@@ -1,0 +1,2323 @@
+{
+  "ets2": [
+    {
+      "english": "A Coruña",
+      "ukrainian": "А-Корунья"
+    },
+    {
+      "english": "Aalborg",
+      "ukrainian": "Ольборг"
+    },
+    {
+      "english": "Aarhus",
+      "ukrainian": "Орхус"
+    },
+    {
+      "english": "Aberdeen",
+      "ukrainian": "Абердин"
+    },
+    {
+      "english": "Ajaccio",
+      "ukrainian": "Аяччо"
+    },
+    {
+      "english": "Albacete",
+      "ukrainian": "Альбасете"
+    },
+    {
+      "english": "Algeciras",
+      "ukrainian": "Альхесірас"
+    },
+    {
+      "english": "Almaraz",
+      "ukrainian": "Альмарас"
+    },
+    {
+      "english": "Almería",
+      "ukrainian": "Альмерія"
+    },
+    {
+      "english": "Alta",
+      "ukrainian": "Альта"
+    },
+    {
+      "english": "Amsterdam",
+      "ukrainian": "Амстердам"
+    },
+    {
+      "english": "Ancona",
+      "ukrainian": "Анкона"
+    },
+    {
+      "english": "Andenes",
+      "ukrainian": "Анденес"
+    },
+    {
+      "english": "Antwerp",
+      "ukrainian": "Антверпен"
+    },
+    {
+      "english": "Argostoli",
+      "ukrainian": "Аргостолі"
+    },
+    {
+      "english": "Arvidsjaur",
+      "ukrainian": "Арвідс'яур"
+    },
+    {
+      "english": "Athens",
+      "ukrainian": "Афіни"
+    },
+    {
+      "english": "Aydın",
+      "ukrainian": "Айдин"
+    },
+    {
+      "english": "Bacău",
+      "ukrainian": "Бакеу"
+    },
+    {
+      "english": "Badajoz",
+      "ukrainian": "Бадахос"
+    },
+    {
+      "english": "Bailén",
+      "ukrainian": "Байлен"
+    },
+    {
+      "english": "Balıkesir",
+      "ukrainian": "Баликесір"
+    },
+    {
+      "english": "Bandırma",
+      "ukrainian": "Бандирма"
+    },
+    {
+      "english": "Banja Luka",
+      "ukrainian": "Баня-Лука"
+    },
+    {
+      "english": "Banská Bystrica",
+      "ukrainian": "Банська-Бистриця"
+    },
+    {
+      "english": "Barcelona",
+      "ukrainian": "Барселона"
+    },
+    {
+      "english": "Bari",
+      "ukrainian": "Барі"
+    },
+    {
+      "english": "Bastia",
+      "ukrainian": "Бастія"
+    },
+    {
+      "english": "Bayonne",
+      "ukrainian": "Байонна"
+    },
+    {
+      "english": "Beja",
+      "ukrainian": "Бежа"
+    },
+    {
+      "english": "Belgrade",
+      "ukrainian": "Белград"
+    },
+    {
+      "english": "Berat",
+      "ukrainian": "Берат"
+    },
+    {
+      "english": "Bergen",
+      "ukrainian": "Берген"
+    },
+    {
+      "english": "Berlin",
+      "ukrainian": "Берлін"
+    },
+    {
+      "english": "Bern",
+      "ukrainian": "Берн"
+    },
+    {
+      "english": "Białystok",
+      "ukrainian": "Білосток"
+    },
+    {
+      "english": "Bihać",
+      "ukrainian": "Біхач"
+    },
+    {
+      "english": "Bijelo Polje",
+      "ukrainian": "Бєло-Полє"
+    },
+    {
+      "english": "Bilbao",
+      "ukrainian": "Більбао"
+    },
+    {
+      "english": "Birmingham",
+      "ukrainian": "Бірмінгем"
+    },
+    {
+      "english": "Bitola",
+      "ukrainian": "Бітола"
+    },
+    {
+      "english": "Bodø",
+      "ukrainian": "Буде"
+    },
+    {
+      "english": "Bologna",
+      "ukrainian": "Болонья"
+    },
+    {
+      "english": "Bonifacio",
+      "ukrainian": "Боніфачо"
+    },
+    {
+      "english": "Bordeaux",
+      "ukrainian": "Бордо"
+    },
+    {
+      "english": "Borlänge",
+      "ukrainian": "Борленге"
+    },
+    {
+      "english": "Bourges",
+      "ukrainian": "Бурж"
+    },
+    {
+      "english": "Brașov",
+      "ukrainian": "Брашов"
+    },
+    {
+      "english": "Bratislava",
+      "ukrainian": "Братислава"
+    },
+    {
+      "english": "Bremen",
+      "ukrainian": "Бремен"
+    },
+    {
+      "english": "Brest",
+      "ukrainian": "Брест"
+    },
+    {
+      "english": "Brno",
+      "ukrainian": "Брно"
+    },
+    {
+      "english": "Brussel",
+      "ukrainian": "Брюссель"
+    },
+    {
+      "english": "București",
+      "ukrainian": "Бухарест"
+    },
+    {
+      "english": "Budapest",
+      "ukrainian": "Будапешт"
+    },
+    {
+      "english": "Burgas",
+      "ukrainian": "Бургас"
+    },
+    {
+      "english": "Burgos",
+      "ukrainian": "Бургос"
+    },
+    {
+      "english": "Cagliari",
+      "ukrainian": "Кальярі"
+    },
+    {
+      "english": "Calais",
+      "ukrainian": "Кале"
+    },
+    {
+      "english": "Călărași",
+      "ukrainian": "Келераш"
+    },
+    {
+      "english": "Calvi",
+      "ukrainian": "Кальві"
+    },
+    {
+      "english": "Cambridge",
+      "ukrainian": "Кембридж"
+    },
+    {
+      "english": "Cardiff",
+      "ukrainian": "Кардіфф"
+    },
+    {
+      "english": "Carlisle",
+      "ukrainian": "Карлайл"
+    },
+    {
+      "english": "Cassino",
+      "ukrainian": "Кассіно"
+    },
+    {
+      "english": "Catania",
+      "ukrainian": "Катанія"
+    },
+    {
+      "english": "Catanzaro",
+      "ukrainian": "Катандзаро"
+    },
+    {
+      "english": "Çanakkale",
+      "ukrainian": "Чанаккале"
+    },
+    {
+      "english": "Cernavodă",
+      "ukrainian": "Чернаводе"
+    },
+    {
+      "english": "Chania",
+      "ukrainian": "Ханья"
+    },
+    {
+      "english": "Chemnitz",
+      "ukrainian": "Хемніц"
+    },
+    {
+      "english": "Chios",
+      "ukrainian": "Хіос"
+    },
+    {
+      "english": "Ciudad Real",
+      "ukrainian": "Сьюдад-Реаль"
+    },
+    {
+      "english": "Civaux",
+      "ukrainian": "Сіво"
+    },
+    {
+      "english": "Clermont-Ferrand",
+      "ukrainian": "Клермон-Ферран"
+    },
+    {
+      "english": "Cluj-Napoca",
+      "ukrainian": "Клуж-Напока"
+    },
+    {
+      "english": "Coimbra",
+      "ukrainian": "Коїмбра"
+    },
+    {
+      "english": "Constanța",
+      "ukrainian": "Констанца"
+    },
+    {
+      "english": "Córdoba",
+      "ukrainian": "Кордова"
+    },
+    {
+      "english": "Craiova",
+      "ukrainian": "Крайова"
+    },
+    {
+      "english": "Daugavpils",
+      "ukrainian": "Даугавпілс"
+    },
+    {
+      "english": "Debrecen",
+      "ukrainian": "Дебрецен"
+    },
+    {
+      "english": "Denizli",
+      "ukrainian": "Денізлі"
+    },
+    {
+      "english": "Dijon",
+      "ukrainian": "Діжон"
+    },
+    {
+      "english": "Dombås",
+      "ukrainian": "Домбос"
+    },
+    {
+      "english": "Dortmund",
+      "ukrainian": "Дортмунд"
+    },
+    {
+      "english": "Dover",
+      "ukrainian": "Дувр"
+    },
+    {
+      "english": "Dresden",
+      "ukrainian": "Дрезден"
+    },
+    {
+      "english": "Duisburg",
+      "ukrainian": "Дуйсбург"
+    },
+    {
+      "english": "Durrës",
+      "ukrainian": "Дуррес"
+    },
+    {
+      "english": "Düsseldorf",
+      "ukrainian": "Дюссельдорф"
+    },
+    {
+      "english": "Edinburgh",
+      "ukrainian": "Единбург"
+    },
+    {
+      "english": "Edirne",
+      "ukrainian": "Едірне"
+    },
+    {
+      "english": "Eindhoven",
+      "ukrainian": "Ейндговен"
+    },
+    {
+      "english": "El Ejido",
+      "ukrainian": "Ель-Ехідо"
+    },
+    {
+      "english": "Erfurt",
+      "ukrainian": "Ерфурт"
+    },
+    {
+      "english": "Esbjerg",
+      "ukrainian": "Есб'єрг"
+    },
+    {
+      "english": "Eskişehir",
+      "ukrainian": "Ескішехір"
+    },
+    {
+      "english": "Falun",
+      "ukrainian": "Фалун"
+    },
+    {
+      "english": "Faro",
+      "ukrainian": "Фару"
+    },
+    {
+      "english": "Felixstowe",
+      "ukrainian": "Фелікстоу"
+    },
+    {
+      "english": "Fier",
+      "ukrainian": "Фієр"
+    },
+    {
+      "english": "Firenze",
+      "ukrainian": "Флоренція"
+    },
+    {
+      "english": "Frankfurt am Main",
+      "ukrainian": "Франкфурт-на-Майні"
+    },
+    {
+      "english": "Galați",
+      "ukrainian": "Галац"
+    },
+    {
+      "english": "Gdańsk",
+      "ukrainian": "Гданськ"
+    },
+    {
+      "english": "Genova",
+      "ukrainian": "Генуя"
+    },
+    {
+      "english": "Genève",
+      "ukrainian": "Женева"
+    },
+    {
+      "english": "Gijón",
+      "ukrainian": "Хіхон"
+    },
+    {
+      "english": "Glasgow",
+      "ukrainian": "Глазго"
+    },
+    {
+      "english": "Göteborg",
+      "ukrainian": "Гетеборг"
+    },
+    {
+      "english": "Granada",
+      "ukrainian": "Гранада"
+    },
+    {
+      "english": "Graz",
+      "ukrainian": "Грац"
+    },
+    {
+      "english": "Hamburg",
+      "ukrainian": "Гамбург"
+    },
+    {
+      "english": "Hannover",
+      "ukrainian": "Ганновер"
+    },
+    {
+      "english": "Helsinki",
+      "ukrainian": "Гельсінкі"
+    },
+    {
+      "english": "Hirtshals",
+      "ukrainian": "Гіртсгальс"
+    },
+    {
+      "english": "Honningsvåg",
+      "ukrainian": "Гоннінгсвог"
+    },
+    {
+      "english": "Iași",
+      "ukrainian": "Ясси"
+    },
+    {
+      "english": "Innsbruck",
+      "ukrainian": "Інсбрук"
+    },
+    {
+      "english": "Ioannina",
+      "ukrainian": "Яніна"
+    },
+    {
+      "english": "Irakleio",
+      "ukrainian": "Іракліон"
+    },
+    {
+      "english": "Istanbul",
+      "ukrainian": "Стамбул"
+    },
+    {
+      "english": "Jyväskylä",
+      "ukrainian": "Ювяскюля"
+    },
+    {
+      "english": "Kajaani",
+      "ukrainian": "Каяані"
+    },
+    {
+      "english": "Kalamata",
+      "ukrainian": "Каламата"
+    },
+    {
+      "english": "Kaliningrad",
+      "ukrainian": "Калінінград"
+    },
+    {
+      "english": "Kaunas",
+      "ukrainian": "Каунас"
+    },
+    {
+      "english": "Kayseri",
+      "ukrainian": "Кайсері"
+    },
+    {
+      "english": "Kiel",
+      "ukrainian": "Кіль"
+    },
+    {
+      "english": "Kiruna",
+      "ukrainian": "Кіруна"
+    },
+    {
+      "english": "Klaipėda",
+      "ukrainian": "Клайпеда"
+    },
+    {
+      "english": "Köln",
+      "ukrainian": "Кельн"
+    },
+    {
+      "english": "Konya",
+      "ukrainian": "Конья"
+    },
+    {
+      "english": "Koper",
+      "ukrainian": "Копер"
+    },
+    {
+      "english": "Kraków",
+      "ukrainian": "Краків"
+    },
+    {
+      "english": "Kragujevac",
+      "ukrainian": "Крагуєваць"
+    },
+    {
+      "english": "Kristiansand",
+      "ukrainian": "Крістіансанн"
+    },
+    {
+      "english": "Kuopio",
+      "ukrainian": "Куопіо"
+    },
+    {
+      "english": "Kyiv",
+      "ukrainian": "Київ"
+    },
+    {
+      "english": "La Rochelle",
+      "ukrainian": "Ла-Рошель"
+    },
+    {
+      "english": "Lahti",
+      "ukrainian": "Лахті"
+    },
+    {
+      "english": "Larisa",
+      "ukrainian": "Лариса"
+    },
+    {
+      "english": "Le Havre",
+      "ukrainian": "Гавр"
+    },
+    {
+      "english": "Le Mans",
+      "ukrainian": "Ле-Ман"
+    },
+    {
+      "english": "Leipzig",
+      "ukrainian": "Лейпциг"
+    },
+    {
+      "english": "León",
+      "ukrainian": "Леон"
+    },
+    {
+      "english": "Lille",
+      "ukrainian": "Лілль"
+    },
+    {
+      "english": "Limoges",
+      "ukrainian": "Лімож"
+    },
+    {
+      "english": "Linköping",
+      "ukrainian": "Лінчепінг"
+    },
+    {
+      "english": "Lisboa",
+      "ukrainian": "Лісабон"
+    },
+    {
+      "english": "Liverpool",
+      "ukrainian": "Ліверпуль"
+    },
+    {
+      "english": "Ljubljana",
+      "ukrainian": "Любляна"
+    },
+    {
+      "english": "London",
+      "ukrainian": "Лондон"
+    },
+    {
+      "english": "Luleå",
+      "ukrainian": "Лулео"
+    },
+    {
+      "english": "Lyon",
+      "ukrainian": "Ліон"
+    },
+    {
+      "english": "Madrid",
+      "ukrainian": "Мадрид"
+    },
+    {
+      "english": "Malmö",
+      "ukrainian": "Мальме"
+    },
+    {
+      "english": "Manchester",
+      "ukrainian": "Манчестер"
+    },
+    {
+      "english": "Marseille",
+      "ukrainian": "Марсель"
+    },
+    {
+      "english": "Metz",
+      "ukrainian": "Мец"
+    },
+    {
+      "english": "Milan",
+      "ukrainian": "Мілан"
+    },
+    {
+      "english": "Mostar",
+      "ukrainian": "Мостар"
+    },
+    {
+      "english": "Munich",
+      "ukrainian": "Мюнхен"
+    },
+    {
+      "english": "Murcia",
+      "ukrainian": "Мурсія"
+    },
+    {
+      "english": "Nantes",
+      "ukrainian": "Нант"
+    },
+    {
+      "english": "Napoli",
+      "ukrainian": "Неаполь"
+    },
+    {
+      "english": "Nice",
+      "ukrainian": "Ніцца"
+    },
+    {
+      "english": "Niš",
+      "ukrainian": "Ніш"
+    },
+    {
+      "english": "Novi Sad",
+      "ukrainian": "Новий Сад"
+    },
+    {
+      "english": "Odesa",
+      "ukrainian": "Одеса"
+    },
+    {
+      "english": "Olbia",
+      "ukrainian": "Ольбія"
+    },
+    {
+      "english": "Oslo",
+      "ukrainian": "Осло"
+    },
+    {
+      "english": "Palermo",
+      "ukrainian": "Палермо"
+    },
+    {
+      "english": "Pamplona",
+      "ukrainian": "Памплона"
+    },
+    {
+      "english": "Paris",
+      "ukrainian": "Париж"
+    },
+    {
+      "english": "Parma",
+      "ukrainian": "Парма"
+    },
+    {
+      "english": "Pejë",
+      "ukrainian": "Печ"
+    },
+    {
+      "english": "Perpignan",
+      "ukrainian": "Перпіньян"
+    },
+    {
+      "english": "Pescara",
+      "ukrainian": "Пескара"
+    },
+    {
+      "english": "Piatra Neamț",
+      "ukrainian": "П'ятра-Нямц"
+    },
+    {
+      "english": "Ploiești",
+      "ukrainian": "Плоєшті"
+    },
+    {
+      "english": "Podgorica",
+      "ukrainian": "Подгориця"
+    },
+    {
+      "english": "Porto",
+      "ukrainian": "Порту"
+    },
+    {
+      "english": "Poitiers",
+      "ukrainian": "Пуатьє"
+    },
+    {
+      "english": "Poznań",
+      "ukrainian": "Познань"
+    },
+    {
+      "english": "Prague",
+      "ukrainian": "Прага"
+    },
+    {
+      "english": "Pristina",
+      "ukrainian": "Приштина"
+    },
+    {
+      "english": "Prizren",
+      "ukrainian": "Призрен"
+    },
+    {
+      "english": "Reims",
+      "ukrainian": "Реймс"
+    },
+    {
+      "english": "Rennes",
+      "ukrainian": "Ренн"
+    },
+    {
+      "english": "Riga",
+      "ukrainian": "Рига"
+    },
+    {
+      "english": "Rijeka",
+      "ukrainian": "Рієка"
+    },
+    {
+      "english": "Roma",
+      "ukrainian": "Рим"
+    },
+    {
+      "english": "Rotterdam",
+      "ukrainian": "Роттердам"
+    },
+    {
+      "english": "Rovaniemi",
+      "ukrainian": "Рованіємі"
+    },
+    {
+      "english": "Salzburg",
+      "ukrainian": "Зальцбург"
+    },
+    {
+      "english": "Samsun",
+      "ukrainian": "Самсун"
+    },
+    {
+      "english": "Santander",
+      "ukrainian": "Сантандер"
+    },
+    {
+      "english": "Sarajevo",
+      "ukrainian": "Сараєво"
+    },
+    {
+      "english": "Sassari",
+      "ukrainian": "Сассарі"
+    },
+    {
+      "english": "Sevilla",
+      "ukrainian": "Севілья"
+    },
+    {
+      "english": "Shkodër",
+      "ukrainian": "Шкодер"
+    },
+    {
+      "english": "Sines",
+      "ukrainian": "Сініш"
+    },
+    {
+      "english": "Sofia",
+      "ukrainian": "Софія"
+    },
+    {
+      "english": "Split",
+      "ukrainian": "Спліт"
+    },
+    {
+      "english": "Stavanger",
+      "ukrainian": "Ставангер"
+    },
+    {
+      "english": "Stockholm",
+      "ukrainian": "Стокгольм"
+    },
+    {
+      "english": "Strasbourg",
+      "ukrainian": "Страсбург"
+    },
+    {
+      "english": "Subotica",
+      "ukrainian": "Суботиця"
+    },
+    {
+      "english": "Suceava",
+      "ukrainian": "Сучава"
+    },
+    {
+      "english": "Szeged",
+      "ukrainian": "Сегед"
+    },
+    {
+      "english": "Tallinn",
+      "ukrainian": "Таллінн"
+    },
+    {
+      "english": "Tampere",
+      "ukrainian": "Тампере"
+    },
+    {
+      "english": "Taranto",
+      "ukrainian": "Таранто"
+    },
+    {
+      "english": "Târgu Mureș",
+      "ukrainian": "Тиргу-Муреш"
+    },
+    {
+      "english": "Thessaloniki",
+      "ukrainian": "Салоніки"
+    },
+    {
+      "english": "Timișoara",
+      "ukrainian": "Тімішоара"
+    },
+    {
+      "english": "Trabzon",
+      "ukrainian": "Трабзон"
+    },
+    {
+      "english": "Trieste",
+      "ukrainian": "Трієст"
+    },
+    {
+      "english": "Toulouse",
+      "ukrainian": "Тулуза"
+    },
+    {
+      "english": "Tours",
+      "ukrainian": "Тур"
+    },
+    {
+      "english": "Turku",
+      "ukrainian": "Турку"
+    },
+    {
+      "english": "Uppsala",
+      "ukrainian": "Уппсала"
+    },
+    {
+      "english": "Valencia",
+      "ukrainian": "Валенсія"
+    },
+    {
+      "english": "Valladolid",
+      "ukrainian": "Вальядолід"
+    },
+    {
+      "english": "Varna",
+      "ukrainian": "Варна"
+    },
+    {
+      "english": "Venezia",
+      "ukrainian": "Венеція"
+    },
+    {
+      "english": "Verona",
+      "ukrainian": "Верона"
+    },
+    {
+      "english": "Vienna",
+      "ukrainian": "Відень"
+    },
+    {
+      "english": "Vilnius",
+      "ukrainian": "Вільнюс"
+    },
+    {
+      "english": "Vlorë",
+      "ukrainian": "Вльора"
+    },
+    {
+      "english": "Warsaw",
+      "ukrainian": "Варшава"
+    },
+    {
+      "english": "Wrocław",
+      "ukrainian": "Вроцлав"
+    },
+    {
+      "english": "Zagreb",
+      "ukrainian": "Загреб"
+    },
+    {
+      "english": "Zaragoza",
+      "ukrainian": "Сарагоса"
+    },
+    {
+      "english": "Zürich",
+      "ukrainian": "Цюрих"
+    },
+    {
+      "english": "Ålesund",
+      "ukrainian": "Олесунн"
+    },
+    {
+      "english": "Apatin",
+      "ukrainian": "Апатин"
+    },
+    {
+      "english": "Bingöl",
+      "ukrainian": "Бінгьоль"
+    },
+    {
+      "english": "Bjelovar",
+      "ukrainian": "Бєловар"
+    },
+    {
+      "english": "Bornholm",
+      "ukrainian": "Борнгольм"
+    },
+    {
+      "english": "Çorum",
+      "ukrainian": "Чорум"
+    },
+    {
+      "english": "Drammen",
+      "ukrainian": "Драммен"
+    },
+    {
+      "english": "Elbasan",
+      "ukrainian": "Ельбасан"
+    },
+    {
+      "english": "Gaziantep",
+      "ukrainian": "Газіантеп"
+    },
+    {
+      "english": "Gävle",
+      "ukrainian": "Євле"
+    },
+    {
+      "english": "Gjilan",
+      "ukrainian": "Гнілане"
+    },
+    {
+      "english": "Hamina",
+      "ukrainian": "Хаміна"
+    },
+    {
+      "english": "Hammerfest",
+      "ukrainian": "Гаммерфест"
+    },
+    {
+      "english": "Harstad",
+      "ukrainian": "Харстад"
+    },
+    {
+      "english": "Ivalo",
+      "ukrainian": "Івало"
+    },
+    {
+      "english": "Karlskrona",
+      "ukrainian": "Карлскруна"
+    },
+    {
+      "english": "Karlsruhe",
+      "ukrainian": "Карлсруе"
+    },
+    {
+      "english": "Kavala",
+      "ukrainian": "Кавала"
+    },
+    {
+      "english": "Kemi",
+      "ukrainian": "Кемі"
+    },
+    {
+      "english": "Kokkola",
+      "ukrainian": "Коккола"
+    },
+    {
+      "english": "Kongsvinger",
+      "ukrainian": "Конгсвінгер"
+    },
+    {
+      "english": "Kotka",
+      "ukrainian": "Котка"
+    },
+    {
+      "english": "Kristiansund",
+      "ukrainian": "Крістіансунн"
+    },
+    {
+      "english": "Kuusamo",
+      "ukrainian": "Куусамо"
+    },
+    {
+      "english": "Linz",
+      "ukrainian": "Лінц"
+    },
+    {
+      "english": "Liptovský Mikuláš",
+      "ukrainian": "Ліптовський Мікулаш"
+    },
+    {
+      "english": "Lubon",
+      "ukrainian": "Любонь"
+    },
+    {
+      "english": "Mora",
+      "ukrainian": "Мура"
+    },
+    {
+      "english": "Narvik",
+      "ukrainian": "Нарвік"
+    },
+    {
+      "english": "Naantali",
+      "ukrainian": "Наанталі"
+    },
+    {
+      "english": "Norrköping",
+      "ukrainian": "Норрчепінг"
+    },
+    {
+      "english": "Nuorgam",
+      "ukrainian": "Нуоргам"
+    },
+    {
+      "english": "Olhão",
+      "ukrainian": "Ольян"
+    },
+    {
+      "english": "Olkiluoto",
+      "ukrainian": "Олкілуото"
+    },
+    {
+      "english": "Olsztyn",
+      "ukrainian": "Ольштин"
+    },
+    {
+      "english": "Örebro",
+      "ukrainian": "Еребру"
+    },
+    {
+      "english": "Örnsköldsvik",
+      "ukrainian": "Ерншельдсвік"
+    },
+    {
+      "english": "Osijek",
+      "ukrainian": "Осієк"
+    },
+    {
+      "english": "Osnabrück",
+      "ukrainian": "Оснабрюк"
+    },
+    {
+      "english": "Östersund",
+      "ukrainian": "Естерсунд"
+    },
+    {
+      "english": "Ostrava",
+      "ukrainian": "Острава"
+    },
+    {
+      "english": "Oulu",
+      "ukrainian": "Оулу"
+    },
+    {
+      "english": "Paldiski",
+      "ukrainian": "Палдіскі"
+    },
+    {
+      "english": "Paluel",
+      "ukrainian": "Палюель"
+    },
+    {
+      "english": "Panevėžys",
+      "ukrainian": "Паневежис"
+    },
+    {
+      "english": "Pärnu",
+      "ukrainian": "Пярну"
+    },
+    {
+      "english": "Patras",
+      "ukrainian": "Патри"
+    },
+    {
+      "english": "Pernik",
+      "ukrainian": "Перник"
+    },
+    {
+      "english": "Pirdop",
+      "ukrainian": "Пирдоп"
+    },
+    {
+      "english": "Pitesti",
+      "ukrainian": "Пітешті"
+    },
+    {
+      "english": "Pori",
+      "ukrainian": "Порі"
+    },
+    {
+      "english": "Prešov",
+      "ukrainian": "Пряшів"
+    },
+    {
+      "english": "Prilep",
+      "ukrainian": "Прилеп"
+    },
+    {
+      "english": "Pyhäjärvi",
+      "ukrainian": "Пюхяярві"
+    },
+    {
+      "english": "Ruse",
+      "ukrainian": "Русе"
+    },
+    {
+      "english": "Saint Petersburg",
+      "ukrainian": "Санкт-Петербург"
+    },
+    {
+      "english": "Sandane",
+      "ukrainian": "Саннане"
+    },
+    {
+      "english": "Skopje",
+      "ukrainian": "Скоп'є"
+    },
+    {
+      "english": "Sodankylä",
+      "ukrainian": "Соданкюля"
+    },
+    {
+      "english": "Sønderborg",
+      "ukrainian": "Сеннерборг"
+    },
+    {
+      "english": "Södertälje",
+      "ukrainian": "Седертельє"
+    },
+    {
+      "english": "Sveti Rok",
+      "ukrainian": "Светі-Рок"
+    },
+    {
+      "english": "Tirana",
+      "ukrainian": "Тирана"
+    },
+    {
+      "english": "Tromsø",
+      "ukrainian": "Тромсе"
+    },
+    {
+      "english": "Umeå",
+      "ukrainian": "Умео"
+    },
+    {
+      "english": "Vaasa",
+      "ukrainian": "Вааса"
+    },
+    {
+      "english": "Veliko Tarnovo",
+      "ukrainian": "Велико-Тирново"
+    },
+    {
+      "english": "Vyborg",
+      "ukrainian": "Виборг"
+    },
+    {
+      "english": "Werlte",
+      "ukrainian": "Верльте"
+    },
+    {
+      "english": "Winsen",
+      "ukrainian": "Вінзен"
+    }
+  ],
+
+  "ats": [
+    {
+      "english": "Aberdeen",
+      "ukrainian": "Абердин"
+    },
+    {
+      "english": "Abilene",
+      "ukrainian": "Абілін"
+    },
+    {
+      "english": "Alamogordo",
+      "ukrainian": "Аламогордо"
+    },
+    {
+      "english": "Alamosa",
+      "ukrainian": "Аламоса"
+    },
+    {
+      "english": "Albuquerque",
+      "ukrainian": "Альбукерке"
+    },
+    {
+      "english": "Alliance",
+      "ukrainian": "Альянс"
+    },
+    {
+      "english": "Amarillo",
+      "ukrainian": "Амарілло"
+    },
+    {
+      "english": "Anacortes",
+      "ukrainian": "Анакортес"
+    },
+    {
+      "english": "Ardmore",
+      "ukrainian": "Ардмор"
+    },
+    {
+      "english": "Artesia",
+      "ukrainian": "Артезія"
+    },
+    {
+      "english": "Astoria",
+      "ukrainian": "Асторія"
+    },
+    {
+      "english": "Austin",
+      "ukrainian": "Остін"
+    },
+    {
+      "english": "Bakersfield",
+      "ukrainian": "Бейкерсфілд"
+    },
+    {
+      "english": "Barstow",
+      "ukrainian": "Барстоу"
+    },
+    {
+      "english": "Baton Rouge",
+      "ukrainian": "Батон-Руж"
+    },
+    {
+      "english": "Beaumont",
+      "ukrainian": "Бомонт"
+    },
+    {
+      "english": "Bellingham",
+      "ukrainian": "Беллінгем"
+    },
+    {
+      "english": "Bend",
+      "ukrainian": "Бенд"
+    },
+    {
+      "english": "Billings",
+      "ukrainian": "Біллінгс"
+    },
+    {
+      "english": "Bismarck",
+      "ukrainian": "Бісмарк"
+    },
+    {
+      "english": "Boise",
+      "ukrainian": "Бойсе"
+    },
+    {
+      "english": "Bozeman",
+      "ukrainian": "Бозмен"
+    },
+    {
+      "english": "Brownsville",
+      "ukrainian": "Браунсвілл"
+    },
+    {
+      "english": "Burlington",
+      "ukrainian": "Берлінгтон"
+    },
+    {
+      "english": "Burns",
+      "ukrainian": "Бернс"
+    },
+    {
+      "english": "Butte",
+      "ukrainian": "Б'ютт"
+    },
+    {
+      "english": "Camp Verde",
+      "ukrainian": "Кемп-Верде"
+    },
+    {
+      "english": "Cape Girardeau",
+      "ukrainian": "Кейп-Жирардо"
+    },
+    {
+      "english": "Carlsbad",
+      "ukrainian": "Карлсбад"
+    },
+    {
+      "english": "Carson City",
+      "ukrainian": "Карсон-Сіті"
+    },
+    {
+      "english": "Casper",
+      "ukrainian": "Каспер"
+    },
+    {
+      "english": "Cedar City",
+      "ukrainian": "Сідар-Сіті"
+    },
+    {
+      "english": "Cedar Rapids",
+      "ukrainian": "Сідар-Рапідс"
+    },
+    {
+      "english": "Cheyenne",
+      "ukrainian": "Шаєнн"
+    },
+    {
+      "english": "Clifton",
+      "ukrainian": "Кліфтон"
+    },
+    {
+      "english": "Clinton",
+      "ukrainian": "Клінтон"
+    },
+    {
+      "english": "Clovis",
+      "ukrainian": "Кловіс"
+    },
+    {
+      "english": "Coeur d'Alene",
+      "ukrainian": "Кер-д'Ален"
+    },
+    {
+      "english": "Colorado Springs",
+      "ukrainian": "Колорадо-Спрінгс"
+    },
+    {
+      "english": "Columbia",
+      "ukrainian": "Коламбія"
+    },
+    {
+      "english": "Columbus",
+      "ukrainian": "Коламбус"
+    },
+    {
+      "english": "Corpus Christi",
+      "ukrainian": "Корпус-Крісті"
+    },
+    {
+      "english": "Council Bluffs",
+      "ukrainian": "Каунсіл-Блаффс"
+    },
+    {
+      "english": "Dallas",
+      "ukrainian": "Даллас"
+    },
+    {
+      "english": "Davenport",
+      "ukrainian": "Давенпорт"
+    },
+    {
+      "english": "Del Rio",
+      "ukrainian": "Дель-Ріо"
+    },
+    {
+      "english": "Denver",
+      "ukrainian": "Денвер"
+    },
+    {
+      "english": "Des Moines",
+      "ukrainian": "Де-Мойн"
+    },
+    {
+      "english": "Dodge City",
+      "ukrainian": "Додж-Сіті"
+    },
+    {
+      "english": "Dubuque",
+      "ukrainian": "Дюб'юк"
+    },
+    {
+      "english": "Durango",
+      "ukrainian": "Дуранго"
+    },
+    {
+      "english": "El Centro",
+      "ukrainian": "Ель-Сентро"
+    },
+    {
+      "english": "El Paso",
+      "ukrainian": "Ель-Пасо"
+    },
+    {
+      "english": "Elko",
+      "ukrainian": "Елко"
+    },
+    {
+      "english": "Ely",
+      "ukrainian": "Ілі"
+    },
+    {
+      "english": "Emporia",
+      "ukrainian": "Емпорія"
+    },
+    {
+      "english": "Enid",
+      "ukrainian": "Інід"
+    },
+    {
+      "english": "Eugene",
+      "ukrainian": "Юджин"
+    },
+    {
+      "english": "Eureka",
+      "ukrainian": "Юрика"
+    },
+    {
+      "english": "Everett",
+      "ukrainian": "Еверетт"
+    },
+    {
+      "english": "Farmington",
+      "ukrainian": "Фармінгтон"
+    },
+    {
+      "english": "Flagstaff",
+      "ukrainian": "Флагстафф"
+    },
+    {
+      "english": "Fort Collins",
+      "ukrainian": "Форт-Коллінс"
+    },
+    {
+      "english": "Fort Smith",
+      "ukrainian": "Форт-Сміт"
+    },
+    {
+      "english": "Fort Worth",
+      "ukrainian": "Форт-Верт"
+    },
+    {
+      "english": "Fresno",
+      "ukrainian": "Фресно"
+    },
+    {
+      "english": "Gallup",
+      "ukrainian": "Галлап"
+    },
+    {
+      "english": "Galveston",
+      "ukrainian": "Галвестон"
+    },
+    {
+      "english": "Garden City",
+      "ukrainian": "Гарден-Сіті"
+    },
+    {
+      "english": "Gillette",
+      "ukrainian": "Джиллетт"
+    },
+    {
+      "english": "Glasgow",
+      "ukrainian": "Глазго"
+    },
+    {
+      "english": "Grand Junction",
+      "ukrainian": "Гранд-Джанкшен"
+    },
+    {
+      "english": "Great Falls",
+      "ukrainian": "Грейт-Фоллс"
+    },
+    {
+      "english": "Guymon",
+      "ukrainian": "Гаймон"
+    },
+    {
+      "english": "Harrison",
+      "ukrainian": "Гаррісон"
+    },
+    {
+      "english": "Havre",
+      "ukrainian": "Гавр"
+    },
+    {
+      "english": "Helena",
+      "ukrainian": "Гелена"
+    },
+    {
+      "english": "Houston",
+      "ukrainian": "Г'юстон"
+    },
+    {
+      "english": "Idaho Falls",
+      "ukrainian": "Айдахо-Фолс"
+    },
+    {
+      "english": "Jackson",
+      "ukrainian": "Джексон"
+    },
+    {
+      "english": "Kansas City",
+      "ukrainian": "Канзас-Сіті"
+    },
+    {
+      "english": "Kennewick",
+      "ukrainian": "Кенневік"
+    },
+    {
+      "english": "Kingman",
+      "ukrainian": "Кінгман"
+    },
+    {
+      "english": "Lafayette",
+      "ukrainian": "Лафаєт"
+    },
+    {
+      "english": "Lake Charles",
+      "ukrainian": "Лейк-Чарльз"
+    },
+    {
+      "english": "Las Vegas",
+      "ukrainian": "Лас-Вегас"
+    },
+    {
+      "english": "Los Angeles",
+      "ukrainian": "Лос-Анджелес"
+    },
+    {
+      "english": "Lubbock",
+      "ukrainian": "Лаббок"
+    },
+    {
+      "english": "Medford",
+      "ukrainian": "Медфорд"
+    },
+    {
+      "english": "Miles City",
+      "ukrainian": "Майлз-Сіті"
+    },
+    {
+      "english": "Missoula",
+      "ukrainian": "Міссула"
+    },
+    {
+      "english": "Moab",
+      "ukrainian": "Моаб"
+    },
+    {
+      "english": "Montrose",
+      "ukrainian": "Монтроуз"
+    },
+    {
+      "english": "New Orleans",
+      "ukrainian": "Новий Орлеан"
+    },
+    {
+      "english": "Nogales",
+      "ukrainian": "Ногалес"
+    },
+    {
+      "english": "Oakland",
+      "ukrainian": "Окленд"
+    },
+    {
+      "english": "Odessa",
+      "ukrainian": "Одеса"
+    },
+    {
+      "english": "Oklahoma City",
+      "ukrainian": "Оклахома-Сіті"
+    },
+    {
+      "english": "Olympia",
+      "ukrainian": "Олімпія"
+    },
+    {
+      "english": "Ontario",
+      "ukrainian": "Онтаріо"
+    },
+    {
+      "english": "Phoenix",
+      "ukrainian": "Фінікс"
+    },
+    {
+      "english": "Pierre",
+      "ukrainian": "П'єр"
+    },
+    {
+      "english": "Portland",
+      "ukrainian": "Портленд"
+    },
+    {
+      "english": "Pueblo",
+      "ukrainian": "Пуебло"
+    },
+    {
+      "english": "Rapid City",
+      "ukrainian": "Рапід-Сіті"
+    },
+    {
+      "english": "Redding",
+      "ukrainian": "Реддінг"
+    },
+    {
+      "english": "Reno",
+      "ukrainian": "Ріно"
+    },
+    {
+      "english": "Roswell",
+      "ukrainian": "Розвелл"
+    },
+    {
+      "english": "Sacramento",
+      "ukrainian": "Сакраменто"
+    },
+    {
+      "english": "Salem",
+      "ukrainian": "Сейлем"
+    },
+    {
+      "english": "Salt Lake City",
+      "ukrainian": "Солт-Лейк-Сіті"
+    },
+    {
+      "english": "San Antonio",
+      "ukrainian": "Сан-Антоніо"
+    },
+    {
+      "english": "San Diego",
+      "ukrainian": "Сан-Дієго"
+    },
+    {
+      "english": "San Francisco",
+      "ukrainian": "Сан-Франциско"
+    },
+    {
+      "english": "Santa Fe",
+      "ukrainian": "Санта-Фе"
+    },
+    {
+      "english": "Seattle",
+      "ukrainian": "Сіетл"
+    },
+    {
+      "english": "Sheridan",
+      "ukrainian": "Шерідан"
+    },
+    {
+      "english": "Shreveport",
+      "ukrainian": "Шривпорт"
+    },
+    {
+      "english": "Sioux City",
+      "ukrainian": "Су-Сіті"
+    },
+    {
+      "english": "Sioux Falls",
+      "ukrainian": "Су-Фолс"
+    },
+    {
+      "english": "Spokane",
+      "ukrainian": "Спокан"
+    },
+    {
+      "english": "Tacoma",
+      "ukrainian": "Такома"
+    },
+    {
+      "english": "Texarkana",
+      "ukrainian": "Тексаркана"
+    },
+    {
+      "english": "Tucson",
+      "ukrainian": "Тусон"
+    },
+    {
+      "english": "Tulsa",
+      "ukrainian": "Талса"
+    },
+    {
+      "english": "Twin Falls",
+      "ukrainian": "Твін-Фоллс"
+    },
+    {
+      "english": "Vernal",
+      "ukrainian": "Вернал"
+    },
+    {
+      "english": "Wenatchee",
+      "ukrainian": "Венатчі"
+    },
+    {
+      "english": "Wichita",
+      "ukrainian": "Вічита"
+    },
+    {
+      "english": "Yakima",
+      "ukrainian": "Якіма"
+    },
+    {
+      "english": "Yuma",
+      "ukrainian": "Юма"
+    },
+    {
+      "english": "Alexandria",
+      "ukrainian": "Александрія"
+    },
+    {
+      "english": "Blythe",
+      "ukrainian": "Блайт"
+    },
+    {
+      "english": "Burlington",
+      "ukrainian": "Берлінгтон"
+    },
+    {
+      "english": "Chadron",
+      "ukrainian": "Шедрон"
+    },
+    {
+      "english": "Cody",
+      "ukrainian": "Коді"
+    },
+    {
+      "english": "Colby",
+      "ukrainian": "Колбі"
+    },
+    {
+      "english": "Colville",
+      "ukrainian": "Колвілл"
+    },
+    {
+      "english": "Coos Bay",
+      "ukrainian": "Кус-Бей"
+    },
+    {
+      "english": "Dalhart",
+      "ukrainian": "Далгарт"
+    },
+    {
+      "english": "DeRidder",
+      "ukrainian": "Де-Ріддер"
+    },
+    {
+      "english": "El Dorado",
+      "ukrainian": "Ель-Дорадо"
+    },
+    {
+      "english": "Evanston",
+      "ukrainian": "Еванстон"
+    },
+    {
+      "english": "Fayetteville",
+      "ukrainian": "Феєтвілл"
+    },
+    {
+      "english": "Fort Dodge",
+      "ukrainian": "Форт-Додж"
+    },
+    {
+      "english": "Fort Stockton",
+      "ukrainian": "Форт-Стоктон"
+    },
+    {
+      "english": "Glendive",
+      "ukrainian": "Глендайв"
+    },
+    {
+      "english": "Grand Canyon Village",
+      "ukrainian": "Гранд-Каньйон-Віллідж"
+    },
+    {
+      "english": "Grand Coulee",
+      "ukrainian": "Гранд-Кулі"
+    },
+    {
+      "english": "Grand Island",
+      "ukrainian": "Гранд-Айленд"
+    },
+    {
+      "english": "Grangeville",
+      "ukrainian": "Грейнджвілл"
+    },
+    {
+      "english": "Hays",
+      "ukrainian": "Гейс"
+    },
+    {
+      "english": "Hilt",
+      "ukrainian": "Гілт"
+    },
+    {
+      "english": "Hobbs",
+      "ukrainian": "Гоббс"
+    },
+    {
+      "english": "Hot Springs",
+      "ukrainian": "Гот-Спрінгс"
+    },
+    {
+      "english": "Houma",
+      "ukrainian": "Гума"
+    },
+    {
+      "english": "Huntsville",
+      "ukrainian": "Гантсвілл"
+    },
+    {
+      "english": "Huron",
+      "ukrainian": "Гурон"
+    },
+    {
+      "english": "Hutchinson",
+      "ukrainian": "Гатчінсон"
+    },
+    {
+      "english": "Idabel",
+      "ukrainian": "Айдабел"
+    },
+    {
+      "english": "Indio",
+      "ukrainian": "Індіо"
+    },
+    {
+      "english": "Iowa City",
+      "ukrainian": "Айова-Сіті"
+    },
+    {
+      "english": "Jackpot",
+      "ukrainian": "Джекпот"
+    },
+    {
+      "english": "Jefferson City",
+      "ukrainian": "Джефферсон-Сіті"
+    },
+    {
+      "english": "Jonesboro",
+      "ukrainian": "Джонсборо"
+    },
+    {
+      "english": "Joplin",
+      "ukrainian": "Джоплін"
+    },
+    {
+      "english": "Junction",
+      "ukrainian": "Джанкшен"
+    },
+    {
+      "english": "Junction City",
+      "ukrainian": "Джанкшен-Сіті"
+    },
+    {
+      "english": "Kalispell",
+      "ukrainian": "Каліспелл"
+    },
+    {
+      "english": "Kayenta",
+      "ukrainian": "Каєнта"
+    },
+    {
+      "english": "Ketchum",
+      "ukrainian": "Кетчум"
+    },
+    {
+      "english": "Kirksville",
+      "ukrainian": "Кірксвілл"
+    },
+    {
+      "english": "Klamath Falls",
+      "ukrainian": "Кламат-Фоллс"
+    },
+    {
+      "english": "Lake Havasu City",
+      "ukrainian": "Лейк-Гавасу-Сіті"
+    },
+    {
+      "english": "Lakeview",
+      "ukrainian": "Лейкв'ю"
+    },
+    {
+      "english": "Lamar",
+      "ukrainian": "Ламар"
+    },
+    {
+      "english": "Laramie",
+      "ukrainian": "Ларамі"
+    },
+    {
+      "english": "Laredo",
+      "ukrainian": "Ларедо"
+    },
+    {
+      "english": "Las Cruces",
+      "ukrainian": "Лас-Крусес"
+    },
+    {
+      "english": "Laurel",
+      "ukrainian": "Лорел"
+    },
+    {
+      "english": "Lawton",
+      "ukrainian": "Лоутон"
+    },
+    {
+      "english": "Lewiston",
+      "ukrainian": "Льюїстон"
+    },
+    {
+      "english": "Lewistown",
+      "ukrainian": "Льюїстаун"
+    },
+    {
+      "english": "Lincoln",
+      "ukrainian": "Лінкольн"
+    },
+    {
+      "english": "Little Rock",
+      "ukrainian": "Літл-Рок"
+    },
+    {
+      "english": "Logan",
+      "ukrainian": "Логан"
+    },
+    {
+      "english": "Longview",
+      "ukrainian": "Лонгв'ю"
+    },
+    {
+      "english": "Lufkin",
+      "ukrainian": "Лафкін"
+    },
+    {
+      "english": "Marysville",
+      "ukrainian": "Мерісвілл"
+    },
+    {
+      "english": "Maryville",
+      "ukrainian": "Мерівілл"
+    },
+    {
+      "english": "Mason City",
+      "ukrainian": "Мейсон-Сіті"
+    },
+    {
+      "english": "McAlester",
+      "ukrainian": "Макалестер"
+    },
+    {
+      "english": "McAllen",
+      "ukrainian": "Мак-Аллен"
+    },
+    {
+      "english": "McCook",
+      "ukrainian": "Мак-Кук"
+    },
+    {
+      "english": "Modesto",
+      "ukrainian": "Модесто"
+    },
+    {
+      "english": "Mojave",
+      "ukrainian": "Мохаве"
+    },
+    {
+      "english": "Monroe",
+      "ukrainian": "Монро"
+    },
+    {
+      "english": "Nampa",
+      "ukrainian": "Нампа"
+    },
+    {
+      "english": "Natchitoches",
+      "ukrainian": "Накітош"
+    },
+    {
+      "english": "Newport",
+      "ukrainian": "Ньюпорт"
+    },
+    {
+      "english": "Norfolk",
+      "ukrainian": "Норфолк"
+    },
+    {
+      "english": "North Platte",
+      "ukrainian": "Норт-Платт"
+    },
+    {
+      "english": "Ogden",
+      "ukrainian": "Огден"
+    },
+    {
+      "english": "Omaha",
+      "ukrainian": "Омаха"
+    },
+    {
+      "english": "Omak",
+      "ukrainian": "Омак"
+    },
+    {
+      "english": "Ottumwa",
+      "ukrainian": "Оттамва"
+    },
+    {
+      "english": "Oxnard",
+      "ukrainian": "Окснард"
+    },
+    {
+      "english": "Page",
+      "ukrainian": "Пейдж"
+    },
+    {
+      "english": "Pendleton",
+      "ukrainian": "Пендлтон"
+    },
+    {
+      "english": "Phillipsburg",
+      "ukrainian": "Філліпсбург"
+    },
+    {
+      "english": "Pine Bluff",
+      "ukrainian": "Пайн-Блафф"
+    },
+    {
+      "english": "Pioche",
+      "ukrainian": "Пайоч"
+    },
+    {
+      "english": "Pittsburg",
+      "ukrainian": "Піттсбург"
+    },
+    {
+      "english": "Pocatello",
+      "ukrainian": "Покателло"
+    },
+    {
+      "english": "Poplar Bluff",
+      "ukrainian": "Поплар-Блафф"
+    },
+    {
+      "english": "Port Angeles",
+      "ukrainian": "Порт-Анджелес"
+    },
+    {
+      "english": "Port Fourchon",
+      "ukrainian": "Порт-Фуршон"
+    },
+    {
+      "english": "Price",
+      "ukrainian": "Прайс"
+    },
+    {
+      "english": "Primm",
+      "ukrainian": "Примм"
+    },
+    {
+      "english": "Provo",
+      "ukrainian": "Прово"
+    },
+    {
+      "english": "Rangely",
+      "ukrainian": "Ренглі"
+    },
+    {
+      "english": "Raton",
+      "ukrainian": "Ратон"
+    },
+    {
+      "english": "Rawlins",
+      "ukrainian": "Ролінс"
+    },
+    {
+      "english": "Riverton",
+      "ukrainian": "Рівертон"
+    },
+    {
+      "english": "Rock Springs",
+      "ukrainian": "Рок-Спрінгс"
+    },
+    {
+      "english": "Rolla",
+      "ukrainian": "Ролла"
+    },
+    {
+      "english": "Salina",
+      "ukrainian": "Саліна"
+    },
+    {
+      "english": "Salmon",
+      "ukrainian": "Салмон"
+    },
+    {
+      "english": "San Angelo",
+      "ukrainian": "Сан-Анджело"
+    },
+    {
+      "english": "San Jose",
+      "ukrainian": "Сан-Хосе"
+    },
+    {
+      "english": "San Simon",
+      "ukrainian": "Сан-Саймон"
+    },
+    {
+      "english": "Sandpoint",
+      "ukrainian": "Сандпойнт"
+    },
+    {
+      "english": "Santa Cruz",
+      "ukrainian": "Санта-Круз"
+    },
+    {
+      "english": "Santa Maria",
+      "ukrainian": "Санта-Марія"
+    },
+    {
+      "english": "Scottsbluff",
+      "ukrainian": "Скоттсблафф"
+    },
+    {
+      "english": "Show Low",
+      "ukrainian": "Шоу-Лоу"
+    },
+    {
+      "english": "Sidney",
+      "ukrainian": "Сідні"
+    },
+    {
+      "english": "Sierra Vista",
+      "ukrainian": "Сьєрра-Віста"
+    },
+    {
+      "english": "Socorro",
+      "ukrainian": "Сокорро"
+    },
+    {
+      "english": "Springdale",
+      "ukrainian": "Спрінгдейл"
+    },
+    {
+      "english": "Springfield",
+      "ukrainian": "Спрінгфілд"
+    },
+    {
+      "english": "St. George",
+      "ukrainian": "Сент-Джордж"
+    },
+    {
+      "english": "St. Joseph",
+      "ukrainian": "Сент-Джозеф"
+    },
+    {
+      "english": "St. Louis",
+      "ukrainian": "Сент-Луїс"
+    },
+    {
+      "english": "Steamboat Springs",
+      "ukrainian": "Стімбот-Спрінгс"
+    },
+    {
+      "english": "Sterling",
+      "ukrainian": "Стерлінг"
+    },
+    {
+      "english": "Stockton",
+      "ukrainian": "Стоктон"
+    },
+    {
+      "english": "The Dalles",
+      "ukrainian": "Даллес"
+    },
+    {
+      "english": "Thompson Falls",
+      "ukrainian": "Томпсон-Фоллс"
+    },
+    {
+      "english": "Tonopah",
+      "ukrainian": "Тонопа"
+    },
+    {
+      "english": "Topeka",
+      "ukrainian": "Топіка"
+    },
+    {
+      "english": "Truckee",
+      "ukrainian": "Тракі"
+    },
+    {
+      "english": "Tucumcari",
+      "ukrainian": "Тукумкарі"
+    },
+    {
+      "english": "Tyler",
+      "ukrainian": "Тайлер"
+    },
+    {
+      "english": "Ukiah",
+      "ukrainian": "Юкайя"
+    },
+    {
+      "english": "Valentine",
+      "ukrainian": "Валентайн"
+    },
+    {
+      "english": "Van Horn",
+      "ukrainian": "Ван-Горн"
+    },
+    {
+      "english": "Vancouver",
+      "ukrainian": "Ванкувер"
+    },
+    {
+      "english": "Victoria",
+      "ukrainian": "Вікторія"
+    },
+    {
+      "english": "Waco",
+      "ukrainian": "Вейко"
+    },
+    {
+      "english": "Woodward",
+      "ukrainian": "Вудворд"
+    },
+    {
+      "english": "Bloomington",
+      "ukrainian": "Блумінгтон"
+    },
+    {
+      "english": "Champaign",
+      "ukrainian": "Шампейн"
+    },
+    {
+      "english": "Chicago",
+      "ukrainian": "Чикаго"
+    },
+    {
+      "english": "East St. Louis",
+      "ukrainian": "Іст-Сент-Луїс"
+    },
+    {
+      "english": "Effingham",
+      "ukrainian": "Еффінгем"
+    },
+    {
+      "english": "Marion",
+      "ukrainian": "Маріон"
+    },
+    {
+      "english": "Moline",
+      "ukrainian": "Молін"
+    },
+    {
+      "english": "Peoria",
+      "ukrainian": "Пеорія"
+    },
+    {
+      "english": "Quincy",
+      "ukrainian": "Квінсі"
+    },
+    {
+      "english": "Rockford",
+      "ukrainian": "Рокфорд"
+    },
+    {
+      "english": "Springfield",
+      "ukrainian": "Спрінгфілд"
+    }
+  ]
+}

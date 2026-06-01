@@ -1,0 +1,51 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>TruckSim_Widget</RootNamespace>
+    <AssemblyName>TruckSim Widget</AssemblyName>
+    <Version>1.2.0</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationIcon>favicon.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Exclude Updater subdirectory from main project compilation -->
+  <ItemGroup>
+    <Compile Remove="Updater\**" />
+    <None Remove="Updater\**" />
+    <Content Remove="Updater\**" />
+    <EmbeddedResource Remove="Updater\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="favicon.ico" />
+    <Content Include="Resources\city_translations_uk.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="SCSSdkClient">
+      <HintPath>..\..\..\..\Downloads\release_v_1_12_1\release_v_1_12_1\Demo\SCSSdkClient.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Build and copy updater.exe to output directory -->
+  <Target Name="BuildAndCopyUpdater" AfterTargets="Build;Publish">
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q"
+          ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
+          DestinationFolder="$(OutputPath)"
+          SkipUnchangedFiles="true"
+          ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
+          DestinationFolder="$(PublishDir)"
+          Condition="'$(PublishDir)' != ''"
+          SkipUnchangedFiles="true"
+          ContinueOnError="true" />
+  </Target>
+
+</Project>
