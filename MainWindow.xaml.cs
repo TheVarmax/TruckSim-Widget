@@ -681,9 +681,15 @@ namespace ETSOverlay
                                 UpdateDeliveryTypeUI(currentSpeed);
 
                                 // Отрисовка прогресса
+                                // Используем данные от навигатора (advisor) в реальном времени, чтобы итоговый километраж
+                                // обновлялся при перестроении маршрута. Берём пройденное + оставшееся по навигатору.
                                 float remaining = (data.NavigationValues.NavigationDistance / 1000f) * distanceFactor;
                                 int drivenInt = Math.Max(0, (int)Math.Round(jobDrivenDistance));
-                                int totalInt = (int)Math.Round(plannedDist);
+                                // totalFromAdvisor — текущее ожидаемое суммарное расстояние (пройдено + оставшееся по навигатору)
+                                float totalFromAdvisor = jobDrivenDistance + remaining;
+                                // На случай, если PlannedDistance из JobValues актуален и больше (редкие случаи), берём максимум
+                                float totalCandidate = Math.Max(totalFromAdvisor, plannedDist);
+                                int totalInt = Math.Max(0, (int)Math.Round(totalCandidate));
 
                                 DistanceInfo.Text = uiLanguage == "uk"
                                     ? $"{drivenInt} / {totalInt} {GetDistanceUnitShort()}"
