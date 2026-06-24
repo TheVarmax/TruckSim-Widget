@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/icon.png" width="100" />
+  <img src="assets/icon.png" width="100" alt="TruckSim Widget icon" />
 </p>
 
 <p align="center">
@@ -12,11 +12,11 @@
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
-  Lightweight status and telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator
+  A lightweight TrucksBook status and telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator.
 </p>
 
 <p align="center">
-  <strong>TrucksBook status • Delivery tracking • Smart alerts • Auto-hide overlay</strong>
+  <strong>Know your delivery is being tracked. Stay out of the way when it is.</strong>
 </p>
 
 <p align="center">
@@ -35,53 +35,79 @@
 
 ---
 
-## What is this?
+## Why TruckSim Widget?
 
-TruckSim Widget is a lightweight overlay that runs alongside Euro Truck Simulator 2 and American Truck Simulator.
+TrucksBook is great at recording deliveries, but it is not always obvious whether everything is actually working while you drive. TruckSim Widget gives you a small, clear status layer over ETS2 or ATS, so you can immediately see whether TrucksBook is online, telemetry is connected, and your current delivery is being tracked.
 
-Its main purpose is to make TrucksBook status easy to see while you drive: whether the client is running, telemetry is connected, and a delivery is being tracked correctly. It also displays essential trip information without turning your screen into another dashboard.
+It is not trying to replace the in-game GPS or build another giant dashboard on top of your game. It shows the essentials, stays quiet when everything is healthy, and becomes visible when something needs attention.
+
+---
+
+## At a glance
+
+| You can see | Why it matters |
+| --- | --- |
+| **TrucksBook status** | Know whether the client is online and tracking correctly. |
+| **Telemetry status** | Catch a missing or disconnected telemetry plugin early. |
+| **Delivery state** | See whether a job is active, paused, delivered, or needs attention. |
+| **Route and distance** | Keep essential trip information visible without opening extra windows. |
+| **Warnings and errors** | Notice recording, sync, upload, or client issues before they ruin a delivery. |
 
 ---
 
 ## Features
 
-### 📊 TrucksBook status & smart alerts
+### 📊 TrucksBook status and smart alerts
 
-See whether TrucksBook is online and recording correctly. The widget highlights meaningful issues such as client, telemetry, recording, synchronization, or upload problems.
+The widget continuously checks the state of TrucksBook and surfaces meaningful problems instead of making you guess. It can highlight client, telemetry, recording, synchronization, and upload issues while a delivery is in progress.
 
 ### 📦 Delivery tracking
 
-Shows cargo status, route, driven distance, and current trip progress.
+See your cargo state, route, driven distance, and current delivery progress in one compact overlay.
 
 ### 🚛 Live telemetry
 
-Real-time speed, route, game state, and delivery information from ETS2 and ATS.
+Get real-time speed, route, game state, and delivery information directly from ETS2 or ATS.
 
-### 🫥 Auto-hide mode
+### 🫥 Auto-hide
 
-When everything is healthy, the widget can fade into an unobtrusive idle state. It expands when you hover over it and immediately becomes visible again when a warning or error is detected.
+When everything is healthy, the widget can fade into an unobtrusive idle state. Hover over it to bring it back, or let an alert reveal it automatically when attention is needed.
 
-Auto-hide also works correctly when the game is closed, keeping the overlay out of the way unless attention is needed.
+Auto-hide also behaves correctly while the game is closed, so the overlay does not linger in your way for no reason. A small miracle of restraint in software.
 
 ### 🎛️ Flexible interface
 
-Choose between Full and Minimal UI modes, adjust opacity and scale, and keep the widget pinned above the game when needed.
+Choose between **Full** and **Minimal** layouts, adjust opacity and scale, and pin the widget above the game when needed.
 
 ### ⚠️ Speed warnings
 
-Configurable speed warnings with visual indicators.
+Set a speed warning threshold and receive a clear visual indication when you exceed it.
 
-### 🌍 Localization
+### 🌍 English and Ukrainian
 
-English and Ukrainian interface support, including English → Ukrainian city name translation in beta.
+The interface supports English and Ukrainian. City names can also be translated from English to Ukrainian; this feature is still in beta.
 
-### ✨ Polished UI
+### ✨ Refined experience
 
-Fully themed dialogs, smooth widget and settings animations, refined layouts, and animated settings dropdowns.
+TruckSim Widget includes themed dialogs, smooth launch and settings animations, polished layout transitions, and custom animated dropdowns.
 
-### 🔄 Safer update experience
+### 🔄 Better updates
 
-Built-in updates keep the app current. After a successful update, TruckSim Widget now shows an in-app success dialog with quick links instead of forcibly opening a browser page.
+The built-in updater keeps the app current. After a successful update, the widget now shows an in-app confirmation window with useful links instead of forcing a browser page open.
+
+---
+
+## Quick start
+
+Already know what you are doing? This is the whole setup:
+
+1. Download and extract TruckSim Widget.
+2. Copy `scs-telemetry.dll` from the included `plugin` folder into your game's `plugins` folder.
+3. Start TrucksBook Client and sign in.
+4. Launch ETS2 or ATS, then start TruckSim Widget.
+5. Check that TrucksBook and telemetry are online. Drive.
+
+For the human-friendly version, keep reading.
 
 ---
 
@@ -91,56 +117,85 @@ Built-in updates keep the app current. After a successful update, TruckSim Widge
 
 You need:
 
-* Windows 10 or Windows 11
-* Euro Truck Simulator 2 or American Truck Simulator installed through Steam
-* [TrucksBook Client](https://trucksbook.eu/) installed and signed in (required for mileage tracking)
+- Windows 10 or Windows 11
+- Euro Truck Simulator 2 or American Truck Simulator installed through Steam
+- [TrucksBook Client](https://trucksbook.eu/) installed and signed in, because it handles mileage tracking
 
-### 1. Download TruckSim Widget
+### 1. Download the widget
 
 1. Open the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/latest).
 2. Under **Assets**, download the TruckSim Widget `.zip` archive.
-3. When the download finishes, right-click the archive and choose **Extract All...**.
-4. Choose any folder where you want to keep the widget, for example `Documents\TruckSim Widget`.
+3. When the download is complete, right-click the ZIP file and choose **Extract All...**.
+4. Pick a permanent folder for the app, for example:
 
-> Do not run the app directly from inside the ZIP archive. Extract the whole archive first.
+```text
+Documents\TruckSim Widget
+```
+
+> **Important:** Do not run the app from inside the ZIP archive. Extract the entire archive first and keep its files together.
 
 ### 2. Install the telemetry plugin
 
-Inside the extracted TruckSim Widget folder, open the `plugin` folder. It contains `scs-telemetry.dll`.
+Open the extracted TruckSim Widget folder, then open the `plugin` folder inside it. You will find:
 
-Copy `scs-telemetry.dll` into the `plugins` folder for every game you want to use with TruckSim Widget.
+```text
+scs-telemetry.dll
+```
+
+Copy that file into the `plugins` folder of every game you want to use with TruckSim Widget.
 
 #### Euro Truck Simulator 2
 
-```
+```text
 ...\Steam\steamapps\common\Euro Truck Simulator 2\bin\win_x64\plugins
 ```
 
 #### American Truck Simulator
 
-```
+```text
 ...\Steam\steamapps\common\American Truck Simulator\bin\win_x64\plugins
 ```
 
 If the `plugins` folder does not exist, create it manually.
 
-> Copy only `scs-telemetry.dll` into the game's `plugins` folder. Keep the rest of the TruckSim Widget files together in the folder where you extracted the archive.
+> Copy **only** `scs-telemetry.dll` into the game folder. Leave the rest of TruckSim Widget together in the folder where you extracted the archive.
 
-### 3. Start the widget
+### 3. Start everything in the right order
 
-1. Start TrucksBook Client and make sure you are signed in.
-2. Launch ETS2 or ATS and load your profile.
-3. Open `TruckSim Widget.exe` from the extracted TruckSim Widget folder.
-4. Check that the widget shows TrucksBook as online and telemetry as connected.
+1. Start **TrucksBook Client** and make sure you are signed in.
+2. Launch **ETS2** or **ATS**, then load your profile.
+3. Open `TruckSim Widget.exe` from the folder where you extracted the app.
+4. Check the widget:
+   - TrucksBook should show as online.
+   - Telemetry should show as connected.
 5. Start driving.
+
+---
+
+## When the widget shows a warning
+
+A warning is there to save a delivery, not to decorate the screen.
+
+| What you see | What to check first |
+| --- | --- |
+| **TrucksBook offline** | Start TrucksBook Client and sign in. |
+| **Telemetry issue** | Check that `scs-telemetry.dll` is in the correct game's `plugins` folder. |
+| **Recording or sync warning** | Keep TrucksBook open and check its current status before continuing the delivery. |
+| **Upload-related warning** | Let TrucksBook stay open until the completed delivery is processed. |
+
+If something behaves unexpectedly, use the project website or the Telegram link above to report it with the relevant logs.
 
 ---
 
 ## Notes
 
-City localization is still in beta.
+### City translation
 
-Some city names may be missing or inaccurate due to the large amount of DLC content in ETS2 and ATS. Coverage is actively improving.
+City localization is still in beta. Some city names may be missing or inaccurate because ETS2 and ATS have a large amount of map and DLC content. Coverage is being improved over time.
+
+### Compatibility
+
+TruckSim Widget is an independent project. It is not affiliated with, endorsed by, or associated with SCS Software, Euro Truck Simulator 2, American Truck Simulator, or TrucksBook.
 
 ---
 
@@ -148,13 +203,13 @@ Some city names may be missing or inaccurate due to the large amount of DLC cont
 
 > Show only what matters. Nothing more.
 
-TruckSim Widget is built to stay quiet when everything works and become useful the moment something needs your attention.
+TruckSim Widget should reassure you when everything works, not demand attention for its own sake. When something goes wrong, it should make the problem obvious before a long delivery becomes a very annoying lesson.
 
 ---
 
 ## Support
 
-If you enjoy TruckSim Widget and want to support its development, you can do so here:
+TruckSim Widget is free to use. If it helps you keep your deliveries tracked and you would like to support development, you can do so here:
 
 <p align="center">
   <a href="https://buymeacoffee.com/thevarmax">
@@ -178,15 +233,14 @@ You are free to use, modify, and distribute this software, including for commerc
 
 The MPL-2.0 license does not grant rights to use the TruckSim Widget name, logo, branding, or other project trademarks.
 
-This project is not affiliated with, endorsed by, or associated with SCS Software, Euro Truck Simulator 2, American Truck Simulator, or TrucksBook.
-
-For full license details, see the [LICENSE](LICENSE) file.
+For full license details, see [LICENSE](LICENSE).
 
 ---
 
-<p align="center"> 
+<p align="center">
   Built with ❤️ for the Truck Simulator community
 </p>
-<p align="center"> 
-  https://trucksim.maksym.uk 
+
+<p align="center">
+  <a href="https://trucksim.maksym.uk">trucksim.maksym.uk</a>
 </p>
