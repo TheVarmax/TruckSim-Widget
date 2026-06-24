@@ -101,6 +101,18 @@ namespace ETSOverlay
             }
         }
 
+        private void AutoHideToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            _mainWindow.OnAutoHideEnabledChanged(true);
+        }
+
+        private void AutoHideToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            _mainWindow.OnAutoHideEnabledChanged(false);
+        }
+
         // --- Public methods for MainWindow to sync state ---
 
         public void SuppressEvents(bool suppress)
@@ -122,6 +134,10 @@ namespace ETSOverlay
             }
             SpeedWarningLabel.Text = isUk ? "Поріг швидкості" : "Speed warning";
             ScaleLabel.Text = isUk ? "Масштаб" : "Scale";
+            AutoHideLabel.Text = isUk ? "Автоскривання" : "Auto-hide";
+            AutoHideHint.Text = isUk
+                ? "Використовує лише статус TruckBook. Тимчасово приховує вибраний режим інтерфейсу, коли статус спокійний."
+                : "Uses TruckBook status only. Temporarily hides the selected UI mode when status is calm.";
             if (!_mainWindow._isCheckingUpdate)
             {
                 BtnCheckUpdate.Content = isUk ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
@@ -141,6 +157,13 @@ namespace ETSOverlay
                     break;
                 }
             }
+            _suppressEvents = false;
+        }
+
+        public void SetAutoHideEnabled(bool enabled)
+        {
+            _suppressEvents = true;
+            AutoHideToggle.IsChecked = enabled;
             _suppressEvents = false;
         }
 

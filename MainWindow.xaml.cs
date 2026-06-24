@@ -112,6 +112,16 @@ namespace ETSOverlay
         private bool _isDesync = false;
 
         private string _uiMode = "full";
+        private bool _autoHideEnabled = false;
+        private DispatcherTimer? _idleTimer;
+        private bool _isIdle = false;
+        private const int IdleDelaySeconds = 3;
+        private const double IdleOpacity = 0.25;
+        private int _autoHideQuietMs = 0;
+        private const int AutoHideTickMs = 250;
+
+        private enum HealthStatus { Neutral, Healthy, Warning, Error }
+        private HealthStatus _currentHealth = HealthStatus.Neutral;
         private double windowOpacity = 0.85;
         private string uiLanguage = "en";
         private readonly Dictionary<string, string> _ets2CityTranslations = new(StringComparer.OrdinalIgnoreCase);
@@ -152,6 +162,7 @@ namespace ETSOverlay
             public string UIMode { get; set; } = "full";
             public double WindowOpacity { get; set; }
             public string UiLanguage { get; set; } = "en";
+            public bool AutoHideEnabled { get; set; } = false;
             public double SettingsLeft { get; set; } = double.NaN;
             public double SettingsTop { get; set; } = double.NaN;
             public int UiScale { get; set; } = 100;
@@ -252,6 +263,18 @@ namespace ETSOverlay
             tbTimer.Interval = TimeSpan.FromSeconds(1);
             tbTimer.Tick += (s, e) => { CheckStatusAndProcesses(); };
             tbTimer.Start();
+
+            // Idle timer for autohide
+            _idleTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(AutoHideTickMs) };
+            _idleTimer.Tick += (s, e) =>
+            {
+                EvaluateAutoHideState();
+            };
+
+            if (_autoHideEnabled)
+            {
+                StartIdleTimer();
+            }
 
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
@@ -1263,6 +1286,25 @@ namespace ETSOverlay
         {
             StatusValue.Text = text;
             StatusValue.Foreground = color ?? Brushes.White;
+
+            // Infer health status from color and react for autohide mode
+            HealthStatus newStatus = HealthStatus.Neutral;
+            if (color is SolidColorBrush sc)
+            {
+                var c = sc.Color;
+                // Green-ish -> Healthy
+                if (c.G > 150 && c.R < 150 && c.B < 150) newStatus = HealthStatus.Healthy;
+                // Red-ish -> Error
+                else if (c.R > 180 && c.G < 140) newStatus = HealthStatus.Error;
+                // Orange/Yellow-ish -> Warning
+                else if (c.R > 180 && c.G > 120 && c.B < 140) newStatus = HealthStatus.Warning;
+                else newStatus = HealthStatus.Neutral;
+            }
+            else if (color == Brushes.Red) newStatus = HealthStatus.Error;
+            else if (color == Brushes.Orange || color == Brushes.Yellow) newStatus = HealthStatus.Warning;
+            else if (color == Brushes.White) newStatus = HealthStatus.Healthy;
+
+            OnStatusLevelChanged(newStatus);
         }
 
         private void ClearAllJobData()
@@ -1496,6 +1538,7 @@ namespace ETSOverlay
                     UIMode = _uiMode,
                     WindowOpacity = windowOpacity,
                     UiLanguage = uiLanguage,
+                    AutoHideEnabled = _autoHideEnabled,
                     SettingsLeft = _settingsWindow?.Left ?? _savedSettingsLeft,
                     SettingsTop = _settingsWindow?.Top ?? _savedSettingsTop,
                     UiScale = _uiScale,
@@ -1527,6 +1570,7 @@ namespace ETSOverlay
                             Top = state.Top;
                             _uiMode = state.UIMode ?? "full";
                             windowOpacity = state.WindowOpacity;
+                            _autoHideEnabled = state.AutoHideEnabled;
                             uiLanguage = string.IsNullOrWhiteSpace(state.UiLanguage) ? "en" : state.UiLanguage;
                             if (windowOpacity <= 0 || windowOpacity > 1)
                             {
@@ -1674,6 +1718,7 @@ namespace ETSOverlay
                 _settingsWindow.SetSpeedWarningText(Math.Max(0, CurrentSpeedWarning).ToString());
                 _settingsWindow.SetVersionText($"v{GetCurrentVersion()}");
                 _settingsWindow.SetScale(_uiScale);
+                _settingsWindow.SetAutoHideEnabled(_autoHideEnabled);
                 _settingsWindow.UpdateLocalization(uiLanguage == "uk");
                 // Restore saved position if available
                 if (!double.IsNaN(_savedSettingsLeft) && !double.IsNaN(_savedSettingsTop))
@@ -1682,6 +1727,7 @@ namespace ETSOverlay
                     _settingsWindow.Top = _savedSettingsTop;
                 }
             }
+
             if (!_settingsWindow.IsVisible)
             {
                 _settingsWindow.Opacity = 0;
@@ -1700,11 +1746,14 @@ namespace ETSOverlay
                 {
                     var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
                     var currentHeight = CollapsibleSection.ActualHeight;
+                    CollapsibleSection.Height = currentHeight;
                     var shrink = new DoubleAnimation(currentHeight, 0, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
 
                     shrink.Completed += (s, ev) => 
                     {
+                        CollapsibleSection.BeginAnimation(HeightProperty, null);
                         CollapsibleSection.Visibility = Visibility.Collapsed;
+                        CollapsibleSection.Height = double.NaN;
                     };
 
                     CollapsibleSection.BeginAnimation(OpacityProperty, fadeOut);
@@ -1770,11 +1819,39 @@ namespace ETSOverlay
             SaveState();
         }
 
+        // Called by SettingsWindow when Auto-hide enabled toggles
+        public void OnAutoHideEnabledChanged(bool enabled)
+        {
+            _autoHideEnabled = enabled;
+            SaveState();
+            if (_autoHideEnabled)
+            {
+                _autoHideQuietMs = IdleDelaySeconds * 1000;
+                StartIdleTimer();
+                EvaluateAutoHideState();
+            }
+            else
+            {
+                StopIdleTimer();
+                ExitIdleState();
+            }
+        }
+
+        public void SetAutoHideEnabled(bool enabled)
+        {
+            _autoHideEnabled = enabled;
+            if (_settingsWindow != null && _settingsWindow.IsVisible)
+            {
+                _settingsWindow.SetAutoHideEnabled(enabled);
+            }
+        }
+
         // Public methods called by SettingsWindow
         public void OnUIModeChanged(string mode)
         {
             _uiMode = mode;
             ApplyUIMode();
+            EnsureAutohideConsistency();
             SaveState();
         }
 
@@ -2997,9 +3074,154 @@ namespace ETSOverlay
         public void NotifyOverlayHover(bool isHovering)
         {
             _overlayHover = isHovering;
-            if (!isHovering)
+            if (isHovering)
+            {
+                // cancel autohide while interacting with overlay
+                StopIdleTimer();
+                ExitIdleState();
+            }
+            else
             {
                 StartOverlayHideTimer();
+                if (_autoHideEnabled)
+                {
+                    StartIdleTimer();
+                }
+            }
+        }
+
+        private void OnStatusLevelChanged(HealthStatus newStatus)
+        {
+            _currentHealth = newStatus;
+            EvaluateAutoHideState();
+        }
+
+        private void StartIdleTimer()
+        {
+            if (_idleTimer == null || _idleTimer.IsEnabled) return;
+            _idleTimer.Start();
+        }
+
+        private void StopIdleTimer()
+        {
+            _idleTimer?.Stop();
+            _autoHideQuietMs = 0;
+        }
+
+        private bool CanAutoHideNow()
+        {
+            if (!_autoHideEnabled) return false;
+            if (_currentHealth == HealthStatus.Error || _currentHealth == HealthStatus.Warning) return false;
+            if (_overlayHover) return false;
+            if (IsPointerInHoverZone()) return false;
+            return true;
+        }
+
+        private void EvaluateAutoHideState()
+        {
+            if (!_autoHideEnabled)
+            {
+                StopIdleTimer();
+                ExitIdleState();
+                return;
+            }
+
+            if (!CanAutoHideNow())
+            {
+                _autoHideQuietMs = 0;
+                if (_isIdle) ExitIdleState();
+                return;
+            }
+
+            if (_isIdle) return;
+
+            _autoHideQuietMs += AutoHideTickMs;
+            if (_autoHideQuietMs >= IdleDelaySeconds * 1000)
+            {
+                _autoHideQuietMs = 0;
+                EnterIdleState();
+            }
+        }
+
+        private void EnterIdleState()
+        {
+            if (_isIdle) return;
+            _isIdle = true;
+
+            _autoHideQuietMs = 0;
+
+            MainBorder.BeginAnimation(OpacityProperty, null);
+            var idleOpacityAnim = new DoubleAnimation(IdleOpacity, TimeSpan.FromSeconds(0.18));
+            MainBorder.BeginAnimation(OpacityProperty, idleOpacityAnim);
+
+            if (_uiMode == "full")
+            {
+                // collapse the collapsible section (animate similar to ApplyUIMode minimal)
+                // Clear any existing animations first to avoid stuck animation state
+                CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSection.BeginAnimation(HeightProperty, null);
+                if (CollapsibleSection.Visibility == Visibility.Visible)
+                {
+                    var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.15));
+                    var currentHeight = CollapsibleSection.ActualHeight;
+                    CollapsibleSection.Height = currentHeight;
+                    var shrink = new DoubleAnimation(currentHeight, 0, TimeSpan.FromSeconds(0.2)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                    shrink.Completed += (s, ev) => 
+                    { 
+                        CollapsibleSection.BeginAnimation(HeightProperty, null);
+                        CollapsibleSection.Visibility = Visibility.Collapsed; 
+                        CollapsibleSection.Height = double.NaN;
+                    };
+                    CollapsibleSection.BeginAnimation(OpacityProperty, fadeOut);
+                    CollapsibleSection.BeginAnimation(HeightProperty, shrink);
+                }
+            }
+            else
+            {
+                // Keep minimal mode collapsed
+                CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSection.BeginAnimation(HeightProperty, null);
+                CollapsibleSection.Visibility = Visibility.Collapsed;
+                CollapsibleSection.Opacity = 0;
+            }
+        }
+
+        private void ExitIdleState()
+        {
+            if (!_isIdle) return;
+            _isIdle = false;
+
+            _autoHideQuietMs = 0;
+
+            MainBorder.BeginAnimation(OpacityProperty, null);
+            var restoreOpacityAnim = new DoubleAnimation(windowOpacity, TimeSpan.FromSeconds(0.18));
+            restoreOpacityAnim.Completed += (s, ev) => ApplyDualLayerOpacity();
+            MainBorder.BeginAnimation(OpacityProperty, restoreOpacityAnim);
+
+            if (_uiMode == "full")
+            {
+                // restore collapsible section
+                CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSection.BeginAnimation(HeightProperty, null);
+                CollapsibleSection.Visibility = Visibility.Visible;
+                CollapsibleSection.Height = double.NaN;
+                CollapsibleSection.UpdateLayout();
+                var targetHeight = CollapsibleSection.ActualHeight;
+                CollapsibleSection.Height = 0;
+                CollapsibleSection.Opacity = 0;
+                var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.18)) { BeginTime = TimeSpan.FromSeconds(0.05) };
+                var grow = new DoubleAnimation(0, targetHeight, TimeSpan.FromSeconds(0.2)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                grow.Completed += (s, ev) => { CollapsibleSection.BeginAnimation(HeightProperty, null); CollapsibleSection.Height = double.NaN; };
+                CollapsibleSection.BeginAnimation(OpacityProperty, fadeIn);
+                CollapsibleSection.BeginAnimation(HeightProperty, grow);
+            }
+            else
+            {
+                // Keep minimal mode collapsed
+                CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSection.BeginAnimation(HeightProperty, null);
+                CollapsibleSection.Visibility = Visibility.Collapsed;
+                CollapsibleSection.Opacity = 0;
             }
         }
 
@@ -3010,6 +3232,9 @@ namespace ETSOverlay
 
         private void MainBorder_MouseEnter(object sender, MouseEventArgs e)
         {
+            // Cancel autohide idle when pointer enters
+            ExitIdleState();
+            StopIdleTimer();
             UpdateOverlayVisibility(e.GetPosition(MainBorder));
         }
 
@@ -3022,6 +3247,11 @@ namespace ETSOverlay
         {
             if (_overlayHover) return;
             StartOverlayHideTimer();
+            if (_autoHideEnabled)
+            {
+                StartIdleTimer();
+            }
+            EvaluateAutoHideState();
         }
 
         private void UpdateOverlayVisibility(Point position)
@@ -3042,6 +3272,7 @@ namespace ETSOverlay
 
         private bool IsPointerInHoverZone()
         {
+            if (!MainBorder.IsMouseOver) return false;
             var position = Mouse.GetPosition(MainBorder);
             return position.Y >= 0 && position.Y <= HeaderHoverZoneHeight;
         }
@@ -3051,6 +3282,31 @@ namespace ETSOverlay
             if (_overlayHideTimer == null) return;
             _overlayHideTimer.Stop();
             _overlayHideTimer.Start();
+        }
+
+        // Ensure autohide state consistency when applying UI mode
+        private void EnsureAutohideConsistency()
+        {
+            if (_autoHideEnabled)
+            {
+                // If current status is healthy, start idle timer; otherwise ensure exit idle
+                if (_currentHealth == HealthStatus.Healthy && !_overlayHover && !IsPointerInHoverZone())
+                {
+                    _autoHideQuietMs = 0;
+                    StartIdleTimer();
+                }
+                else
+                {
+                    StopIdleTimer();
+                    ExitIdleState();
+                }
+            }
+            else
+            {
+                // Not autohide -> ensure no idle state remains
+                StopIdleTimer();
+                ExitIdleState();
+            }
         }
 
 

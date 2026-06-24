@@ -45,8 +45,8 @@
                        MouseEnter="HeaderHover_Enter"/>
 
             <!-- INTRO OVERLAY -->
-            <Grid x:Name="IntroOverlay" Background="#1A1C20" Panel.ZIndex="100" Visibility="Collapsed">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-10,0,0">
+            <Grid x:Name="IntroOverlay" Background="#1A1C20" Panel.ZIndex="100" Visibility="Collapsed" ClipToBounds="True">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0">
                     <Border Background="#252830" CornerRadius="12" Padding="8" Margin="0,0,0,12" BorderBrush="#353840" BorderThickness="1">
                         <Path Data="M20,8H17V4H3C1.89,4 1,4.89 1,6V17H3A3,3 0 0,0 6,20A3,3 0 0,0 9,17H15A3,3 0 0,0 18,20A3,3 0 0,0 21,17H23V12L20,8M6,18.5C5.17,18.5 4.5,17.83 4.5,17C4.5,16.17 5.17,15.5 6,15.5C6.83,15.5 7.5,16.17 7.5,17C7.5,17.83 6.83,18.5 6,18.5M18,18.5C17.17,18.5 16.5,17.83 16.5,17C16.5,16.17 17.17,15.5 18,15.5C18.83,15.5 19.5,16.17 19.5,17C19.5,17.83 18.83,18.5 18,18.5M17,12V9.5H19.5L21.47,12H17Z" Fill="#7AC5CD" Stretch="Uniform" Width="36" Height="36" HorizontalAlignment="Center"/>
                     </Border>
