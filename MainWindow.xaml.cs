@@ -2892,19 +2892,29 @@ namespace ETSOverlay
             }
             catch (Exception ex)
             {
+                string displayMessage = ex.Message;
+                
+                // Если ошибка 1223 (Операция отменена пользователем)
+                if (ex is System.ComponentModel.Win32Exception win32ex && win32ex.NativeErrorCode == 1223)
+                {
+                    displayMessage = uiLanguage == "uk"
+                        ? "Запуск скасовано. Якщо Windows SmartScreen заблокував запуск, натисніть «Докладніше» (More info) і виберіть «Виконати в будь-якому випадку» (Run anyway)."
+                        : "Launch canceled. If Windows SmartScreen blocked the app, click 'More info' and then 'Run anyway'.";
+                }
+
                 WriteLog($"Failed to launch updater: {ex.Message}");
 
                 if (_settingsWindow != null)
                 {
                     _settingsWindow.UpdateStatusText.Foreground = Brushes.Red;
                     _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
-                        ? $"❌ Помилка: {ex.Message}"
-                        : $"❌ Error: {ex.Message}";
+                        ? $"❌ Помилка: Запуск скасовано"
+                        : $"❌ Error: Launch canceled";
                     _settingsWindow.BtnCheckUpdate.IsEnabled = true;
                     _settingsWindow.BtnCheckUpdate.Content = uiLanguage == "uk" ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
                 }
 
-                ShowUpdateErrorDialog(ex.Message);
+                ShowUpdateErrorDialog(displayMessage);
             }
         }
 
