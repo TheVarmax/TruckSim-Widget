@@ -333,28 +333,17 @@ static class Program
                 _statusLabel.Text = _lang == "uk" ? "✅ Оновлення встановлено!" : "✅ Update installed!";
                 _progressFill.BackColor = SuccessColor;
 
-                // Открываем donate страницу
-                try
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = SuccessUrl,
-                        UseShellExecute = true
-                    });
-                }
-                catch (Exception ex)
-                {
-                    WriteLog(_logPath, $"Failed to open success page: {ex.Message}");
-                }
+                // Открытие donate страницы перенесено в само приложение после обновления
 
                 // Небольшая пауза перед перезапуском
                 await Task.Delay(1500);
 
                 // Перезапускаем приложение
-                WriteLog(_logPath, $"Restarting application: {_appExe}");
+                WriteLog(_logPath, $"Restarting application: {_appExe} with --updated flag");
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = _appExe,
+                    Arguments = "--updated",
                     WorkingDirectory = _appDir,
                     UseShellExecute = true
                 });

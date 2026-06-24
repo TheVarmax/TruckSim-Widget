@@ -303,7 +303,19 @@ namespace ETSOverlay
                 var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.3));
                 var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3));
 
-                fadeOut.Completed += (s, ev) => IntroOverlay.Visibility = Visibility.Collapsed;
+                fadeOut.Completed += (s, ev) => 
+                {
+                    IntroOverlay.Visibility = Visibility.Collapsed;
+
+                    // Show update success dialog if applicable
+                    var args = Environment.GetCommandLineArgs();
+                    if (Array.Exists(args, arg => arg == "--updated"))
+                    {
+                        var successWindow = new UpdateSuccessWindow(uiLanguage);
+                        successWindow.Owner = this;
+                        successWindow.ShowDialog();
+                    }
+                };
 
                 IntroOverlay.BeginAnimation(OpacityProperty, fadeOut);
                 MainUI.BeginAnimation(OpacityProperty, fadeIn);

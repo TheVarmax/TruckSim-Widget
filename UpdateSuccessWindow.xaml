@@ -1,0 +1,77 @@
+<Window x:Class="ETSOverlay.UpdateSuccessWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Update Successful" Width="460" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen" Topmost="True" ShowInTaskbar="False">
+
+    <Border Background="#1A1C20" CornerRadius="12" Padding="20" Margin="15">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="20" Opacity="0.5" Direction="270" ShadowDepth="4"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <TextBlock x:Name="TitleBlock" Text="UPDATE SUCCESSFUL" Foreground="#43A047" FontSize="15" FontWeight="Bold" Margin="0,0,0,15"/>
+
+            <!-- Body -->
+            <StackPanel x:Name="MessageContainer" Grid.Row="1" Margin="0,5,0,20">
+                <TextBlock x:Name="MessageBlock" Text="Оновлення успішно встановлено!" Foreground="White" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                <TextBlock x:Name="SubmessageBlock" Text="Дякуємо за використання TruckSim Widget. Ви можете слідкувати за новинами на нашому сайті або в репозиторії GitHub." Foreground="#A0A0A0" FontStyle="Italic" FontSize="13" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <!-- Buttons -->
+            <StackPanel x:Name="ButtonsPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+                <Button x:Name="BtnWebsite" Content="Сайт проєкту" Click="BtnWebsite_Click" Padding="12,0" Height="30" Margin="0,0,10,0" Cursor="Hand" Background="#43A047" Foreground="White" BorderThickness="0">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Button x:Name="BtnGitHub" Content="GitHub" Click="BtnGitHub_Click" Padding="12,0" Height="30" Margin="0,0,10,0" Cursor="Hand" Background="#2b3137" Foreground="White" BorderThickness="0">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#24292e"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+
+                <Button x:Name="BtnClose" Content="Закрити" Click="BtnClose_Click" Padding="15,0" Height="30" Cursor="Hand" Background="#3A3D45" Foreground="White" BorderThickness="0">
+                    <Button.Template>
+                        <ControlTemplate TargetType="Button">
+                            <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="border" Property="Background" Value="#E81123"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Button.Template>
+                </Button>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>
