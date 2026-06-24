@@ -87,13 +87,28 @@ Built-in updates keep the app current. After a successful update, TruckSim Widge
 
 ## Installation
 
-### Requirements
+### Before you start
 
-* TrucksBook Client (required for mileage tracking)
+You need:
 
-### Plugin setup
+* Windows 10 or Windows 11
+* Euro Truck Simulator 2 or American Truck Simulator installed through Steam
+* [TrucksBook Client](https://trucksbook.eu/) installed and signed in (required for mileage tracking)
 
-Copy `scs-telemetry.dll` into the game folder:
+### 1. Download TruckSim Widget
+
+1. Open the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/latest).
+2. Under **Assets**, download the TruckSim Widget `.zip` archive.
+3. When the download finishes, right-click the archive and choose **Extract All...**.
+4. Choose any folder where you want to keep the widget, for example `Documents\TruckSim Widget`.
+
+> Do not run the app directly from inside the ZIP archive. Extract the whole archive first.
+
+### 2. Install the telemetry plugin
+
+Inside the extracted TruckSim Widget folder, open the `plugin` folder. It contains `scs-telemetry.dll`.
+
+Copy `scs-telemetry.dll` into the `plugins` folder for every game you want to use with TruckSim Widget.
 
 #### Euro Truck Simulator 2
 
@@ -109,14 +124,15 @@ Copy `scs-telemetry.dll` into the game folder:
 
 If the `plugins` folder does not exist, create it manually.
 
----
+> Copy only `scs-telemetry.dll` into the game's `plugins` folder. Keep the rest of the TruckSim Widget files together in the folder where you extracted the archive.
 
-## Run
+### 3. Start the widget
 
-1. Launch ETS2 or ATS
-2. Start TruckSim Widget
-3. Confirm that TrucksBook is online and telemetry is connected
-4. Drive
+1. Start TrucksBook Client and make sure you are signed in.
+2. Launch ETS2 or ATS and load your profile.
+3. Open `TruckSim Widget.exe` from the extracted TruckSim Widget folder.
+4. Check that the widget shows TrucksBook as online and telemetry as connected.
+5. Start driving.
 
 ---
 
