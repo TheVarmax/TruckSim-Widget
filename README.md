@@ -12,11 +12,11 @@
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
-  Lightweight, telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator
+  Lightweight status and telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator
 </p>
 
 <p align="center">
-  <strong>Live telemetry • Delivery tracking • TrucksBook sync • Minimal overlay</strong>
+  <strong>TrucksBook status • Delivery tracking • Smart alerts • Auto-hide overlay</strong>
 </p>
 
 <p align="center">
@@ -39,39 +39,49 @@
 
 TruckSim Widget is a lightweight overlay that runs alongside Euro Truck Simulator 2 and American Truck Simulator.
 
-It displays real-time telemetry like speed, route, delivery status, and trip progress while staying minimal and non-intrusive.
+Its main purpose is to make TrucksBook status easy to see while you drive: whether the client is running, telemetry is connected, and a delivery is being tracked correctly. It also displays essential trip information without turning your screen into another dashboard.
 
 ---
 
 ## Features
 
-### 🚛 Live telemetry
+### 📊 TrucksBook status & smart alerts
 
-Real-time speed and route information.
+See whether TrucksBook is online and recording correctly. The widget highlights meaningful issues such as client, telemetry, recording, synchronization, or upload problems.
 
 ### 📦 Delivery tracking
 
-Cargo status and distance.
+Shows cargo status, route, driven distance, and current trip progress.
 
-### 📊 TrucksBook integration
+### 🚛 Live telemetry
 
-Automatic kilometer tracking synced with your profile.
+Real-time speed, route, game state, and delivery information from ETS2 and ATS.
 
-### ⚠️ Smart alerts
+### 🫥 Auto-hide mode
+
+When everything is healthy, the widget can fade into an unobtrusive idle state. It expands when you hover over it and immediately becomes visible again when a warning or error is detected.
+
+Auto-hide also works correctly when the game is closed, keeping the overlay out of the way unless attention is needed.
+
+### 🎛️ Flexible interface
+
+Choose between Full and Minimal UI modes, adjust opacity and scale, and keep the widget pinned above the game when needed.
+
+### ⚠️ Speed warnings
 
 Configurable speed warnings with visual indicators.
 
 ### 🌍 Localization
 
-City name translation (English → Ukrainian, beta).
+English and Ukrainian interface support, including English → Ukrainian city name translation in beta.
 
-### 🎮 In-game overlay
+### ✨ Polished UI
 
-Lightweight overlay with minimal performance impact.
+Fully themed dialogs, smooth widget and settings animations, refined layouts, and animated settings dropdowns.
 
-### 🔄 Auto updates
+### 🔄 Safer update experience
 
-Built-in updater keeps the app always up to date.
+Built-in updates keep the app current. After a successful update, TruckSim Widget now shows an in-app success dialog with quick links instead of forcibly opening a browser page.
 
 ---
 
@@ -105,8 +115,8 @@ If the `plugins` folder does not exist, create it manually.
 
 1. Launch ETS2 or ATS
 2. Start TruckSim Widget
-3. Drive
-4. Enjoy the overlay
+3. Confirm that TrucksBook is online and telemetry is connected
+4. Drive
 
 ---
 
@@ -122,7 +132,7 @@ Some city names may be missing or inaccurate due to the large amount of DLC cont
 
 > Show only what matters. Nothing more.
 
-Minimal, fast, and focused on driving experience.
+TruckSim Widget is built to stay quiet when everything works and become useful the moment something needs your attention.
 
 ---
 
@@ -155,7 +165,6 @@ The MPL-2.0 license does not grant rights to use the TruckSim Widget name, logo,
 This project is not affiliated with, endorsed by, or associated with SCS Software, Euro Truck Simulator 2, American Truck Simulator, or TrucksBook.
 
 For full license details, see the [LICENSE](LICENSE) file.
-
 
 ---
 
