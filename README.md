@@ -12,11 +12,15 @@
 <h1 align="center">TruckSim Widget</h1>
 
 <p align="center">
-  A lightweight TrucksBook status and telemetry overlay for Euro Truck Simulator 2 & American Truck Simulator.
+  <strong>Never wonder if TrucksBook is still recording your delivery.</strong>
 </p>
 
 <p align="center">
-  <strong>Know your delivery is being tracked. Stay out of the way when it is.</strong>
+  TruckSim Widget quietly monitors TrucksBook and your game's telemetry while you drive, warning you before recording or synchronization problems ruin your trip.
+</p>
+
+<p align="center">
+  <strong>Free • Lightweight • ETS2 & ATS</strong>
 </p>
 
 <p align="center">
@@ -37,43 +41,45 @@
 
 ## Why TruckSim Widget?
 
-TrucksBook is great at recording deliveries, but it is not always obvious whether everything is actually working while you drive. TruckSim Widget gives you a small, clear status layer over ETS2 or ATS, so you can immediately see whether TrucksBook is online, telemetry is connected, and your current delivery is being tracked.
+TrucksBook is excellent at logging deliveries, but problems are not always obvious while you are driving. A disconnected telemetry plugin, a recording issue, or a synchronization problem can remain unnoticed until the trip is already over.
 
-It is not trying to replace the in-game GPS or build another giant dashboard on top of your game. It shows the essentials, stays quiet when everything is healthy, and becomes visible when something needs attention.
+TruckSim Widget is a lightweight companion overlay for TrucksBook. It keeps an eye on the important parts in the background, so you can see when your delivery is being tracked correctly and notice problems before they cost you a trip.
+
+It is not here to replace the in-game GPS or become another giant dashboard. When everything works, it stays out of your way. When something needs attention, it makes that clear.
 
 ---
 
 ## At a glance
 
-| You can see | Why it matters |
+| What it keeps an eye on | Why it matters |
 | --- | --- |
-| **TrucksBook status** | Know whether the client is online and tracking correctly. |
+| **TrucksBook status** | Know whether the client is online and your delivery is being tracked. |
 | **Telemetry status** | Catch a missing or disconnected telemetry plugin early. |
 | **Delivery state** | See whether a job is active, paused, delivered, or needs attention. |
-| **Route and distance** | Keep essential trip information visible without opening extra windows. |
+| **Route and distance** | Keep essential trip information visible without extra windows. |
 | **Warnings and errors** | Notice recording, sync, upload, or client issues before they ruin a delivery. |
 
 ---
 
 ## Features
 
-### 📊 TrucksBook status and smart alerts
+### 📊 TrucksBook monitoring and smart alerts
 
-The widget continuously checks the state of TrucksBook and surfaces meaningful problems instead of making you guess. It can highlight client, telemetry, recording, synchronization, and upload issues while a delivery is in progress.
+Know at a glance whether TrucksBook is online and your delivery is being tracked correctly. If the client, telemetry, recording, synchronization, or upload needs attention, the widget makes it visible while the trip is still in progress.
 
 ### 📦 Delivery tracking
 
-See your cargo state, route, driven distance, and current delivery progress in one compact overlay.
+Keep your cargo state, route, driven distance, and current delivery progress visible in one compact overlay.
 
 ### 🚛 Live telemetry
 
-Get real-time speed, route, game state, and delivery information directly from ETS2 or ATS.
+See the information that matters during a delivery without filling the screen with another dashboard.
 
 ### 🫥 Auto-hide
 
-When everything is healthy, the widget can fade into an unobtrusive idle state. Hover over it to bring it back, or let an alert reveal it automatically when attention is needed.
+When everything works, the widget quietly fades into the background.
 
-Auto-hide also behaves correctly while the game is closed, so the overlay does not linger in your way for no reason. A small miracle of restraint in software.
+Hover over it to bring it back, or let an alert reveal it automatically when something needs your attention.
 
 ### 🎛️ Flexible interface
 
@@ -91,23 +97,21 @@ The interface supports English and Ukrainian. City names can also be translated 
 
 TruckSim Widget includes themed dialogs, smooth launch and settings animations, polished layout transitions, and custom animated dropdowns.
 
-### 🔄 Better updates
+### 🔄 Automatic updates
 
-The built-in updater keeps the app current. After a successful update, the widget now shows an in-app confirmation window with useful links instead of forcing a browser page open.
+Stay up to date without manually checking for every new release. After a successful update, the widget shows an in-app confirmation window with useful links instead of forcing a browser page open.
 
 ---
 
 ## Quick start
 
-Already know what you are doing? This is the whole setup:
+The initial setup takes a minute and only needs to be completed once:
 
 1. Download and extract TruckSim Widget.
 2. Copy `scs-telemetry.dll` from the included `plugin` folder into your game's `plugins` folder.
 3. Start TrucksBook Client and sign in.
 4. Launch ETS2 or ATS, then start TruckSim Widget.
 5. Check that TrucksBook and telemetry are online. Drive.
-
-For the human-friendly version, keep reading.
 
 ---
 
@@ -174,7 +178,7 @@ If the `plugins` folder does not exist, create it manually.
 
 ## When the widget shows a warning
 
-A warning is there to save a delivery, not to decorate the screen.
+Every warning is designed to help you fix a problem before it costs your delivery.
 
 | What you see | What to check first |
 | --- | --- |
@@ -203,7 +207,13 @@ TruckSim Widget is an independent project. It is not affiliated with, endorsed b
 
 > Show only what matters. Nothing more.
 
-TruckSim Widget should reassure you when everything works, not demand attention for its own sake. When something goes wrong, it should make the problem obvious before a long delivery becomes a very annoying lesson.
+TruckSim Widget was never designed to become another dashboard.
+
+Its purpose is simple: give you confidence that TrucksBook is doing its job.
+
+If everything works, the widget stays quiet. If something breaks, you will know immediately.
+
+Nothing more. Nothing less.
 
 ---
 
