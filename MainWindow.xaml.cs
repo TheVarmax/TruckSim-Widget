@@ -119,6 +119,8 @@ namespace ETSOverlay
         private const double IdleOpacity = 0.25;
         private int _autoHideQuietMs = 0;
         private const int AutoHideTickMs = 250;
+        private bool _mainBorderHovered = false;
+        private bool _startupComplete = false;
 
         private enum HealthStatus { Neutral, Healthy, Warning, Error }
         private HealthStatus _currentHealth = HealthStatus.Neutral;
@@ -271,10 +273,8 @@ namespace ETSOverlay
                 EvaluateAutoHideState();
             };
 
-            if (_autoHideEnabled)
-            {
-                StartIdleTimer();
-            }
+            // Don't start idle timer here — defer until startup animation completes
+            // to prevent auto-hide from triggering during the intro animation
 
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
@@ -286,39 +286,76 @@ namespace ETSOverlay
                 UpdateHeaderOverlayPosition();
                 HideHeaderOverlay();
 
-                // 1. Анимация появления виджета + Интро
+                // 1. Подготовка: скрыть MainUI, показать IntroOverlay
                 MainUI.Opacity = 0;
                 IntroOverlay.Visibility = Visibility.Visible;
                 IntroOverlay.Opacity = 1;
 
-                // Плавно проявляем главное окно от 0 до windowOpacity
+                // Плавно проявляем MainBorder от 0 до windowOpacity
                 MainBorder.Opacity = 0;
                 var windowFade = new DoubleAnimation(windowOpacity, TimeSpan.FromSeconds(0.4));
                 MainBorder.BeginAnimation(OpacityProperty, windowFade);
 
-                // Ждем 1.5 секунды, чтобы пользователь прочитал интро
+                // Ждём 1.5 секунды
                 await Task.Delay(1500);
 
-                // Кросс-фейд: затухаем интро, проявляем интерфейс
-                var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.3));
+                // 2. Кросс-фейд: исчезает интро, появляется интерфейс
                 var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3));
+                MainUI.BeginAnimation(OpacityProperty, fadeIn);
 
-                fadeOut.Completed += (s, ev) => 
+                // Определяем нужна ли анимация высоты (когда IntroOverlay выше MainUI)
+                var introHeight = IntroOverlay.ActualHeight;
+                IntroOverlay.UpdateLayout();
+
+                // Fade out intro opacity
+                var introFadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.3));
+                IntroOverlay.BeginAnimation(OpacityProperty, introFadeOut);
+
+                // Ждём завершения opacity-фейда
+                await Task.Delay(300);
+
+                // 3. Анимация высоты: IntroOverlay сжимается до 0, окно плавно меняет размер
+                if (introHeight > 0)
+                {
+                    IntroOverlay.Height = introHeight;
+                    var shrinkIntro = new DoubleAnimation(introHeight, 0, TimeSpan.FromSeconds(0.3))
+                    {
+                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut }
+                    };
+                    shrinkIntro.Completed += (s2, ev2) =>
+                    {
+                        IntroOverlay.BeginAnimation(HeightProperty, null);
+                        IntroOverlay.Visibility = Visibility.Collapsed;
+                        IntroOverlay.Height = double.NaN;
+                    };
+                    IntroOverlay.BeginAnimation(HeightProperty, shrinkIntro);
+                    await Task.Delay(300);
+                }
+                else
                 {
                     IntroOverlay.Visibility = Visibility.Collapsed;
+                }
 
-                    // Show update success dialog if applicable
-                    var args = Environment.GetCommandLineArgs();
-                    if (Array.Exists(args, arg => arg == "--updated"))
-                    {
-                        var successWindow = new UpdateSuccessWindow(uiLanguage);
-                        successWindow.Owner = this;
-                        successWindow.ShowDialog();
-                    }
-                };
+                // Show update success dialog if applicable
+                var args = Environment.GetCommandLineArgs();
+                if (Array.Exists(args, arg => arg == "--updated"))
+                {
+                    var successWindow = new UpdateSuccessWindow(uiLanguage);
+                    successWindow.Owner = this;
+                    successWindow.ShowDialog();
+                }
 
-                IntroOverlay.BeginAnimation(OpacityProperty, fadeOut);
-                MainUI.BeginAnimation(OpacityProperty, fadeIn);
+                // 4. Финализация: сброс анимации opacity для чистого idle-перехода
+                MainBorder.BeginAnimation(OpacityProperty, null);
+                MainBorder.Opacity = windowOpacity;
+                ApplyDualLayerOpacity();
+
+                _startupComplete = true;
+                if (_autoHideEnabled && !_mainBorderHovered)
+                {
+                    _autoHideQuietMs = 0;
+                    StartIdleTimer();
+                }
             };
 
             // Восстановление после сворачивания в трей
@@ -1838,9 +1875,8 @@ namespace ETSOverlay
             SaveState();
             if (_autoHideEnabled)
             {
-                _autoHideQuietMs = IdleDelaySeconds * 1000;
+                _autoHideQuietMs = 0;
                 StartIdleTimer();
-                EvaluateAutoHideState();
             }
             else
             {
@@ -3135,7 +3171,8 @@ namespace ETSOverlay
             if (!_autoHideEnabled) return false;
             if (_currentHealth == HealthStatus.Error || _currentHealth == HealthStatus.Warning) return false;
             if (_overlayHover) return false;
-            if (IsPointerInHoverZone()) return false;
+            if (_mainBorderHovered) return false;
+            if (!_startupComplete) return false;
             return true;
         }
 
@@ -3173,7 +3210,7 @@ namespace ETSOverlay
             _autoHideQuietMs = 0;
 
             MainBorder.BeginAnimation(OpacityProperty, null);
-            var idleOpacityAnim = new DoubleAnimation(IdleOpacity, TimeSpan.FromSeconds(0.18));
+            var idleOpacityAnim = new DoubleAnimation(MainBorder.Opacity, IdleOpacity, TimeSpan.FromSeconds(0.18));
             MainBorder.BeginAnimation(OpacityProperty, idleOpacityAnim);
 
             if (_uiMode == "full")
@@ -3184,6 +3221,7 @@ namespace ETSOverlay
                 CollapsibleSection.BeginAnimation(HeightProperty, null);
                 if (CollapsibleSection.Visibility == Visibility.Visible)
                 {
+                    CollapsibleSection.UpdateLayout();
                     var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.15));
                     var currentHeight = CollapsibleSection.ActualHeight;
                     CollapsibleSection.Height = currentHeight;
@@ -3215,8 +3253,9 @@ namespace ETSOverlay
 
             _autoHideQuietMs = 0;
 
+            var currentOpacity = MainBorder.Opacity;
             MainBorder.BeginAnimation(OpacityProperty, null);
-            var restoreOpacityAnim = new DoubleAnimation(windowOpacity, TimeSpan.FromSeconds(0.18));
+            var restoreOpacityAnim = new DoubleAnimation(currentOpacity, windowOpacity, TimeSpan.FromSeconds(0.18));
             restoreOpacityAnim.Completed += (s, ev) => ApplyDualLayerOpacity();
             MainBorder.BeginAnimation(OpacityProperty, restoreOpacityAnim);
 
@@ -3254,6 +3293,7 @@ namespace ETSOverlay
 
         private void MainBorder_MouseEnter(object sender, MouseEventArgs e)
         {
+            _mainBorderHovered = true;
             // Cancel autohide idle when pointer enters
             ExitIdleState();
             StopIdleTimer();
@@ -3267,13 +3307,14 @@ namespace ETSOverlay
 
         private void MainBorder_MouseLeave(object sender, MouseEventArgs e)
         {
+            _mainBorderHovered = false;
             if (_overlayHover) return;
             StartOverlayHideTimer();
             if (_autoHideEnabled)
             {
+                _autoHideQuietMs = 0;
                 StartIdleTimer();
             }
-            EvaluateAutoHideState();
         }
 
         private void UpdateOverlayVisibility(Point position)
@@ -3311,8 +3352,8 @@ namespace ETSOverlay
         {
             if (_autoHideEnabled)
             {
-                // If current status is healthy, start idle timer; otherwise ensure exit idle
-                if (_currentHealth == HealthStatus.Healthy && !_overlayHover && !IsPointerInHoverZone())
+                // If current status allows hiding, start idle timer; otherwise ensure exit idle
+                if ((_currentHealth == HealthStatus.Healthy || _currentHealth == HealthStatus.Neutral) && !_overlayHover && !_mainBorderHovered)
                 {
                     _autoHideQuietMs = 0;
                     StartIdleTimer();
