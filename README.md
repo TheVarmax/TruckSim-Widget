@@ -75,7 +75,7 @@ Keep your cargo state, route, driven distance, and current delivery progress vis
 
 See the information that matters during a delivery without filling the screen with another dashboard.
 
-### 🫥 Auto-hide (Beta)
+### 🫥 Auto-hide
 
 When everything works, the widget quietly fades into the background.
 
