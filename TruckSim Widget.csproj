@@ -5,7 +5,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>TruckSim_Widget</RootNamespace>
     <AssemblyName>TruckSim Widget</AssemblyName>
-    <Version>1.2.3</Version>
+    <Version>1.2.4</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
