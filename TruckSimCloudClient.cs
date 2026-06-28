@@ -69,7 +69,7 @@ namespace ETSOverlay
         [JsonPropertyName("plan")]
         public string Plan { get; set; } = string.Empty;
 
-        [JsonPropertyName("expiresAt")]
+        [JsonPropertyName("validUntil")]
         public DateTime? ExpiresAt { get; set; }
     }
 

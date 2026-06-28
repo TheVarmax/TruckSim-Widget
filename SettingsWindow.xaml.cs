@@ -137,14 +137,22 @@ namespace ETSOverlay
             
             if (licenseManager.Status == "active")
             {
-                LicenseSectionTitle.Text = "★ Supporter";
+                string planName = string.IsNullOrEmpty(licenseManager.CurrentPlan) 
+                    ? "Supporter" 
+                    : char.ToUpper(licenseManager.CurrentPlan[0]) + licenseManager.CurrentPlan.Substring(1);
+
+                LicenseSectionTitle.Text = $"★ {planName}";
                 LicenseSectionTitle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F5C542")); // Gold
                 
-                string statusText = "🟢 Active";
+                string statusText = _isUk ? "🟢 Активна" : "🟢 Active";
                 if (licenseManager.ExpiresAt.HasValue)
                 {
                     string dateStr = licenseManager.ExpiresAt.Value.ToString("dd.MM.yyyy");
                     statusText += _isUk ? $" (до {dateStr})" : $" (until {dateStr})";
+                }
+                else
+                {
+                    statusText += " (Lifetime)";
                 }
                 
                 LicenseStatusText.Text = statusText;
