@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Settings"
-        Width="390"
+        Width="580"
         SizeToContent="Height"
         WindowStyle="None"
         AllowsTransparency="True"
@@ -12,10 +12,38 @@
         WindowStartupLocation="Manual">
 
     <Window.Resources>
+        <Style x:Key="TabButtonStyle" TargetType="RadioButton">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#3F9843"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="ComboBoxItem">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Background" Value="#2A2D35" />
+            <Setter Property="Foreground" Value="{DynamicResource MainTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
             <Setter Property="Padding" Value="10,6" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="ComboBoxItem">
@@ -24,7 +52,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#40444F" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource CardBackgroundHoverBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -33,28 +61,28 @@
         </Style>
 
         <ControlTemplate x:Key="ComboBoxToggleButton" TargetType="ToggleButton">
-            <Border x:Name="templateRoot" Background="#2A2D35" BorderBrush="#3A3D45" BorderThickness="1" CornerRadius="6">
+            <Border x:Name="templateRoot" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition />
                         <ColumnDefinition Width="25" />
                     </Grid.ColumnDefinitions>
                     <Border Grid.Column="1" Background="Transparent">
-                        <Path x:Name="arrow" Data="M0,0 L4.5,4.5 L9,0" Stroke="White" StrokeThickness="1.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Path x:Name="arrow" Data="M0,0 L4.5,4.5 L9,0" Stroke="{DynamicResource MainTextBrush}" StrokeThickness="1.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
                     </Border>
                 </Grid>
             </Border>
             <ControlTemplate.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter TargetName="templateRoot" Property="Background" Value="#353840" />
+                    <Setter TargetName="templateRoot" Property="Background" Value="{DynamicResource CardBackgroundHoverBrush}" />
                 </Trigger>
             </ControlTemplate.Triggers>
         </ControlTemplate>
 
         <Style TargetType="ComboBox">
-            <Setter Property="Foreground" Value="White" />
-            <Setter Property="Background" Value="#2A2D35" />
-            <Setter Property="BorderBrush" Value="#3A3D45" />
+            <Setter Property="Foreground" Value="{DynamicResource MainTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}" />
             <Setter Property="Height" Value="32" />
             <Setter Property="FontSize" Value="13" />
             <Setter Property="Template">
@@ -64,7 +92,7 @@
                             <ToggleButton x:Name="toggleButton" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}" Focusable="False" IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}" Template="{StaticResource ComboBoxToggleButton}" />
                             <ContentPresenter x:Name="contentPresenter" IsHitTestVisible="False" Margin="12,0,30,0" VerticalAlignment="Center" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" ContentTemplateSelector="{TemplateBinding ItemTemplateSelector}" />
                             <Popup x:Name="popup" AllowsTransparency="True" Placement="Bottom" PopupAnimation="None">
-                                <Border x:Name="dropDownBorder" MinWidth="{Binding ActualWidth, ElementName=toggleButton}" MaxHeight="150" Background="#2A2D35" BorderBrush="#3A3D45" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" RenderTransformOrigin="0.5,0" Opacity="0">
+                                <Border x:Name="dropDownBorder" MinWidth="{Binding ActualWidth, ElementName=toggleButton}" MaxHeight="200" Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" RenderTransformOrigin="0.5,0" Opacity="0">
                                     <Border.RenderTransform>
                                         <ScaleTransform ScaleY="0.8"/>
                                     </Border.RenderTransform>
@@ -124,8 +152,8 @@
         <Style x:Key="ModernSwitchToggleStyle" TargetType="ToggleButton">
             <Setter Property="Width" Value="48" />
             <Setter Property="Height" Value="26" />
-            <Setter Property="Background" Value="#2A2D35" />
-            <Setter Property="BorderBrush" Value="#3A3D45" />
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Cursor" Value="Hand" />
@@ -133,19 +161,8 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
                         <Grid>
-                            <Border x:Name="Track"
-                                    Background="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Background}"
-                                    BorderBrush="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=BorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="13" />
-                            <Ellipse x:Name="Thumb"
-                                     Width="20"
-                                     Height="20"
-                                     Fill="White"
-                                     HorizontalAlignment="Left"
-                                     VerticalAlignment="Center"
-                                     Margin="3"
-                                     RenderTransformOrigin="0.5,0.5">
+                            <Border x:Name="Track" Background="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=Background}" BorderBrush="{Binding RelativeSource={RelativeSource TemplatedParent}, Path=BorderBrush}" BorderThickness="1" CornerRadius="13" />
+                            <Ellipse x:Name="Thumb" Width="20" Height="20" Fill="White" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3" RenderTransformOrigin="0.5,0.5">
                                 <Ellipse.RenderTransform>
                                     <TranslateTransform X="0" />
                                 </Ellipse.RenderTransform>
@@ -160,16 +177,14 @@
                                 <Setter TargetName="Track" Property="BorderBrush" Value="#43A047" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="False">
-                                <Setter TargetName="Track" Property="Background" Value="#2A2D35" />
-                                <Setter TargetName="Track" Property="BorderBrush" Value="#3A3D45" />
+                                <Setter TargetName="Track" Property="Background" Value="{DynamicResource InputBackgroundBrush}" />
+                                <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource InputBorderBrush}" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
                                 <Trigger.EnterActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Thumb"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                             To="22" Duration="0:0:0.18">
+                                            <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)" To="22" Duration="0:0:0.18">
                                                 <DoubleAnimation.EasingFunction>
                                                     <CubicEase EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
@@ -180,9 +195,7 @@
                                 <Trigger.ExitActions>
                                     <BeginStoryboard>
                                         <Storyboard>
-                                            <DoubleAnimation Storyboard.TargetName="Thumb"
-                                                             Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)"
-                                                             To="0" Duration="0:0:0.18">
+                                            <DoubleAnimation Storyboard.TargetName="Thumb" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.X)" To="0" Duration="0:0:0.18">
                                                 <DoubleAnimation.EasingFunction>
                                                     <CubicEase EasingMode="EaseOut" />
                                                 </DoubleAnimation.EasingFunction>
@@ -205,20 +218,20 @@
         </Style>
     </Window.Resources>
 
-    <Border Background="#1A1C20" CornerRadius="12" Padding="20" Margin="20">
+    <Border Background="{DynamicResource WindowBackgroundBrush}" CornerRadius="12" Padding="20" Margin="20">
         <Border.Effect>
-            <DropShadowEffect Color="Black" BlurRadius="25" Opacity="0.6" Direction="270" ShadowDepth="5"/>
+            <DropShadowEffect Color="Black" BlurRadius="25" Opacity="{DynamicResource ShadowOpacity}" Direction="270" ShadowDepth="5"/>
         </Border.Effect>
 
         <StackPanel>
             <!-- Header -->
             <Grid Margin="0,0,0,18">
-                <TextBlock x:Name="SettingsTitle" Text="SETTINGS" Foreground="White" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock x:Name="SettingsTitle" Text="SETTINGS" Foreground="{DynamicResource MainTextBrush}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
                 <Button Click="BtnCloseSettings_Click" HorizontalAlignment="Right" Width="32" Height="32" Cursor="Hand">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="border" Background="#2A2D35" CornerRadius="6">
-                                <Path Data="M0,0 L10,10 M0,10 L10,0" Stroke="#B0B0B0" StrokeThickness="2" Stretch="Uniform" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border x:Name="border" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="6">
+                                <Path Data="M0,0 L10,10 M0,10 L10,0" Stroke="{DynamicResource MutedTextBrush}" StrokeThickness="2" Stretch="Uniform" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
@@ -230,145 +243,312 @@
                 </Button>
             </Grid>
 
-            <!-- UI Mode -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,0,16">
-                <TextBlock x:Name="UIModeLabel" Text="UI Mode" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                <ComboBox x:Name="UIModeSelector" Width="152" SelectionChanged="UIModeSelector_SelectionChanged">
-                    <ComboBoxItem Content="Full Interface" Tag="full"/>
-                    <ComboBoxItem Content="Minimalism" Tag="minimal"/>
-                </ComboBox>
-            </StackPanel>
-            <!-- Auto-hide toggle -->
-            <StackPanel Margin="0,0,0,16">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock x:Name="AutoHideLabel" Text="Auto-hide" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                    <ToggleButton x:Name="AutoHideToggle" Style="{StaticResource ModernSwitchToggleStyle}" Checked="AutoHideToggle_Checked" Unchecked="AutoHideToggle_Unchecked" VerticalAlignment="Center"/>
-                </StackPanel>
-                <TextBlock x:Name="AutoHideHint" Text="Uses TruckBook status only. Temporarily hides the selected UI mode when status is calm." Foreground="#8A8F98" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
-            </StackPanel>
+            <!-- Tabs Selection -->
+            <Grid Margin="0,0,0,16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <RadioButton x:Name="TabGeneralBtn" Grid.Column="0" Content="General" Height="30" IsChecked="True" Checked="TabGeneralBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                <RadioButton x:Name="TabAppearanceBtn" Grid.Column="2" Content="Appearance" Height="30" Checked="TabAppearanceBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+            </Grid>
 
-            <!-- Opacity -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,20,0,0">
-                <TextBlock x:Name="OpacityLabel" Text="Opacity" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                <Slider x:Name="OpacitySlider" Minimum="40" Maximum="100" Value="85" Width="150" VerticalAlignment="Center" ValueChanged="OpacitySlider_ValueChanged"/>
-                <TextBlock x:Name="OpacityValue" Text="85%" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center"/>
-            </StackPanel>
-
-            <!-- Scale -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,16,0,0">
-                <TextBlock x:Name="ScaleLabel" Text="Scale" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                <ComboBox x:Name="ScaleSelector" Width="150" SelectionChanged="ScaleSelector_SelectionChanged">
-                    <ComboBoxItem Content="75%" Tag="75"/>
-                    <ComboBoxItem Content="100%" Tag="100" IsSelected="True"/>
-                    <ComboBoxItem Content="125%" Tag="125"/>
-                    <ComboBoxItem Content="150%" Tag="150"/>
-                </ComboBox>
-            </StackPanel>
-
-            <!-- Language -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,16,0,0">
-                <TextBlock x:Name="LanguageLabel" Text="Language" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                <ComboBox x:Name="LanguageSelector" Width="150" SelectionChanged="LanguageSelector_SelectionChanged">
-                    <ComboBoxItem Content="English" Tag="en"/>
-                    <ComboBoxItem Content="Українська" Tag="uk"/>
-                </ComboBox>
-            </StackPanel>
-
-            <!-- Speed Warning -->
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,16,0,0">
-                <TextBlock x:Name="SpeedWarningLabel" Text="Speed warning" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                <TextBox x:Name="SpeedWarningBox" Width="100" Height="28" VerticalContentAlignment="Center" TextAlignment="Center" Background="#2A2D35" Foreground="White" BorderBrush="#3A3D45" TextChanged="SpeedWarningBox_TextChanged"/>
-                <Grid Margin="6,0,0,0" Width="26" Height="28" VerticalAlignment="Center">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="14"/>
-                        <RowDefinition Height="14"/>
-                    </Grid.RowDefinitions>
-                    <Button x:Name="SpeedWarningUp" Grid.Row="0" Height="14" Click="SpeedWarningUp_Click" Cursor="Hand">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="border" Background="#2A2D35" BorderBrush="#3A3D45" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0">
-                                    <TextBlock Text="▲" Foreground="#B0B0B0" FontSize="7" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,1,0,0"/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="border" Property="Background" Value="#353840"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-                    <Button x:Name="SpeedWarningDown" Grid.Row="1" Height="14" Click="SpeedWarningDown_Click" Cursor="Hand">
-                        <Button.Template>
-                            <ControlTemplate TargetType="Button">
-                                <Border x:Name="border" Background="#2A2D35" BorderBrush="#3A3D45" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4">
-                                    <TextBlock Text="▼" Foreground="#B0B0B0" FontSize="7" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,-1,0,0"/>
-                                </Border>
-                                <ControlTemplate.Triggers>
-                                    <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="border" Property="Background" Value="#353840"/>
-                                    </Trigger>
-                                </ControlTemplate.Triggers>
-                            </ControlTemplate>
-                        </Button.Template>
-                    </Button>
-                </Grid>
-            </StackPanel>
-
-            <!-- Update Buttons -->
-            <Grid Margin="0,20,0,0">
+            <!-- Tab: General Content -->
+            <Grid x:Name="TabGeneralContent" Margin="0,0,0,16" Visibility="Visible">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="20"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <Button x:Name="BtnCheckUpdate" Grid.Column="0" Content="🔄 Check for updates" Click="BtnCheckUpdate_Click"
-                        Background="#43A047" Foreground="White" BorderThickness="0"
-                        Height="32" HorizontalAlignment="Stretch" Cursor="Hand">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="border" Property="Opacity" Value="0.85"/>
-                                </Trigger>
-                                <Trigger Property="IsEnabled" Value="False">
-                                    <Setter TargetName="border" Property="Background" Value="#2A2C31"/>
-                                    <Setter Property="Foreground" Value="#888888"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
+                <!-- Left Column -->
+                <StackPanel Grid.Column="0">
+                    <!-- UI Mode -->
+                    <Grid VerticalAlignment="Center" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="UIModeLabel" Grid.Column="0" Text="UI Mode" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="UIModeSelector" Grid.Column="1" SelectionChanged="UIModeSelector_SelectionChanged">
+                            <ComboBoxItem Content="Full Interface" Tag="full"/>
+                            <ComboBoxItem Content="Minimalism" Tag="minimal"/>
+                        </ComboBox>
+                    </Grid>
 
-                <Button x:Name="BtnDonate" Grid.Column="2" Content="💛 Donate" Click="BtnDonate_Click"
-                        Background="#E8BA23" Foreground="Black" BorderThickness="0"
-                        Height="32" HorizontalAlignment="Stretch" Cursor="Hand" FontWeight="Bold">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="border" Property="Opacity" Value="0.85"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
+                    <!-- Auto-hide toggle -->
+                    <StackPanel Margin="0,0,0,16">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="AutoHideLabel" Text="Auto-hide" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <ToggleButton x:Name="AutoHideToggle" Style="{StaticResource ModernSwitchToggleStyle}" Checked="AutoHideToggle_Checked" Unchecked="AutoHideToggle_Unchecked" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="AutoHideHint" Text="Uses TruckBook status only. Temporarily hides the selected UI mode when status is calm." Foreground="#8A8F98" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <!-- Opacity -->
+                    <Grid VerticalAlignment="Center" Margin="0,4,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="OpacityLabel" Grid.Column="0" Text="Opacity" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <Slider x:Name="OpacitySlider" Grid.Column="1" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="OpacitySlider_ValueChanged"/>
+                        <TextBlock x:Name="OpacityValue" Grid.Column="2" Text="85%" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" Width="35" TextAlignment="Right"/>
+                    </Grid>
+
+                    <!-- Scale -->
+                    <Grid VerticalAlignment="Center">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="ScaleLabel" Grid.Column="0" Text="Scale" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="ScaleSelector" Grid.Column="1" SelectionChanged="ScaleSelector_SelectionChanged">
+                            <ComboBoxItem Content="75%" Tag="75"/>
+                            <ComboBoxItem Content="100%" Tag="100" IsSelected="True"/>
+                            <ComboBoxItem Content="125%" Tag="125"/>
+                            <ComboBoxItem Content="150%" Tag="150"/>
+                        </ComboBox>
+                    </Grid>
+                </StackPanel>
+
+                <!-- Right Column -->
+                <StackPanel Grid.Column="2">
+                    <!-- Language -->
+                    <Grid VerticalAlignment="Center" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="LanguageLabel" Grid.Column="0" Text="Language" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <ComboBox x:Name="LanguageSelector" Grid.Column="1" SelectionChanged="LanguageSelector_SelectionChanged">
+                            <ComboBoxItem Content="English" Tag="en"/>
+                            <ComboBoxItem Content="Українська" Tag="uk"/>
+                        </ComboBox>
+                    </Grid>
+
+                    <!-- Speed Warning -->
+                    <Grid VerticalAlignment="Center" Margin="0,0,0,16">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="SpeedWarningLabel" Grid.Column="0" Text="Speed warning" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                        <TextBox x:Name="SpeedWarningBox" Grid.Column="1" Height="28" VerticalContentAlignment="Center" TextAlignment="Center" Background="{DynamicResource InputBackgroundBrush}" Foreground="White" BorderBrush="{DynamicResource InputBorderBrush}" TextChanged="SpeedWarningBox_TextChanged"/>
+                        <Grid Grid.Column="2" Margin="6,0,0,0" Width="26" Height="28" VerticalAlignment="Center">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="14"/>
+                                <RowDefinition Height="14"/>
+                            </Grid.RowDefinitions>
+                            <Button x:Name="SpeedWarningUp" Grid.Row="0" Height="14" Click="SpeedWarningUp_Click" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0">
+                                            <TextBlock Text="▲" Foreground="#B0B0B0" FontSize="7" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                            <Button x:Name="SpeedWarningDown" Grid.Row="1" Height="14" Click="SpeedWarningDown_Click" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4">
+                                            <TextBlock Text="▼" Foreground="#B0B0B0" FontSize="7" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,-1,0,0"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                    </Grid>
+                </StackPanel>
             </Grid>
 
-            <TextBlock x:Name="UpdateStatusText" Text="" Foreground="#888888"
-                       FontSize="12" HorizontalAlignment="Center"
-                       TextWrapping="Wrap" Margin="0,8,0,0"/>
+            <!-- Tab: Appearance Content -->
+            <Grid x:Name="TabAppearanceContent" Margin="0,0,0,16" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                
+                <StackPanel Grid.Column="0">
+                    <!-- Theme -->
+                    <StackPanel Margin="0,0,0,16">
+                        <TextBlock x:Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="ThemeSelector" SelectionChanged="AppearanceSetting_SelectionChanged" />
+                    </StackPanel>
+                    
+                    <!-- Card Style -->
+                    <StackPanel Margin="0,0,0,16">
+                        <TextBlock x:Name="CardStyleLabel" Text="Card Style" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="CardStyleSelector" SelectionChanged="AppearanceSetting_SelectionChanged" />
+                    </StackPanel>
+                    
+                    <!-- Global Accent Color -->
+                    <StackPanel x:Name="GlobalAccentPanel" Margin="0,0,0,16">
+                        <TextBlock x:Name="GlobalAccentLabel" Text="Global Accent" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="GlobalAccentSelector" SelectionChanged="AppearanceSetting_SelectionChanged" />
+                    </StackPanel>
+                </StackPanel>
+                
+                <StackPanel Grid.Column="2">
+                    <!-- Accent Coloring Mode -->
+                    <StackPanel Margin="0,0,0,4">
+                        <TextBlock x:Name="AccentModeLabel" Text="Accent Mode" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
+                        <ComboBox x:Name="AccentModeSelector" SelectionChanged="AccentMode_SelectionChanged" />
+                    </StackPanel>
+                    <TextBlock x:Name="AccentModeHint" Text="Uniform applies your accent everywhere. Custom allows picking per tile." Foreground="#8A8F98" FontSize="11" Margin="0,0,0,16" TextWrapping="Wrap"/>
+                    
+                    <StackPanel x:Name="CustomAccentsPanel" Visibility="Collapsed">
+                        <TextBlock x:Name="CustomAccentsTitle" Text="Tile Colors" Foreground="White" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="10"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorSim" Text="TrucksBook / Sim" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorSim" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorStatus" Text="Status" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorStatus" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
 
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorGame" Text="Game" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorGame" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorDistance" Text="Distance" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorDistance" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorRoute" Text="Route" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorRoute" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorSpeed" Text="Speed" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorSpeed" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorMax" Text="Max Speed" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorMax" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
+                            <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,0,0,8">
+                                <TextBlock x:Name="LblColorType" Text="Delivery Type" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox x:Name="CmbColorType" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
+                            </StackPanel>
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- Bottom Section -->
+            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="8" Padding="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+
+                    <!-- Supporter Banner -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock x:Name="LicenseSectionTitle" Text="⭐ Стати Supporter" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,0,0,4"/>
+                            <TextBlock x:Name="LicenseStatusText" Text="Free" Foreground="#A0A0A0" FontSize="13"/>
+                        </StackPanel>
+
+                        <Button x:Name="BtnManageLicense" Grid.Column="1" Content="Стати Supporter" Width="130" Height="32" Background="#4CAF50" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnManageLicense_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="4">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="Opacity" Value="0.9"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </Grid>
+
+                    <!-- Action Buttons -->
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Button x:Name="BtnCheckUpdate" Grid.Column="0" Content="🔄 Перевірити оновлення" Height="36" Background="#3F9843" Foreground="White" FontWeight="SemiBold" BorderThickness="0" Cursor="Hand" Click="BtnCheckUpdate_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="Background" Value="#4CAE50"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button x:Name="BtnDonate" Grid.Column="2" Content="💛 Підтримати" Height="36" Background="#EABF20" Foreground="Black" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Click="BtnDonate_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="Background" Value="#F5CB32"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
 
             <!-- Version -->
-            <TextBlock x:Name="VersionLabel" Text="" Foreground="#555555" FontSize="10" HorizontalAlignment="Center" Margin="0,15,0,0"/>
+            <TextBlock x:Name="VersionLabel" Text="v1.0.0" Foreground="#555555" FontSize="11" HorizontalAlignment="Center" Margin="0,16,0,0"/>
+            <TextBlock x:Name="UpdateStatusText" Text="" Foreground="#B0B0B0" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+
         </StackPanel>
     </Border>
 </Window>

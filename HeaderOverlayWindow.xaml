@@ -12,9 +12,9 @@
 
     <Window.Resources>
         <Style x:Key="HeaderBtnStyle" TargetType="Button">
-            <Setter Property="Background" Value="#2A2D35"/>
+            <Setter Property="Background" Value="{DynamicResource HeaderButtonBackgroundBrush}"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Foreground" Value="#B0B0B0"/>
+            <Setter Property="Foreground" Value="{DynamicResource HeaderIconBrush}"/>
             <Setter Property="Width" Value="26"/>
             <Setter Property="Height" Value="26"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -26,7 +26,7 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#3A3D45"/>
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource HeaderButtonHoverBrush}"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -53,7 +53,7 @@
         </Style>
     </Window.Resources>
 
-    <Border x:Name="OverlayBorder" Background="#1A1C20" CornerRadius="8" Padding="6" Margin="16">
+    <Border x:Name="OverlayBorder" Background="{DynamicResource HeaderBackgroundBrush}" CornerRadius="8" Padding="6" Margin="16">
         <Border.LayoutTransform>
             <ScaleTransform x:Name="HeaderScaleTransform" ScaleX="1.15" ScaleY="1.15"/>
         </Border.LayoutTransform>
@@ -63,21 +63,21 @@
 
         <Grid Background="Transparent">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
-                <TextBlock Text="TruckSim Widget" Foreground="#D0D0D0" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
+                <TextBlock Text="TruckSim Widget" Foreground="{DynamicResource HeaderTextBrush}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center"/>
             </StackPanel>
 
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                 <Button Click="BtnSettings_Click" Style="{StaticResource HeaderBtnStyle}" ToolTip="Settings" Margin="0,0,4,0">
-                    <Path Data="M19.4 13c0-.33.05-.66.05-1s-.02-.67-.05-1l2.1-1.66c.2-.15.25-.42.13-.64l-2-3.46c-.12-.22-.4-.3-.6-.22l-2.5 1c-.5-.4-1.07-.73-1.68-.98l-.4-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.6.25-1.17.58-1.68.98l-2.5-1c-.22-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.03.33-.07.67-.07 1s.04.67.07 1l-2.1 1.66c-.2.15-.25.42-.12.64l2 3.46c.12.22.38.3.6.22l2.5-1c.5.4 1.07.73 1.68.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.5-.42l.37-2.65c.6-.25 1.17-.58 1.68-.98l2.5 1c.22.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64L19.4 13zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" Fill="#B0B0B0" Stretch="Uniform" Width="12" Height="12"/>
+                    <Path Data="M19.4 13c0-.33.05-.66.05-1s-.02-.67-.05-1l2.1-1.66c.2-.15.25-.42.13-.64l-2-3.46c-.12-.22-.4-.3-.6-.22l-2.5 1c-.5-.4-1.07-.73-1.68-.98l-.4-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.5.42l-.37 2.65c-.6.25-1.17.58-1.68.98l-2.5-1c-.22-.08-.48 0-.6.22l-2 3.46c-.13.22-.07.49.12.64L4.57 11c-.03.33-.07.67-.07 1s.04.67.07 1l-2.1 1.66c-.2.15-.25.42-.12.64l2 3.46c.12.22.38.3.6.22l2.5-1c.5.4 1.07.73 1.68.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.5-.42l.37-2.65c.6-.25 1.17-.58 1.68-.98l2.5 1c.22.08.48 0 .6-.22l2-3.46c.12-.22.07-.49-.12-.64L19.4 13zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z" Fill="{DynamicResource HeaderIconBrush}" Stretch="Uniform" Width="12" Height="12"/>
                 </Button>
                 <Button x:Name="BtnTopmost" Click="BtnTopmost_Click" Style="{StaticResource HeaderBtnStyle}" ToolTip="Pin" Margin="0,0,4,0">
-                    <Path x:Name="PinIcon" Data="M16,12V4H17V2H7V4H8V12L6,14V16H11V22H13V16H18V14L16,12Z" Fill="#B0B0B0" Stretch="Uniform" Width="10" Height="10"/>
+                    <Path x:Name="PinIcon" Data="M16,12V4H17V2H7V4H8V12L6,14V16H11V22H13V16H18V14L16,12Z" Fill="{DynamicResource HeaderIconBrush}" Stretch="Uniform" Width="10" Height="10"/>
                 </Button>
                 <Button Click="BtnMinimize_Click" Style="{StaticResource HeaderBtnStyle}" Margin="0,0,4,0">
-                    <Path Data="M0,0 L12,0" Stroke="#B0B0B0" StrokeThickness="2" Stretch="Uniform" Width="10" VerticalAlignment="Center"/>
+                    <Path Data="M0,0 L12,0" Stroke="{DynamicResource HeaderIconBrush}" StrokeThickness="2" Stretch="Uniform" Width="10" VerticalAlignment="Center"/>
                 </Button>
                 <Button Click="BtnClose_Click" Style="{StaticResource CloseBtnStyle}">
-                    <Path Data="M0,0 L10,10 M0,10 L10,0" Stroke="#B0B0B0" StrokeThickness="2" Stretch="Uniform" Width="8" Height="8" VerticalAlignment="Center"/>
+                    <Path Data="M0,0 L10,10 M0,10 L10,0" Stroke="{DynamicResource HeaderIconBrush}" StrokeThickness="2" Stretch="Uniform" Width="8" Height="8" VerticalAlignment="Center"/>
                 </Button>
             </StackPanel>
         </Grid>

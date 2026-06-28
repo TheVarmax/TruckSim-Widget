@@ -1,0 +1,157 @@
+<Window x:Class="ETSOverlay.LicenseDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Supporter" Width="400" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        WindowStartupLocation="CenterScreen" Topmost="True" ShowInTaskbar="False">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#1A1C20"/>
+            <Setter Property="BorderBrush" Value="#3A3D45"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </Window.Resources>
+
+    <Border Background="#2A2D35" CornerRadius="12" Padding="20" Margin="15">
+        <Border.Effect>
+            <DropShadowEffect Color="Black" BlurRadius="20" Opacity="0.5" Direction="270" ShadowDepth="4"/>
+        </Border.Effect>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <TextBlock x:Name="TitleBlock" Text="Supporter" FontSize="16" FontWeight="Bold" Margin="0,0,0,15"/>
+
+            <!-- INLINE MESSAGE AREA -->
+            <Border x:Name="MessageBorder" Grid.Row="1" CornerRadius="6" Padding="12" Margin="0,0,0,15" Visibility="Collapsed">
+                <TextBlock x:Name="MessageText" TextWrapping="Wrap" FontSize="12" FontWeight="SemiBold"/>
+            </Border>
+
+            <!-- INACTIVE VIEW -->
+            <StackPanel x:Name="InactivePanel" Grid.Row="2" Visibility="Collapsed">
+                <TextBlock x:Name="InactiveDescText" Text="Unlock additional customization options and support future development." 
+                           TextWrapping="Wrap" Foreground="#A0A0A0" Margin="0,0,0,15" FontSize="13"/>
+                <TextBlock x:Name="LicenseKeyLabel" Text="License Key" FontSize="12" Foreground="#888888" Margin="0,0,0,4"/>
+                <TextBox x:Name="LicenseKeyInput" Margin="0,0,0,20"/>
+                
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BtnCloseInactive" Grid.Column="0" Content="Close" Click="BtnClose_Click" Height="32" Cursor="Hand" Background="#3A3D45" Foreground="White" BorderThickness="0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#40444F"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button x:Name="BtnActivate" Grid.Column="2" Content="Activate" Click="BtnActivate_Click" Height="32" Cursor="Hand" Background="#43A047" Foreground="White" BorderThickness="0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter TargetName="border" Property="Background" Value="#3A3D45"/>
+                                        <Setter Property="Foreground" Value="#888888"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </StackPanel>
+
+            <!-- ACTIVE VIEW -->
+            <StackPanel x:Name="ActivePanel" Grid.Row="2" Visibility="Visible">
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="StatusLabel" Text="Status:" Foreground="#888888" Width="100"/>
+                    <TextBlock x:Name="ActiveStatusText" Grid.Column="1" Text="🟢 Active" FontWeight="Bold" Foreground="#43A047"/>
+                </Grid>
+                <Grid Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="PlanLabel" Text="Plan:" Foreground="#888888" Width="100"/>
+                    <TextBlock x:Name="ActivePlanText" Grid.Column="1" Text="Supporter"/>
+                </Grid>
+                <Grid Margin="0,0,0,20">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="LastValidatedLabel" Text="Last Validated:" Foreground="#888888" Width="100"/>
+                    <TextBlock x:Name="ActiveValidatedText" Grid.Column="1" Text="Never"/>
+                </Grid>
+
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="BtnCloseActive" Grid.Column="0" Content="Close" Click="BtnClose_Click" Height="32" Cursor="Hand" Background="#3A3D45" Foreground="White" BorderThickness="0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#40444F"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button x:Name="BtnDeactivate" Grid.Column="2" Content="Deactivate" Click="BtnDeactivate_Click" Height="32" Cursor="Hand" Background="#E81123" Foreground="White" BorderThickness="0">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter TargetName="border" Property="Background" Value="#3A3D45"/>
+                                        <Setter Property="Foreground" Value="#888888"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

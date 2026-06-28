@@ -58,6 +58,7 @@ namespace ETSOverlay
         private float _lastTickOdometer = -1; // Предыдущее значение одометра для дельты
         private bool _cargoWasLoaded = false; // Флаг, чтобы засекать одометр именно в момент сцепки
         private bool _trailerWasAttachedBeforeLoading = false; // Был ли прицеплен свой прицеп до загрузки груза
+        private bool _isTrailerAttached = false; // Подцеплен ли прицеп в данный момент
         private int _navZeroTicks = 0; // Для отслеживания сброса GPS-маршрута
         private int _navPositiveTicks = 0; // Для отслеживания возврата GPS-маршрута
         private float _lastValidNavDist = 0; // Для отслеживания внезапного обрыва маршрута
@@ -109,6 +110,7 @@ namespace ETSOverlay
 
         // Рассинхрон
         private int _desyncSeconds = 0;
+        private int _desyncGracePeriod = 0;
         private bool _isDesync = false;
 
         private string _uiMode = "full";
@@ -138,6 +140,20 @@ namespace ETSOverlay
         // UI Scale
         private const double BASE_SCALE = 1.15; // default "100%" is 15% larger than design
         private int _uiScale = 100; // user-selected scale percentage
+
+        // Appearance Saved State (Premium features keep their value even if unsubscribed)
+        public string SavedTheme { get; private set; } = "classic";
+        public string SavedAccent { get; private set; } = "teal";
+        public string SavedCardStyle { get; private set; } = "standard";
+        public string SavedAccentMode { get; private set; } = "standard";
+        public Dictionary<string, string> SavedCustomAccents { get; private set; } = new();
+
+        // Appearance Active State (What is actually rendered, downgraded if necessary)
+        public string ActiveTheme { get; private set; } = "classic";
+        public string ActiveAccent { get; private set; } = "teal";
+        public string ActiveCardStyle { get; private set; } = "standard";
+        public string ActiveAccentMode { get; private set; } = "standard";
+        public Dictionary<string, string> ActiveCustomAccents { get; private set; } = new();
 
         private bool _headerOverlayVisible = false;
         private bool _overlayHover = false;
@@ -169,6 +185,18 @@ namespace ETSOverlay
             public double SettingsTop { get; set; } = double.NaN;
             public int UiScale { get; set; } = 100;
             public List<string> CancelledJobs { get; set; } = new();
+            public string LicenseKey { get; set; } = string.Empty;
+            public string HardwareHash { get; set; } = string.Empty;
+            public List<string> CachedFeatures { get; set; } = new();
+            public DateTime LastLicenseValidation { get; set; }
+            public string LicensePlan { get; set; } = string.Empty;
+            public string LicenseStatus { get; set; } = "inactive";
+            public DateTime? LicenseExpiry { get; set; }
+            public string SavedTheme { get; set; } = "classic";
+            public string SavedAccent { get; set; } = "teal";
+            public string SavedCardStyle { get; set; } = "standard";
+            public string AccentMode { get; set; } = "standard";
+            public Dictionary<string, string> CustomCardAccents { get; set; } = new();
         }
 
         private class GameState
@@ -246,6 +274,7 @@ namespace ETSOverlay
             ApplyLocalization();
             UpdateSpeedWarningText();
             ApplyScale();
+            ApplyAppearance();
 
             MouseLeftButtonDown += (s, e) => { if (!locked) DragMove(); };
             LocationChanged += (s, e) =>
@@ -281,6 +310,11 @@ namespace ETSOverlay
 
             Loaded += async (s, e) =>
             {
+                // Validate license in the background
+                _ = LicenseManager.Instance.ValidateLicenseAsync(GetCurrentVersion());
+                LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
+                UpdateSupporterVisuals();
+
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
@@ -442,7 +476,11 @@ namespace ETSOverlay
 
                 if (isGameOnline && data.TruckValues.CurrentValues.DashboardValues.Odometer > 0)
                 {
-                    if (!_forceProfileUnloaded) isProfileLoaded = true;
+                    if (!_forceProfileUnloaded)
+                    {
+                        if (!isProfileLoaded) _desyncGracePeriod = 20;
+                        isProfileLoaded = true;
+                    }
                     else isProfileLoaded = false; // Тракбук сказал, что мы вышли из профиля
                 }
 
@@ -549,6 +587,7 @@ namespace ETSOverlay
                     // ПРАВКА: Проверяем ТОЛЬКО первый прицеп (индекс 0). Составные прицепы могут иметь Trailer[1].Attached=true (прицеплен к Trailer[0]), 
                     // даже когда Trailer[0] отцеплен от грузовика!
                     bool isTrailerAttached = data.TrailerValues != null && data.TrailerValues.Length > 0 && data.TrailerValues[0].Attached;
+                    _isTrailerAttached = isTrailerAttached;
                     bool rawIsCargoLoaded = data.JobValues.CargoLoaded && isTrailerAttached;
 
                     // Дебаунс: ждём 3 тика подряд, чтобы убедиться, что это не фантомный всплеск при загрузке
@@ -632,6 +671,7 @@ namespace ETSOverlay
                     }
                     else
                     {
+                        bool wasDelivering = isDelivering;
                         isDelivering = true;
 
                         // ПЕРЕСТРАХОВКА УБРАНА: _cargoWasLoaded больше не восстанавливается из файла.
@@ -649,8 +689,9 @@ namespace ETSOverlay
                             LoadOrInitJobState(resolvedJobId, isNewJob: true);
                             SaveJobState();
                         }
-                        else if (_lastTelemetryJobId != _currentTelemetryJobId)
+                        else if (_lastTelemetryJobId != _currentTelemetryJobId || !wasDelivering)
                         {
+                            _desyncGracePeriod = 20;
                             LoadOrInitJobState(resolvedJobId);
                         }
 
@@ -745,7 +786,7 @@ namespace ETSOverlay
                                     int raceThreshold = UseMiles ? 81 : 100;
                                     if (maxSpeedKmh > raceThreshold)
                                     {
-                                        if (!isRace) WriteLog($"Speed exceeded {raceThreshold}{GetSpeedUnitSuffix()} - marked as RACING");
+                                        if (!isRace) WriteLog($"Speed exceeded {raceThreshold}{GetSpeedUnitSuffix()} - marked as RACE");
                                         isRace = true;
                                     }
                                     SaveJobState();
@@ -849,7 +890,15 @@ namespace ETSOverlay
                     ResetDisplay(true); // Полная очистка интерфейса и состояния
                 }
                 TbStatus.Text = _isTbRunning ? LocalizeStatus("TB_ONLINE") : LocalizeStatus("TB_OFFLINE");
-                TbStatus.Foreground = _isTbRunning ? new SolidColorBrush(Color.FromRgb(82, 193, 79)) : Brushes.Red;
+                if (_isTbRunning)
+                {
+                    if (ActiveAccentMode == "standard") TbStatus.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                    else TbStatus.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush_Sim");
+                }
+                else
+                {
+                    TbStatus.Foreground = Brushes.Red;
+                }
                 _tbHasActiveJob = false;
                 _isRecordingBroken = false;
                 _awaitingTbResponse = false;
@@ -1171,7 +1220,9 @@ namespace ETSOverlay
                             _lastTbSaysNoJob = tbSaysNoJob;
 
                             // Если последним действием был ВЫХОД из профиля, жестко глушим заказ
+                            bool prevForceUnloaded = _forceProfileUnloaded;
                             _forceProfileUnloaded = (lastProfileLeave > lastProfileLoad);
+                            if (prevForceUnloaded && !_forceProfileUnloaded) _desyncGracePeriod = 20;
 
                             bool logSaysActive = (lastStart > maxEnd);
                             if (_forceProfileUnloaded) logSaysActive = false;
@@ -1233,8 +1284,13 @@ namespace ETSOverlay
                                 WriteLog("TB reports active job. Ghost data cleared.");
                             }
 
+                            if (_desyncGracePeriod > 0)
+                            {
+                                _desyncGracePeriod--;
+                                _desyncSeconds = 0;
+                            }
                             // Проверяем рассинхрон только если мы в профиле, иначе нам всё равно
-                            if (_awaitingTbResponse || _awaitingTbUpload || !isProfileLoaded || _forceProfileUnloaded)
+                            else if (_awaitingTbResponse || _awaitingTbUpload || !isProfileLoaded || _forceProfileUnloaded)
                             {
                                 _desyncSeconds = 0;
                             }
@@ -1266,7 +1322,13 @@ namespace ETSOverlay
                             }
                             else { _desyncSeconds = 0; }
 
-                            _isDesync = _desyncSeconds >= 5; // Даем 5 секунд, чтобы игра точно успела прогрузить телеметрию
+                            bool prevDesync = _isDesync;
+                            _isDesync = _desyncSeconds >= 10; // Даем 10 секунд на подтверждение рассинхрона (снижение ложных срабатываний)
+                            
+                            if (!prevDesync && _isDesync)
+                            {
+                                WriteLog($"[DIAGNOSTICS] Desync raised. GameType={_currentGame}, ProfileLoaded={isProfileLoaded}, TelJob={_currentTelemetryJobId}, TBJob={(_currentGame == GameType.Ats ? _tbJobIdAts : _tbJobIdEts)}, SavedJob={CurrentLastJobId}, TBHasJob={_tbHasActiveJob}, TelHasJob={_telHasJobInfo}, TrailerAttached={_isTrailerAttached}, CargoLoaded={_cargoWasLoaded}, DesyncCount={_desyncSeconds}");
+                            }
 
                             TbStatus.Text = tbState;
                             TbStatus.Foreground = tbColor;
@@ -1309,6 +1371,7 @@ namespace ETSOverlay
             if (!_isTbRunning && _telHasActiveJob) UpdateStatusUI(LocalizeStatus("TB_CLOSED_NO_REC"), Brushes.Red, false);
             else if (_isRecordingBroken && _telHasActiveJob) UpdateStatusUI(LocalizeStatus("NOT_RECORDING"), Brushes.Red, false);
             else if (_awaitingTbResponse || _forceProfileUnloaded) UpdateStatusUI(LocalizeStatus("PROFILE_MENU"), Brushes.Orange, false);
+            else if (isDelivering && _cargoWasLoaded && !_isTrailerAttached) UpdateStatusUI(LocalizeStatus("TRAILER_DETACHED"), Brushes.Red, false);
             else if (_isDesync) UpdateStatusUI(uiLanguage == "uk" ? "Гра ≠ TB" : "Game ≠ TB", Brushes.Red, false);
             else if (_isRecordingBroken && _telHasJobInfo) UpdateStatusUI(LocalizeStatus("TB_ERROR_CHECK"), Brushes.Red, false);
             else if ((_deliveredIndicatorUntil > DateTime.Now || _deliveredFromLogUntil > DateTime.Now) && isPaused && !_telHasActiveJob) UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), false);
@@ -1316,8 +1379,7 @@ namespace ETSOverlay
             else if (!isDelivering) UpdateStatusUI(LocalizeStatus("FREE_ROAM"), Brushes.White, false);
             else if (isDelivering && !_telHasActiveJob)
             {
-                if (_cargoWasLoaded) UpdateStatusUI(LocalizeStatus("TRAILER_DETACHED"), Brushes.Orange, false);
-                else if (_telHasJobInfo) UpdateStatusUI(LocalizeStatus("DRIVING_TO_PICKUP"), new SolidColorBrush(Color.FromRgb(122, 197, 205)), false);
+                if (_telHasJobInfo) UpdateStatusUI(LocalizeStatus("DRIVING_TO_PICKUP"), new SolidColorBrush(Color.FromRgb(122, 197, 205)), false);
                 else UpdateStatusUI(LocalizeStatus("WAIT_TB"), Brushes.Orange, false);
             }
             else if (isPaused && _telHasActiveJob) UpdateStatusUI(uiLanguage == "uk" ? "ПАУЗА (Меню)" : "PAUSED (Menu)", Brushes.Yellow, false);
@@ -1440,17 +1502,9 @@ namespace ETSOverlay
             }
 
             jobDrivenDistance = state.DrivenDistance;
-            // ВАЖНО: Максимальная скорость загружается ТОЛЬКО если груз уже был загружен в этом заказе
-            if (state.CargoWasLoaded)
-            {
-                maxSpeedKmh = state.MaxSpeedKmh;
-                isRace = state.IsRace;
-            }
-            else
-            {
-                maxSpeedKmh = 0;
-                isRace = false;
-            }
+            // ВАЖНО: Максимальная скорость загружается всегда, чтобы не терять её при перезапуске/реконнекте
+            maxSpeedKmh = state.MaxSpeedKmh;
+            isRace = state.IsRace;
             // КРИТИЧЕСКОЕ ПРАВИЛО ОТМЕНЕНО: Теперь мы восстанавливаем _cargoWasLoaded, чтобы при перезапуске виджета во время паузы (с отцепленным прицепом)
             // он помнил, что груз уже БЫЛ взят, и корректно показывал ORDER SUSPENDED, а не откатывался в Фазу 1 (To pickup...)
             _cargoWasLoaded = jobDrivenDistance > 0 || state.CargoWasLoaded;
@@ -1573,6 +1627,25 @@ namespace ETSOverlay
             return false;
         }
 
+        public void SaveStatePublic() => SaveState();
+
+        private void UpdateSupporterVisuals()
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.Invoke(UpdateSupporterVisuals);
+                return;
+            }
+            if (LicenseManager.Instance.Status == "active")
+            {
+                StartupLogo.Fill = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5C542"));
+            }
+            else
+            {
+                StartupLogo.Fill = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#7AC5CD"));
+            }
+        }
+
         private void SaveState()
         {
             try
@@ -1591,7 +1664,19 @@ namespace ETSOverlay
                     SettingsLeft = _settingsWindow?.Left ?? _savedSettingsLeft,
                     SettingsTop = _settingsWindow?.Top ?? _savedSettingsTop,
                     UiScale = _uiScale,
-                    CancelledJobs = _cancelledJobs.ToList()
+                    CancelledJobs = _cancelledJobs.ToList(),
+                    LicenseKey = LicenseManager.Instance.LicenseKey,
+                    HardwareHash = LicenseManager.Instance.HardwareHash,
+                    CachedFeatures = LicenseManager.Instance.GetFeaturesList(),
+                    LastLicenseValidation = LicenseManager.Instance.LastValidationTime,
+                    LicensePlan = LicenseManager.Instance.CurrentPlan,
+                    LicenseStatus = LicenseManager.Instance.Status,
+                    LicenseExpiry = LicenseManager.Instance.ExpiresAt,
+                    SavedTheme = SavedTheme,
+                    SavedAccent = SavedAccent,
+                    SavedCardStyle = SavedCardStyle,
+                    AccentMode = SavedAccentMode,
+                    CustomCardAccents = SavedCustomAccents
                 };
 
                 var json = JsonSerializer.Serialize(state);
@@ -1631,10 +1716,21 @@ namespace ETSOverlay
                                 _savedSettingsLeft = state.SettingsLeft;
                                 _savedSettingsTop = state.SettingsTop;
                             }
+                            _uiScale = state.UiScale == 0 ? 100 : state.UiScale;
+                            SavedTheme = state.SavedTheme ?? "classic";
+                            SavedAccent = state.SavedAccent ?? "teal";
+                            SavedCardStyle = state.SavedCardStyle ?? "standard";
+                            SavedAccentMode = state.AccentMode ?? "standard";
+                            if (state.CustomCardAccents != null)
+                            {
+                                SavedCustomAccents = state.CustomCardAccents;
+                            }
+                            
                             if (state.CancelledJobs != null)
                             {
                                 _cancelledJobs = new HashSet<string>(state.CancelledJobs);
                             }
+                            LicenseManager.Instance.Initialize(state.LicenseKey, state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseStatus, state.LicenseExpiry);
                             // При старте не загружаем сохранённые заказы, только настройки интерфейса.
                         }
                     }
@@ -1659,18 +1755,9 @@ namespace ETSOverlay
                             float.TryParse(parts[1], out jobDrivenDistance);
                             if (jobDrivenDistance > 10000) jobDrivenDistance = 0;
 
-                            if (_cargoWasLoaded)
-                            {
-                                int.TryParse(parts[2], out maxSpeedKmh);
-                                MaxSpeedValue.Text = maxSpeedKmh.ToString();
-                                bool.TryParse(parts[3], out isRace);
-                            }
-                            else
-                            {
-                                maxSpeedKmh = 0;
-                                MaxSpeedValue.Text = "0";
-                                isRace = false;
-                            }
+                            int.TryParse(parts[2], out maxSpeedKmh);
+                            MaxSpeedValue.Text = maxSpeedKmh.ToString();
+                            bool.TryParse(parts[3], out isRace);
                         }
                         if (parts.Length >= 6)
                         {
@@ -1685,6 +1772,11 @@ namespace ETSOverlay
                 }
             }
             catch { }
+
+            if (string.IsNullOrEmpty(LicenseManager.Instance.HardwareHash))
+            {
+                LicenseManager.Instance.Initialize("", "", null, DateTime.MinValue, "", "");
+            }
 
             MainBorder.Opacity = windowOpacity;
             ApplyDualLayerOpacity();
@@ -1738,21 +1830,36 @@ namespace ETSOverlay
         {
             if (isGameOnline && _telHasActiveJob)
             {
-                if (isRace)
+                if (ActiveAccentMode == "standard")
                 {
-                    DeliveryType.Text = uiLanguage == "uk" ? "ПЕРЕГОНИ" : "RACING";
-                    DeliveryType.Foreground = Brushes.Red;
+                    if (isRace)
+                    {
+                        DeliveryType.Text = uiLanguage == "uk" ? "ГОНКА" : "RACE";
+                        DeliveryType.Foreground = Brushes.Red;
+                    }
+                    else
+                    {
+                        DeliveryType.Text = uiLanguage == "uk" ? "РЕАЛ" : "REAL";
+                        DeliveryType.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                    }
                 }
                 else
                 {
-                    DeliveryType.Text = uiLanguage == "uk" ? "РЕАЛ" : "REAL";
-                    DeliveryType.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                    DeliveryType.Text = isRace ? (uiLanguage == "uk" ? "ГОНКА" : "RACE") : (uiLanguage == "uk" ? "РЕАЛ" : "REAL");
+                    DeliveryType.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush_Type");
                 }
             }
             else
             {
                 DeliveryType.Text = uiLanguage == "uk" ? "Н/Д" : "N/A";
-                DeliveryType.Foreground = Brushes.Gray;
+                if (ActiveAccentMode == "standard")
+                {
+                    DeliveryType.Foreground = Brushes.Gray;
+                }
+                else
+                {
+                    DeliveryType.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush_Type");
+                }
             }
         }
 
@@ -1864,7 +1971,10 @@ namespace ETSOverlay
         public void OnScaleChanged(int scalePercent)
         {
             _uiScale = scalePercent;
-            ApplyScale();
+            Dispatcher.Invoke(() => {
+                ApplyScale();
+                ApplyAppearance();
+            });
             SaveState();
         }
 
@@ -1901,6 +2011,43 @@ namespace ETSOverlay
             ApplyUIMode();
             EnsureAutohideConsistency();
             SaveState();
+        }
+
+        public void SetAppearance(string theme, string accent, string cardStyle, string accentMode, Dictionary<string, string> customAccents)
+        {
+            SavedTheme = theme;
+            SavedAccent = accent;
+            SavedCardStyle = cardStyle;
+            SavedAccentMode = accentMode;
+            SavedCustomAccents = new Dictionary<string, string>(customAccents);
+            ApplyAppearance();
+            SaveState();
+        }
+
+        private void ApplyAppearance()
+        {
+            var license = LicenseManager.Instance;
+            
+            bool isSupporter = license.Status == "active";
+            bool canUseThemes = isSupporter || license.HasFeature("appearance.themes");
+            bool canUseAccents = isSupporter || license.HasFeature("appearance.accents");
+            bool canUseCardStyles = isSupporter || license.HasFeature("appearance.cardStyle");
+
+            ActiveTheme = canUseThemes ? SavedTheme : "classic";
+            ActiveAccent = canUseAccents ? SavedAccent : "teal";
+            ActiveCardStyle = canUseCardStyles ? SavedCardStyle : "standard";
+            ActiveAccentMode = canUseAccents ? SavedAccentMode : "standard";
+            
+            ActiveCustomAccents.Clear();
+            if (canUseAccents)
+            {
+                foreach (var kvp in SavedCustomAccents)
+                {
+                    ActiveCustomAccents[kvp.Key] = kvp.Value;
+                }
+            }
+
+            ThemeManager.Instance.ApplyTheme(ActiveTheme, ActiveAccent, ActiveCardStyle, ActiveAccentMode, ActiveCustomAccents);
         }
 
         public void OnOpacityChanged(double sliderValue)
@@ -1958,6 +2105,11 @@ namespace ETSOverlay
             uiLanguage = lang;
             ApplyLocalization();
             SaveState();
+        }
+
+        public string GetUiLanguage()
+        {
+            return uiLanguage;
         }
 
         public void OnSpeedWarningChanged(int value)
@@ -2073,7 +2225,7 @@ namespace ETSOverlay
                 "WAIT_TB" => isUk ? "Чекаю TB..." : "Wait for TB...",
                 "WAIT_TB_UPLOAD" => isUk ? "Відправка..." : "Uploading...",
                 "DRIVING_TO_PICKUP" => isUk ? "За вантажем..." : "To pickup...",
-                "TRAILER_DETACHED" => isUk ? "Від'єднано!" : "Detached!",
+                "TRAILER_DETACHED" => isUk ? "Причіп від'єднано!" : "Trailer detached!",
                 "RECORDING_KM" => isUk ? "Запис кілометрів" : "Recording km",
                 "TB_CLOSED_NO_REC" => isUk ? "TB ЗАКРИТО" : "TB CLOSED",
                 "NOT_RECORDING" => isUk ? "НЕ ЗАПИСУЄ!" : "NO REC!",
@@ -2096,7 +2248,7 @@ namespace ETSOverlay
                 "TB Error: Check Client" or "TB Error" or "Помилка TB" or "Помилка TB: Перевірте клієнт" => LocalizeStatus("TB_ERROR_CHECK"),
                 "Profile Menu" or "In Menu" or "В меню" or "Меню профілю" => LocalizeStatus("PROFILE_MENU"),
                 "Free Roam" or "ВІЛЬНИЙ РЕЖИМ" => LocalizeStatus("FREE_ROAM"),
-                "Trailer detached!" or "Detached!" or "Від'єднано!" or "Причеп від'єднано!" => LocalizeStatus("TRAILER_DETACHED"),
+                "Trailer detached!" or "Detached!" or "Від'єднано!" or "Причіп від'єднано!" => LocalizeStatus("TRAILER_DETACHED"),
                 "PAUSED (Menu)" or "ПАУЗА (Меню)" => uiLanguage == "uk" ? "ПАУЗА (Меню)" : "PAUSED (Menu)",
                 "Recording km" or "Запис кілометрів" => LocalizeStatus("RECORDING_KM"),
                 "Waiting for TB..." or "Wait for TB..." or "Чекаю TB..." or "Очікування TB..." => LocalizeStatus("WAIT_TB"),
@@ -2591,9 +2743,21 @@ namespace ETSOverlay
         /// <summary>
         /// Получает текущую версию приложения из сборки
         /// </summary>
-        private static string GetCurrentVersion()
+        public static string GetCurrentVersion()
         {
-            var version = Assembly.GetExecutingAssembly().GetName().Version;
+            var infoVersionAttr = System.Reflection.Assembly.GetExecutingAssembly().GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>();
+            if (infoVersionAttr != null && !string.IsNullOrWhiteSpace(infoVersionAttr.InformationalVersion))
+            {
+                var versionStr = infoVersionAttr.InformationalVersion;
+                var plusIndex = versionStr.IndexOf('+');
+                if (plusIndex >= 0)
+                {
+                    return versionStr.Substring(0, plusIndex);
+                }
+                return versionStr;
+            }
+
+            var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
             if (version == null) return "0.0.0";
             return $"{version.Major}.{version.Minor}.{version.Build}";
         }

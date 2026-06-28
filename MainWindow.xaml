@@ -12,29 +12,29 @@
 
     <Window.Resources>
         <Style x:Key="InfoCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#252830"/>
-            <Setter Property="CornerRadius" Value="7"/>
-            <Setter Property="BorderBrush" Value="#353840"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource CardCornerRadius}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Padding" Value="{DynamicResource InfoCardPadding}"/>
         </Style>
 
         <Style x:Key="GaugeCardStyle" TargetType="Border">
-            <Setter Property="Background" Value="#252830"/>
-            <Setter Property="CornerRadius" Value="7"/>
-            <Setter Property="BorderBrush" Value="#353840"/>
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="CornerRadius" Value="{DynamicResource CardCornerRadius}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="5,3"/>
+            <Setter Property="Padding" Value="{DynamicResource GaugeCardPadding}"/>
         </Style>
     </Window.Resources>
 
-    <Border x:Name="MainBorder" Width="342" Background="#1A1C20" CornerRadius="8" Padding="6" Margin="16"
+    <Border x:Name="MainBorder" Width="342" Background="{DynamicResource WindowBackgroundBrush}" CornerRadius="8" Padding="6" Margin="16"
             MouseEnter="MainBorder_MouseEnter" MouseMove="MainBorder_MouseMove" MouseLeave="MainBorder_MouseLeave">
         <Border.LayoutTransform>
             <ScaleTransform x:Name="UIScaleTransform" ScaleX="1.15" ScaleY="1.15"/>
         </Border.LayoutTransform>
         <Border.Effect>
-            <DropShadowEffect Color="Black" BlurRadius="14" Opacity="0.5" Direction="270" ShadowDepth="3"/>
+            <DropShadowEffect Color="Black" BlurRadius="14" Opacity="{DynamicResource ShadowOpacity}" Direction="270" ShadowDepth="3"/>
         </Border.Effect>
 
         <Grid>
@@ -45,12 +45,12 @@
                        MouseEnter="HeaderHover_Enter"/>
 
             <!-- INTRO OVERLAY -->
-            <Grid x:Name="IntroOverlay" Background="#1A1C20" Panel.ZIndex="100" Visibility="Collapsed" ClipToBounds="True">
+            <Grid x:Name="IntroOverlay" Background="{DynamicResource WindowBackgroundBrush}" Panel.ZIndex="100" Visibility="Collapsed" ClipToBounds="True">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0">
-                    <Border Background="#252830" CornerRadius="12" Padding="8" Margin="0,0,0,12" BorderBrush="#353840" BorderThickness="1">
-                        <Path Data="M20,8H17V4H3C1.89,4 1,4.89 1,6V17H3A3,3 0 0,0 6,20A3,3 0 0,0 9,17H15A3,3 0 0,0 18,20A3,3 0 0,0 21,17H23V12L20,8M6,18.5C5.17,18.5 4.5,17.83 4.5,17C4.5,16.17 5.17,15.5 6,15.5C6.83,15.5 7.5,16.17 7.5,17C7.5,17.83 6.83,18.5 6,18.5M18,18.5C17.17,18.5 16.5,17.83 16.5,17C16.5,16.17 17.17,15.5 18,15.5C18.83,15.5 19.5,16.17 19.5,17C19.5,17.83 18.83,18.5 18,18.5M17,12V9.5H19.5L21.47,12H17Z" Fill="#7AC5CD" Stretch="Uniform" Width="36" Height="36" HorizontalAlignment="Center"/>
+                    <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="{DynamicResource CardCornerRadius}" Padding="8" Margin="0,0,0,12" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                        <Path x:Name="StartupLogo" Data="M20,8H17V4H3C1.89,4 1,4.89 1,6V17H3A3,3 0 0,0 6,20A3,3 0 0,0 9,17H15A3,3 0 0,0 18,20A3,3 0 0,0 21,17H23V12L20,8M6,18.5C5.17,18.5 4.5,17.83 4.5,17C4.5,16.17 5.17,15.5 6,15.5C6.83,15.5 7.5,16.17 7.5,17C7.5,17.83 6.83,18.5 6,18.5M18,18.5C17.17,18.5 16.5,17.83 16.5,17C16.5,16.17 17.17,15.5 18,15.5C18.83,15.5 19.5,16.17 19.5,17C19.5,17.83 18.83,18.5 18,18.5M17,12V9.5H19.5L21.47,12H17Z" Fill="{DynamicResource AccentColorBrush}" Stretch="Uniform" Width="36" Height="36" HorizontalAlignment="Center"/>
                     </Border>
-                    <TextBlock Text="TRUCKSIM WIDGET" Foreground="White" FontSize="16" FontWeight="Heavy" HorizontalAlignment="Center"/>
+                    <TextBlock Text="TRUCKSIM WIDGET" Foreground="{DynamicResource MainTextBrush}" FontSize="16" FontWeight="Heavy" HorizontalAlignment="Center"/>
                 </StackPanel>
             </Grid>
 
@@ -71,12 +71,12 @@
                     <!-- TB STATUS Card -->
                     <Border x:Name="SimCard" Grid.Column="0" Style="{StaticResource InfoCardStyle}">
                         <StackPanel Orientation="Horizontal">
-                            <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
-                                <Ellipse x:Name="TbStatusDot" Width="8" Height="8" Fill="#4CAF50" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Background="{DynamicResource CardBackgroundHoverBrush}" CornerRadius="16" Width="32" Height="32">
+                                <Ellipse x:Name="TbStatusDot" Width="8" Height="8" Fill="{DynamicResource AccentBrush_Sim}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="SimLabel" Text="TRUCKSBOOK" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                                <TextBlock x:Name="TbStatus" Text="TB • ONLINE" Foreground="#4CAF50" FontSize="11" FontWeight="Bold"/>
+                                <TextBlock x:Name="SimLabel" Text="TRUCKSBOOK" Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold"/>
+                                <TextBlock x:Name="TbStatus" Text="TB • ONLINE" Foreground="{DynamicResource AccentBrush_Sim}" FontSize="11" FontWeight="Bold"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -84,12 +84,12 @@
                     <!-- STATUS Card -->
                     <Border x:Name="StatusCard" Grid.Column="2" Style="{StaticResource InfoCardStyle}">
                         <StackPanel Orientation="Horizontal">
-                            <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
-                                <Path Data="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z" Fill="#7AC5CD" Stretch="Uniform" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Background="{DynamicResource CardBackgroundHoverBrush}" CornerRadius="16" Width="32" Height="32">
+                                <Path Data="M12 6v3l4-4-4-4v3c-4.42 0-8 3.58-8 8 0 1.57.46 3.03 1.24 4.26L6.7 14.8c-.45-.83-.7-1.79-.7-2.8 0-3.31 2.69-6 6-6zm6.76 1.74L17.3 9.2c.44.84.7 1.79.7 2.8 0 3.31-2.69 6-6 6v-3l-4 4 4 4v-3c4.42 0 8-3.58 8-8 0-1.57-.46-3.03-1.24-4.26z" Fill="{DynamicResource AccentBrush_Status}" Stretch="Uniform" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
-                                <TextBlock x:Name="StatusLabel" Text="STATUS" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                                <TextBlock x:Name="StatusValue" Text="Wait for game..." Foreground="#A0A0A0" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,-8,0"/>
+                                <TextBlock x:Name="StatusLabel" Text="STATUS" Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold"/>
+                                <TextBlock x:Name="StatusValue" Text="Wait for game..." Foreground="{DynamicResource MutedTextBrush}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,-8,0"/>
                             </StackPanel>
                         </StackPanel>
                     </Border>
@@ -107,12 +107,12 @@
                         <!-- GAME Card -->
                         <Border x:Name="GameCard" Grid.Column="0" Style="{StaticResource InfoCardStyle}">
                             <StackPanel Orientation="Horizontal">
-                                <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
-                                    <Path Data="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" Fill="#7AC5CD" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Background="{DynamicResource CardBackgroundHoverBrush}" CornerRadius="16" Width="32" Height="32">
+                                    <Path Data="M15 7.5V2H9v5.5l3 3 3-3zM7.5 9H2v6h5.5l3-3-3-3zM9 16.5V22h6v-5.5l-3-3-3 3zM16.5 9l-3 3 3 3H22V9h-5.5z" Fill="{DynamicResource AccentBrush_GameIcon}" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="GameLabel" Text="GAME" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                                    <TextBlock x:Name="GameStatus" Text="ACTIVE" Foreground="#4CAF50" FontSize="12" FontWeight="Bold"/>
+                                    <TextBlock x:Name="GameLabel" Text="GAME" Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold"/>
+                                    <TextBlock x:Name="GameStatus" Text="ACTIVE" Foreground="{DynamicResource AccentBrush_GameText}" FontSize="12" FontWeight="Bold"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
@@ -120,44 +120,44 @@
                         <!-- DISTANCE Card -->
                         <Border x:Name="DistanceCard" Grid.Column="2" Style="{StaticResource InfoCardStyle}">
                             <StackPanel Orientation="Horizontal">
-                                <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
-                                    <Path Data="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" Fill="#52C14F" Stretch="Uniform" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <Border Background="{DynamicResource CardBackgroundHoverBrush}" CornerRadius="16" Width="32" Height="32">
+                                    <Path Data="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" Fill="{DynamicResource AccentBrush_Distance}" Stretch="Uniform" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
                                 <StackPanel Margin="8,0,0,0" VerticalAlignment="Center">
-                                    <TextBlock x:Name="DistanceLabel" Text="DISTANCE" Foreground="White" FontSize="10" FontWeight="Bold"/>
-                                    <TextBlock x:Name="DistanceInfo" Text="0 / 0 km" Foreground="#52C14F" FontSize="11" FontWeight="SemiBold"/>
+                                    <TextBlock x:Name="DistanceLabel" Text="DISTANCE" Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold"/>
+                                    <TextBlock x:Name="DistanceInfo" Text="0 / 0 km" Foreground="{DynamicResource AccentBrush_Distance}" FontSize="11" FontWeight="SemiBold"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
                     </Grid>
 
             <!-- ROW 3: ROUTE CARD -->
-            <Border x:Name="RouteCard" Style="{StaticResource InfoCardStyle}" Margin="0,0,0,6">
+            <Border x:Name="RouteCard" Style="{StaticResource InfoCardStyle}" Margin="{DynamicResource CardMargin}">
                 <Grid>
                     <!-- SINGLE LINE LAYOUT -->
                     <StackPanel x:Name="RouteSingleLineGrid" Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Background="#1E2028" CornerRadius="16" Width="32" Height="32">
-                            <Path Data="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z" Fill="#B0B0B0" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <Border Background="{DynamicResource CardBackgroundHoverBrush}" CornerRadius="16" Width="32" Height="32">
+                            <Path Data="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z" Fill="{DynamicResource AccentBrush_Route}" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock x:Name="RouteLabel" Text="ROUTE" Foreground="White" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                        <TextBlock x:Name="RouteLabel" Text="ROUTE" Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="8,0,0,0"/>
                         
-                        <Border Width="2" Background="#353840" CornerRadius="1" Margin="10,2,10,2"/>
+                        <Border Width="2" Background="{DynamicResource CardBorderBrush}" CornerRadius="1" Margin="10,2,10,2"/>
                         
-                        <TextBlock x:Name="Route" Text="NOT DEFINED" Foreground="White" FontSize="12" FontWeight="Bold" TextWrapping="Wrap" MaxWidth="220" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="Route" Text="NOT DEFINED" Foreground="{DynamicResource MainTextBrush}" FontSize="12" FontWeight="Bold" TextWrapping="Wrap" MaxWidth="220" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- MULTI LINE LAYOUT -->
                     <StackPanel x:Name="RouteMultiLineGrid" Visibility="Collapsed" VerticalAlignment="Center" Margin="0,2,0,2">
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                            <Border Background="#1E2028" CornerRadius="12" Width="24" Height="24">
-                                <Path Data="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z" Fill="#B0B0B0" Stretch="Uniform" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            <Border Background="{DynamicResource CardBackgroundHoverBrush}" CornerRadius="12" Width="24" Height="24">
+                                <Path Data="M21 3L3 10.53v.98l6.84 2.65L12.48 21h.98L21 3z" Fill="{DynamicResource AccentBrush_Route}" Stretch="Uniform" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock x:Name="RouteLabelMulti" Text="ROUTE" Foreground="White" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            <TextBlock x:Name="RouteLabelMulti" Text="ROUTE" Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="6,0,0,0"/>
                         </StackPanel>
                         
-                        <Border Height="2" Background="#353840" CornerRadius="1" Margin="10,6,10,6"/>
+                        <Border Height="2" Background="{DynamicResource CardBorderBrush}" CornerRadius="1" Margin="10,6,10,6"/>
                         
-                        <TextBlock x:Name="RouteMulti" Text="NOT DEFINED" Foreground="White" FontSize="12" FontWeight="Bold" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
+                        <TextBlock x:Name="RouteMulti" Text="NOT DEFINED" Foreground="{DynamicResource MainTextBrush}" FontSize="12" FontWeight="Bold" TextWrapping="Wrap" HorizontalAlignment="Center" TextAlignment="Center"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -181,15 +181,15 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock x:Name="SpeedHeader" Grid.Row="0" Text="SPEED" Foreground="White" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="SpeedHeader" Grid.Row="0" Text="SPEED" Foreground="{DynamicResource MainTextBrush}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
 
 
 
                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,0">
-                            <TextBlock x:Name="SpeedValue" Text="0" Foreground="White" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="SpeedValue" Text="0" Foreground="{DynamicResource AccentBrush_Speed}" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="SpeedUnit" Grid.Row="2" Text="km/h" Foreground="#888888" FontSize="9" HorizontalAlignment="Center" Margin="0,-2,0,0"/>
+                        <TextBlock x:Name="SpeedUnit" Grid.Row="2" Text="km/h" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" HorizontalAlignment="Center" Margin="0,-2,0,0"/>
                     </Grid>
                 </Border>
 
@@ -202,15 +202,15 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock x:Name="MaxHeader" Grid.Row="0" Text="MAX" Foreground="White" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="MaxHeader" Grid.Row="0" Text="MAX" Foreground="{DynamicResource MainTextBrush}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
 
 
 
                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,0">
-                            <TextBlock x:Name="MaxSpeedValue" Text="0" Foreground="#F39C12" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="MaxSpeedValue" Text="0" Foreground="{DynamicResource AccentBrush_Max}" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"/>
                         </StackPanel>
 
-                        <TextBlock x:Name="MaxUnit" Grid.Row="2" Text="km/h" Foreground="#888888" FontSize="9" HorizontalAlignment="Center" Margin="0,-2,0,0"/>
+                        <TextBlock x:Name="MaxUnit" Grid.Row="2" Text="km/h" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" HorizontalAlignment="Center" Margin="0,-2,0,0"/>
                     </Grid>
                 </Border>
 
@@ -223,10 +223,10 @@
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock x:Name="TypeHeader" Grid.Row="0" Text="TYPE" Foreground="White" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <TextBlock x:Name="TypeHeader" Grid.Row="0" Text="TYPE" Foreground="{DynamicResource MainTextBrush}" FontSize="9" FontWeight="Bold" HorizontalAlignment="Center"/>
 
                         <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,0">
-                            <TextBlock x:Name="DeliveryType" Text="N/A" Foreground="Gray" FontSize="20" FontWeight="Heavy" HorizontalAlignment="Center"/>
+                            <TextBlock x:Name="DeliveryType" Text="N/A" Foreground="{DynamicResource AccentBrush_Type}" FontSize="20" FontWeight="Heavy" HorizontalAlignment="Center"/>
                         </StackPanel>
 
                         <!-- Empty placeholder to match exact Row 2 layout of Speed/Max cards for perfect vertical alignment -->
