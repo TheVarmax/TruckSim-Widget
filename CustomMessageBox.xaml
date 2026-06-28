@@ -14,16 +14,45 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- Header -->
             <TextBlock x:Name="TitleBlock" Text="TITLE" Foreground="White" FontSize="14" FontWeight="Bold" Margin="0,0,0,15"/>
 
             <!-- Body -->
-            <StackPanel x:Name="MessageContainer" Grid.Row="1" Margin="0,5,0,20"/>
+            <StackPanel x:Name="MessageContainer" Grid.Row="1" Margin="0,5,0,15"/>
+            
+            <!-- CheckBox (Hidden by default) -->
+            <CheckBox x:Name="ChkDontAskAgain" Grid.Row="2" Content="Don't show again" Visibility="Collapsed" Foreground="#AAAAAA" Margin="0,0,0,20">
+                <CheckBox.Resources>
+                    <Style TargetType="CheckBox">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="CheckBox">
+                                    <StackPanel Orientation="Horizontal">
+                                        <Border Width="16" Height="16" Background="#25272C" BorderBrush="#3A3D45" BorderThickness="1" CornerRadius="3" Margin="0,0,8,0">
+                                            <Path x:Name="checkMark" Data="M3,8 L6,11 L13,4" Stroke="#43A047" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Hidden" Margin="1,1,0,0"/>
+                                        </Border>
+                                        <ContentPresenter VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="checkMark" Property="Visibility" Value="Visible"/>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter Property="Foreground" Value="White"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </CheckBox.Resources>
+            </CheckBox>
 
             <!-- Buttons -->
-            <StackPanel x:Name="ButtonsPanel" Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,15,0,0">
+            <StackPanel x:Name="ButtonsPanel" Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,5,0,0">
                 <Button x:Name="BtnYes" Content="Yes" Click="BtnYes_Click" Width="80" Height="30" Margin="0,0,10,0" Cursor="Hand" Background="#43A047" Foreground="White" BorderThickness="0">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">

@@ -327,10 +327,16 @@ namespace ETSOverlay
         {
             if (_suppressEvents || _mainWindow == null) return;
 
-            string theme = (ThemeSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "classic";
-            string cardStyle = (CardStyleSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "standard";
-            string accentMode = (AccentModeSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "standard";
-            string globalAccent = (GlobalAccentSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
+            var license = LicenseManager.Instance;
+            bool isSupporter = license.Status == "active";
+            bool canUseThemes = isSupporter || license.HasFeature("appearance.themes");
+            bool canUseAccents = isSupporter || license.HasFeature("appearance.accents");
+            bool canUseCardStyles = isSupporter || license.HasFeature("appearance.cardStyle");
+
+            string theme = canUseThemes ? ((ThemeSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "classic") : _mainWindow.SavedTheme;
+            string cardStyle = canUseCardStyles ? ((CardStyleSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "standard") : _mainWindow.SavedCardStyle;
+            string accentMode = canUseAccents ? ((AccentModeSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "standard") : _mainWindow.SavedAccentMode;
+            string globalAccent = canUseAccents ? ((GlobalAccentSelector.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal") : _mainWindow.SavedAccent;
 
             var customAccents = new Dictionary<string, string>();
             if (accentMode == "custom")
@@ -343,6 +349,14 @@ namespace ETSOverlay
                 customAccents["Speed"] = (CmbColorSpeed.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
                 customAccents["Max"] = (CmbColorMax.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
                 customAccents["Type"] = (CmbColorType.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
+            }
+            else if (!canUseAccents && _mainWindow.SavedAccentMode == "custom")
+            {
+                // Preserve saved custom accents if they can't change it right now
+                foreach(var kvp in _mainWindow.SavedCustomAccents)
+                {
+                    customAccents[kvp.Key] = kvp.Value;
+                }
             }
 
             _mainWindow.SetAppearance(theme, globalAccent, cardStyle, accentMode, customAccents);

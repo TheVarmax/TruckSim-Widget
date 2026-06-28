@@ -88,8 +88,8 @@ namespace ETSOverlay
         {
             var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/activate", request);
             
-            // Allow reading JSON on 400 Bad Request if the API returns validation errors in the same format
-            if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.BadRequest)
+            // Allow reading JSON on 4xx errors if the API returns validation/revocation errors in the same format
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
             {
                 response.EnsureSuccessStatusCode();
             }
@@ -101,7 +101,7 @@ namespace ETSOverlay
         {
             var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/check", request);
             
-            if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.BadRequest)
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
             {
                 response.EnsureSuccessStatusCode();
             }
@@ -113,7 +113,7 @@ namespace ETSOverlay
         {
             var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/deactivate", request);
             
-            if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.BadRequest)
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
             {
                 response.EnsureSuccessStatusCode();
             }

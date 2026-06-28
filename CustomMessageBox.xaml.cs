@@ -7,11 +7,18 @@ namespace ETSOverlay
     public partial class CustomMessageBox : Window
     {
         public MessageBoxResult Result { get; private set; } = MessageBoxResult.No;
+        public bool IsDontAskAgainChecked { get; private set; } = false;
 
-        public CustomMessageBox(string message, string title, string yesText, string noText)
+        public CustomMessageBox(string message, string title, string yesText, string noText, bool showCheckbox = false, string checkboxText = "")
         {
             InitializeComponent();
             TitleBlock.Text = title.ToUpper();
+            
+            if (showCheckbox)
+            {
+                ChkDontAskAgain.Visibility = Visibility.Visible;
+                ChkDontAskAgain.Content = checkboxText;
+            }
             
             // Split the message into paragraphs and apply formatting
             var paragraphs = message.Split(new[] { "\n\n" }, StringSplitOptions.None);
@@ -55,23 +62,35 @@ namespace ETSOverlay
         private void BtnYes_Click(object sender, RoutedEventArgs e)
         {
             Result = MessageBoxResult.Yes;
+            IsDontAskAgainChecked = ChkDontAskAgain.IsChecked ?? false;
             Close();
         }
 
         private void BtnNo_Click(object sender, RoutedEventArgs e)
         {
             Result = MessageBoxResult.No;
+            IsDontAskAgainChecked = ChkDontAskAgain.IsChecked ?? false;
             Close();
         }
 
-        public static MessageBoxResult Show(Window owner, string message, string title, string yesText = "Yes", string noText = "No")
+        public static MessageBoxResult Show(Window owner, string message, string title, string yesText, string noText)
         {
-            var dialog = new CustomMessageBox(message, title, yesText, noText)
+            var msgBox = new CustomMessageBox(message, title, yesText, noText)
             {
                 Owner = owner
             };
-            dialog.ShowDialog();
-            return dialog.Result;
+            msgBox.ShowDialog();
+            return msgBox.Result;
+        }
+
+        public static (MessageBoxResult result, bool isCheckboxChecked) ShowWithCheckbox(Window owner, string message, string title, string yesText, string noText, string checkboxText)
+        {
+            var msgBox = new CustomMessageBox(message, title, yesText, noText, true, checkboxText)
+            {
+                Owner = owner
+            };
+            msgBox.ShowDialog();
+            return (msgBox.Result, msgBox.IsDontAskAgainChecked);
         }
     }
 }

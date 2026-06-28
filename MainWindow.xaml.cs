@@ -31,7 +31,8 @@ namespace ETSOverlay
         }
 
         // Auto-update constants
-        private const string GitHubApiUrl = "https://api.github.com/repos/TheVarmax/TruckSim-Widget/releases/latest";
+        // GitHub URL (using /releases to include pre-releases/betas)
+        private const string GitHubApiUrl = "https://api.github.com/repos/TheVarmax/TruckSim-Widget/releases";
         private const string DonateUrl = "https://donate.maksym.uk";
         private const string SupportEmail = "info@maksym.uk";
         public bool _isCheckingUpdate = false;
@@ -147,6 +148,7 @@ namespace ETSOverlay
         public string SavedCardStyle { get; private set; } = "standard";
         public string SavedAccentMode { get; private set; } = "standard";
         public Dictionary<string, string> SavedCustomAccents { get; private set; } = new();
+        public bool SkipBetaUpdates { get; set; } = false;
 
         // Appearance Active State (What is actually rendered, downgraded if necessary)
         public string ActiveTheme { get; private set; } = "classic";
@@ -159,6 +161,7 @@ namespace ETSOverlay
         private bool _overlayHover = false;
         private HeaderOverlayWindow? _headerOverlay;
         private DispatcherTimer? _overlayHideTimer;
+        private DispatcherTimer? _licenseCheckTimer;
 
         private class JobState
         {
@@ -197,6 +200,7 @@ namespace ETSOverlay
             public string SavedCardStyle { get; set; } = "standard";
             public string AccentMode { get; set; } = "standard";
             public Dictionary<string, string> CustomCardAccents { get; set; } = new();
+            public bool SkipBetaUpdates { get; set; } = false;
         }
 
         private class GameState
@@ -283,6 +287,13 @@ namespace ETSOverlay
                 UpdateHeaderOverlayPosition();
             };
             SizeChanged += (s, e) => { UpdateHeaderOverlayPosition(); };
+
+            _licenseCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
+            _licenseCheckTimer.Tick += (s, e) => 
+            {
+                _ = LicenseManager.Instance.ValidateLicenseAsync(GetCurrentVersion());
+            };
+            _licenseCheckTimer.Start();
 
             telemetry = new SCSSdkTelemetry();
             telemetry.Data += Telemetry_Data;
@@ -1644,6 +1655,8 @@ namespace ETSOverlay
             {
                 StartupLogo.Fill = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#7AC5CD"));
             }
+
+            ApplyAppearance();
         }
 
         private void SaveState()
@@ -1676,7 +1689,8 @@ namespace ETSOverlay
                     SavedAccent = SavedAccent,
                     SavedCardStyle = SavedCardStyle,
                     AccentMode = SavedAccentMode,
-                    CustomCardAccents = SavedCustomAccents
+                    CustomCardAccents = SavedCustomAccents,
+                    SkipBetaUpdates = SkipBetaUpdates
                 };
 
                 var json = JsonSerializer.Serialize(state);
@@ -2879,14 +2893,29 @@ namespace ETSOverlay
 
                 var response = await client.GetStringAsync(GitHubApiUrl);
                 using var doc = JsonDocument.Parse(response);
-                var root = doc.RootElement;
+                
+                if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() == 0)
+                {
+                    WriteLog("No releases found on GitHub.");
+                    _isCheckingUpdate = false;
+                    return;
+                }
 
-                string tagName = root.GetProperty("tag_name").GetString() ?? "";
-                string releaseName = root.GetProperty("name").GetString() ?? tagName;
+                var latestRelease = doc.RootElement[0];
+                string tagName = latestRelease.GetProperty("tag_name").GetString() ?? "";
+                string releaseName = latestRelease.GetProperty("name").GetString() ?? tagName;
+                bool isBeta = tagName.Contains("beta", StringComparison.OrdinalIgnoreCase) || releaseName.Contains("beta", StringComparison.OrdinalIgnoreCase);
                 string remoteVersion = ExtractVersionFromTag(tagName);
                 string currentVersion = GetCurrentVersion();
 
-                WriteLog($"Current version: {currentVersion}, Latest: {remoteVersion} ({tagName})");
+                WriteLog($"Current version: {currentVersion}, Latest: {remoteVersion} ({tagName}) - Beta: {isBeta}");
+
+                if (isBeta && SkipBetaUpdates && silent)
+                {
+                    WriteLog("Beta update found, but user chose to skip betas. Ignoring silently.");
+                    _isCheckingUpdate = false;
+                    return;
+                }
 
                 if (IsNewerVersion(remoteVersion, currentVersion))
                 {
@@ -2894,7 +2923,7 @@ namespace ETSOverlay
                     string? downloadUrl = null;
                     string? assetName = null;
 
-                    if (root.TryGetProperty("assets", out var assets))
+                    if (latestRelease.TryGetProperty("assets", out var assets))
                     {
                         foreach (var asset in assets.EnumerateArray())
                         {
@@ -2924,7 +2953,7 @@ namespace ETSOverlay
                         });
 
                         // Показываем диалог подтверждения
-                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName);
+                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName, isBeta);
                     }
                     else
                     {
@@ -3022,23 +3051,41 @@ namespace ETSOverlay
         /// <summary>
         /// Показывает диалог подтверждения обновления
         /// </summary>
-        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName)
+        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName, bool isBeta = false)
         {
             Dispatcher.Invoke(() =>
             {
                 string title = uiLanguage == "uk" ? "Оновлення доступне" : "Update Available";
                 string message = uiLanguage == "uk"
-                    ? $"Доступна нова версія: {releaseName}\n\nВстановити оновлення?\n\nПрограма буде закрита для оновлення файлів."
-                    : $"A new version is available: {releaseName}\n\nInstall update?\n\nThe application will close to update files.";
+                    ? $"Доступна нова {(isBeta ? "БЕТА " : "")}версія: {releaseName}\n\nВстановити оновлення?\n\nПрограма буде закрита для оновлення файлів."
+                    : $"A new {(isBeta ? "BETA " : "")}version is available: {releaseName}\n\nInstall update?\n\nThe application will close to update files.";
 
                 string yesBtn = uiLanguage == "uk" ? "Так" : "Yes";
                 string noBtn = uiLanguage == "uk" ? "Ні" : "No";
 
-                var result = CustomMessageBox.Show(this, message, title, yesBtn, noBtn);
+                MessageBoxResult result;
+                bool isCheckboxChecked = false;
+
+                if (isBeta)
+                {
+                    string chkText = uiLanguage == "uk" ? "Більше не пропонувати бета-оновлення" : "Do not offer beta updates again";
+                    var dialogResult = CustomMessageBox.ShowWithCheckbox(this, message, title, yesBtn, noBtn, chkText);
+                    result = dialogResult.result;
+                    isCheckboxChecked = dialogResult.isCheckboxChecked;
+                }
+                else
+                {
+                    result = CustomMessageBox.Show(this, message, title, yesBtn, noBtn);
+                }
 
                 if (result == MessageBoxResult.Yes)
                 {
                     LaunchUpdaterAndShutdown(downloadUrl, assetName);
+                }
+                else if (isBeta && isCheckboxChecked)
+                {
+                    SkipBetaUpdates = true;
+                    SaveState();
                 }
             });
         }
