@@ -2782,7 +2782,7 @@ namespace ETSOverlay
         private static string ExtractVersionFromTag(string tag)
         {
             if (string.IsNullOrWhiteSpace(tag)) return "0.0.0";
-            var match = Regex.Match(tag, @"(\d+\.\d+\.\d+)");
+            var match = Regex.Match(tag, @"(\d+\.\d+(?:\.\d+)?)");
             return match.Success ? match.Groups[1].Value : "0.0.0";
         }
 
