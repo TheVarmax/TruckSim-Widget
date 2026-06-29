@@ -5,16 +5,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>TruckSim_Widget</RootNamespace>
     <AssemblyName>TruckSim Widget</AssemblyName>
-    <Version>1.5.0-beta</Version>
-    <AssemblyVersion>1.5.0.0</AssemblyVersion>
-    <FileVersion>1.5.0.0</FileVersion>
-    <InformationalVersion>1.5.0-beta</InformationalVersion>
-    <Product>TruckSim Widget</Product>
-    <Title>TruckSim Widget</Title>
-    <Company>TheVarmax</Company>
-    <Authors>TheVarmax</Authors>
-    <Description>Telemetry overlay for Euro Truck Simulator 2 and American Truck Simulator.</Description>
-    <Copyright>Copyright © TheVarmax 2026</Copyright>
+    <Version>1.3.5-beta</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -47,17 +38,9 @@
 
   <!-- Build and copy updater.exe to output directory -->
   <Target Name="BuildAndCopyUpdater" AfterTargets="Build;Publish">
-    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q"
-          ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
-          DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true"
-          ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
-          DestinationFolder="$(PublishDir)"
-          Condition="'$(PublishDir)' != ''"
-          SkipUnchangedFiles="true"
-          ContinueOnError="true" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q" ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
   </Target>
 
 </Project>
