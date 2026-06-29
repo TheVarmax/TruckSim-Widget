@@ -306,8 +306,6 @@ namespace ETSOverlay
             ApplyScale();
             ApplyAppearance();
 
-            _ = InitializeCloudSyncAsync();
-
             MouseLeftButtonDown += (s, e) => { if (!locked) DragMove(); };
             LocationChanged += (s, e) =>
             {
@@ -350,12 +348,13 @@ namespace ETSOverlay
             Loaded += async (s, e) =>
             {
                 // Validate license in the background
-                _ = LicenseManager.Instance.ValidateLicenseAsync(GetCurrentVersion());
+                _ = ValidateLicenseOnStartupAsync();
                 LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
                 LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
                 {
                     Dispatcher.Invoke(() =>
                     {
+                        WriteLog($"License plan: {LicenseManager.Instance.CurrentPlan}");
                         WriteLog($"License features: {string.Join(", ", features)}");
                         WriteLog($"Cloud Sync available: {hasCloudSync.ToString().ToLower()}");
                     });
@@ -3572,6 +3571,42 @@ namespace ETSOverlay
         private void MainBorder_MouseMove(object sender, MouseEventArgs e)
         {
             UpdateOverlayVisibility(e.GetPosition(MainBorder));
+        }
+
+        private async Task ValidateLicenseOnStartupAsync()
+        {
+            try
+            {
+                await LicenseManager.Instance.ValidateLicenseAsync(GetCurrentVersion());
+                SaveState();
+
+                Dispatcher.Invoke(() =>
+                {
+                    _settingsWindow?.UpdateLicenseUI();
+                    _settingsWindow?.UpdateCloudTab();
+                });
+
+                if (CloudSyncEnabled && LicenseManager.Instance.HasFeature("cloud_sync"))
+                {
+                    await InitializeCloudSyncAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"Startup license validation failed: {ex.Message}");
+            }
+        }
+
+        private void MainBorder_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _mainBorderHovered = false;
+            if (_overlayHover) return;
+            StartOverlayHideTimer();
+            if (_autoHideEnabled)
+            {
+                _autoHideQuietMs = 0;
+                StartIdleTimer();
+            }
         }
 
         private void MainBorder_MouseLeave(object sender, MouseEventArgs e)
