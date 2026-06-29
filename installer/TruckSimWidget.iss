@@ -79,7 +79,7 @@ Source: "{#PublishDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
 
 [Icons]
 Name: "{group}\TruckSim Widget"; Filename: "{app}\{#MyAppExeName}"
-Name: "{group}\Open telemetry plugin folder"; Filename: "{app}\plugin"
+Name: "{group}\{cm:OpenPluginFolder}"; Filename: "{app}\plugin"
 Name: "{autodesktop}\TruckSim Widget"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
@@ -150,7 +150,7 @@ begin
     CustomMessage('TelemetryPageTitle'),
     CustomMessage('TelemetryPageSub'),
     CustomMessage('TelemetryPageDesc'),
-    True,
+    False,
     False
   );
 
