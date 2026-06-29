@@ -16,11 +16,11 @@
 </p>
 
 <p align="center">
-  TruckSim Widget quietly monitors TrucksBook and your game's telemetry while you drive, warning you before recording or synchronization problems ruin your trip.
+  TruckSim Widget quietly monitors TrucksBook and your game's telemetry while you drive, warning you before recording or synchronization problems ruin your trip. It also adds advanced customization, secure Supporter licensing, and optional cloud sync for your widget settings.
 </p>
 
 <p align="center">
-  <strong>Free • Lightweight • ETS2 & ATS</strong>
+  <strong>Free core features • Lightweight • ETS2 & ATS</strong>
 </p>
 
 <p align="center">
@@ -75,11 +75,38 @@ Keep your cargo state, route, driven distance, and current delivery progress vis
 
 See the information that matters during a delivery without filling the screen with another dashboard.
 
-### 🫥 Auto-hide
+### 🎨 Advanced UI customization *(Supporters Exclusive)*
+
+Make the widget fit your setup instead of settling for one fixed look.
+
+- Choose from **Classic**, **Midnight**, **Carbon**, and **OLED Black** themes.
+- Select **Standard**, **Rounded**, or **Compact** card styles.
+- Change the overall accent color or assign separate colors to individual tiles.
+- Keep your preferred appearance ready for the next time your Supporter access is active.
+
+### ☁️ Cloud Sync *(Supporters Exclusive)*
+
+Keep your widget preferences available across your computers.
+
+- Automatically synchronize supported UI settings through TruckSim Cloud.
+- Upload this PC or download your saved configuration manually whenever needed.
+- Smart conflict handling helps prevent accidental overwrites when multiple devices change settings.
+- Remove your cloud backup directly from the widget without changing local settings.
+
+### 🔐 Supporter licensing
+
+TruckSim Widget now includes secure subscription-based access to Supporter features.
+
+- Device-based activation with encrypted device tokens.
+- Subscription plan, activation details, and validity shown directly in settings.
+- Features are enabled by the server, so the app always follows the current subscription state.
+
+### 🫥 Enhanced Auto-hide
 
 When everything works, the widget quietly fades into the background.
 
-Hover over it to bring it back, or let an alert reveal it automatically when something needs your attention.
+- Improved startup and transition behavior for a smoother first auto-hide event.
+- Hover over it to bring it back, or let an alert reveal it automatically when something needs attention.
 
 ### 🎛️ Flexible interface
 
@@ -95,7 +122,7 @@ The interface supports English and Ukrainian. City names can also be translated 
 
 ### ✨ Refined experience
 
-TruckSim Widget includes themed dialogs, smooth launch and settings animations, polished layout transitions, and custom animated dropdowns.
+TruckSim Widget includes themed dialogs, smooth launch and settings animations, polished layout transitions, custom animated dropdowns, and a tab-based settings interface.
 
 ### 🔄 Automatic updates
 
