@@ -27,7 +27,13 @@
     </Content>
     <Content Include="plugin\scs-telemetry.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>
+	<Content Include="plugin\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	  <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+	  <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
+	</Content>
   </ItemGroup>
 
   <ItemGroup>
@@ -38,17 +44,9 @@
 
   <!-- Build and copy updater.exe to output directory -->
   <Target Name="BuildAndCopyUpdater" AfterTargets="Build;Publish">
-    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q"
-          ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
-          DestinationFolder="$(OutputPath)"
-          SkipUnchangedFiles="true"
-          ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe"
-          DestinationFolder="$(PublishDir)"
-          Condition="'$(PublishDir)' != ''"
-          SkipUnchangedFiles="true"
-          ContinueOnError="true" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q" ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
   </Target>
 
 </Project>
