@@ -16,11 +16,11 @@
 </p>
 
 <p align="center">
-  TruckSim Widget quietly monitors TrucksBook and your game's telemetry while you drive, warning you before recording or synchronization problems ruin your trip.
+  TruckSim Widget is a lightweight telemetry overlay for Euro Truck Simulator 2 and American Truck Simulator. It monitors TrucksBook and game telemetry in real time, provides configurable alerts, interface customization, Supporter subscriptions, and optional cloud synchronization for widget settings.
 </p>
 
 <p align="center">
-  <strong>Free • Lightweight • ETS2 & ATS</strong>
+  <strong>Free core features • Lightweight • ETS2 & ATS</strong>
 </p>
 
 <p align="center">
@@ -75,11 +75,41 @@ Keep your cargo state, route, driven distance, and current delivery progress vis
 
 See the information that matters during a delivery without filling the screen with another dashboard.
 
+### 🎨 Interface customization *(Supporters Exclusive)*
+
+Configure the appearance of the widget to match your preferences.
+
+- Four built-in themes: **Classic**, **Midnight**, **Carbon**, and **OLED Black**.
+- Three card styles: **Standard**, **Rounded**, and **Compact**.
+- Global accent colors and individual colors for each tile.
+- Adjustable opacity and interface scale.
+- Appearance preferences are retained when Supporter access is inactive.
+
+### ☁️ Cloud Sync *(Supporters Exclusive)*
+
+Synchronize supported widget settings between your computers.
+
+- Automatic synchronization through TruckSim Cloud.
+- Manual upload and download.
+- Conflict resolution for settings changed on multiple devices.
+- Cloud backup removal without changing local settings.
+
+### 🔐 Supporter subscriptions
+
+Supporter subscriptions provide access to premium functionality.
+
+- Device-based activation.
+- Device token authentication stored using Windows data protection.
+- Subscription plan, activation details, and validity displayed in settings.
+- Server-managed feature access.
+
 ### 🫥 Auto-hide
 
-When everything works, the widget quietly fades into the background.
+Reduces the widget's visibility when everything is operating normally.
 
-Hover over it to bring it back, or let an alert reveal it automatically when something needs your attention.
+- Smooth fade transitions.
+- Expands on hover.
+- Automatically becomes visible when attention is required.
 
 ### 🎛️ Flexible interface
 
@@ -93,9 +123,9 @@ Set a speed warning threshold and receive a clear visual indication when you exc
 
 The interface supports English and Ukrainian. City names can also be translated from English to Ukrainian; this feature is still in beta.
 
-### ✨ Refined experience
+### ✨ Interface and settings
 
-TruckSim Widget includes themed dialogs, smooth launch and settings animations, polished layout transitions, and custom animated dropdowns.
+The app includes themed dialogs, launch and settings animations, layout transitions, animated dropdowns, and a tab-based settings interface.
 
 ### 🔄 Automatic updates
 
