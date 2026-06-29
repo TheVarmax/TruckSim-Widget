@@ -25,12 +25,13 @@
     <Content Include="Resources\city_translations_uk.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <Content Include="plugin\scs-telemetry.dll">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
-	<Content Include="plugin\scs-telemetry.dll">
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="plugin\**\*">
 	  <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-	 </Content>
+	  <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+	</Content>
   </ItemGroup>
 
   <ItemGroup>
