@@ -9,7 +9,8 @@ namespace ETSOverlay
     {
         private static readonly string StoragePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            @"TruckSim Widget\device.dat"
+            "TruckSimWidget",
+            "device.dat"
         );
 
         public static void SaveToken(string token)
