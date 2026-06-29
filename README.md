@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  TruckSim Widget quietly monitors TrucksBook and your game's telemetry while you drive, warning you before recording or synchronization problems ruin your trip. It also adds advanced customization, secure Supporter licensing, and optional cloud sync for your widget settings.
+  TruckSim Widget is a lightweight telemetry overlay for Euro Truck Simulator 2 and American Truck Simulator. It monitors TrucksBook and game telemetry in real time, provides configurable alerts, interface customization, Supporter subscriptions, and optional cloud synchronization for widget settings.
 </p>
 
 <p align="center">
@@ -75,38 +75,41 @@ Keep your cargo state, route, driven distance, and current delivery progress vis
 
 See the information that matters during a delivery without filling the screen with another dashboard.
 
-### 🎨 Advanced UI customization *(Supporters Exclusive)*
+### 🎨 Interface customization *(Supporters Exclusive)*
 
-Make the widget fit your setup instead of settling for one fixed look.
+Configure the appearance of the widget to match your preferences.
 
-- Choose from **Classic**, **Midnight**, **Carbon**, and **OLED Black** themes.
-- Select **Standard**, **Rounded**, or **Compact** card styles.
-- Change the overall accent color or assign separate colors to individual tiles.
-- Keep your preferred appearance ready for the next time your Supporter access is active.
+- Four built-in themes: **Classic**, **Midnight**, **Carbon**, and **OLED Black**.
+- Three card styles: **Standard**, **Rounded**, and **Compact**.
+- Global accent colors and individual colors for each tile.
+- Adjustable opacity and interface scale.
+- Appearance preferences are retained when Supporter access is inactive.
 
 ### ☁️ Cloud Sync *(Supporters Exclusive)*
 
-Keep your widget preferences available across your computers.
+Synchronize supported widget settings between your computers.
 
-- Automatically synchronize supported UI settings through TruckSim Cloud.
-- Upload this PC or download your saved configuration manually whenever needed.
-- Smart conflict handling helps prevent accidental overwrites when multiple devices change settings.
-- Remove your cloud backup directly from the widget without changing local settings.
+- Automatic synchronization through TruckSim Cloud.
+- Manual upload and download.
+- Conflict resolution for settings changed on multiple devices.
+- Cloud backup removal without changing local settings.
 
-### 🔐 Supporter licensing
+### 🔐 Supporter subscriptions
 
-TruckSim Widget now includes secure subscription-based access to Supporter features.
+Supporter subscriptions provide access to premium functionality.
 
-- Device-based activation with encrypted device tokens.
-- Subscription plan, activation details, and validity shown directly in settings.
-- Features are enabled by the server, so the app always follows the current subscription state.
+- Device-based activation.
+- Device token authentication stored using Windows data protection.
+- Subscription plan, activation details, and validity displayed in settings.
+- Server-managed feature access.
 
-### 🫥 Enhanced Auto-hide
+### 🫥 Auto-hide
 
-When everything works, the widget quietly fades into the background.
+Reduces the widget's visibility when everything is operating normally.
 
-- Improved startup and transition behavior for a smoother first auto-hide event.
-- Hover over it to bring it back, or let an alert reveal it automatically when something needs attention.
+- Smooth fade transitions.
+- Expands on hover.
+- Automatically becomes visible when attention is required.
 
 ### 🎛️ Flexible interface
 
@@ -120,9 +123,9 @@ Set a speed warning threshold and receive a clear visual indication when you exc
 
 The interface supports English and Ukrainian. City names can also be translated from English to Ukrainian; this feature is still in beta.
 
-### ✨ Refined experience
+### ✨ Interface and settings
 
-TruckSim Widget includes themed dialogs, smooth launch and settings animations, polished layout transitions, custom animated dropdowns, and a tab-based settings interface.
+The app includes themed dialogs, launch and settings animations, layout transitions, animated dropdowns, and a tab-based settings interface.
 
 ### 🔄 Automatic updates
 
