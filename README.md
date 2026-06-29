@@ -139,10 +139,11 @@ The initial setup takes a minute and only needs to be completed once:
 
 1. Download either the **Installer** or the **Portable ZIP** from the latest release.
 2. Install the app or extract the portable archive to a permanent folder.
-3. Copy `scs-telemetry.dll` from the included `plugin` folder into your game's `plugins` folder.
-4. Start TrucksBook Client and sign in.
-5. Launch ETS2 or ATS, then start TruckSim Widget.
-6. Check that TrucksBook and telemetry are online. Drive.
+3. If you use the installer, select ETS2 and/or ATS during **Telemetry Plugin Setup** and choose the game folder when asked. The installer will create the `plugins` folder and copy `scs-telemetry.dll` automatically.
+4. If you use the portable ZIP, copy `scs-telemetry.dll` from the included `plugin` folder into your game's `plugins` folder manually.
+5. Start TrucksBook Client and sign in.
+6. Launch ETS2 or ATS, then start TruckSim Widget.
+7. Check that TrucksBook and telemetry are online. Drive.
 
 ---
 
@@ -162,14 +163,45 @@ Open the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/
 
 | Format | Best for | What to do |
 | --- | --- | --- |
-| **Installer (recommended)** `TruckSimWidgetSetup-<version>.exe` | Most users | Run the setup, choose an installation folder, and follow the installer. It creates Windows shortcuts and an uninstall entry. |
-| **Portable ZIP** `TruckSimWidget-<version>-portable.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. |
+| **Installer (recommended)** `TruckSimWidgetSetup-<version>.exe` | Most users | Run the setup, choose an installation folder, and use the built-in telemetry plugin setup page to configure ETS2 and/or ATS. The installer creates Windows shortcuts and an uninstall entry. |
+| **Portable ZIP** `TruckSimWidget-<version>-portable.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. |
 
 > **Important:** Do not run the portable version from inside the ZIP archive. Extract it first.
 
 ### 2. Install the telemetry plugin
 
-Open the TruckSim Widget installation folder, or the extracted portable folder, then open the `plugin` folder inside it. You will find:
+TruckSim Widget needs `scs-telemetry.dll` inside the game `plugins` folder.
+
+#### Installer users
+
+During setup, the installer shows a **Telemetry Plugin Setup** page. Select the games you want to configure:
+
+- **Euro Truck Simulator 2**
+- **American Truck Simulator**
+
+If the installer detects a standard Steam installation, the game folder may be filled in automatically. Otherwise, choose the root game folder manually, for example:
+
+```text
+...\Steam\steamapps\common\Euro Truck Simulator 2
+```
+
+or:
+
+```text
+...\Steam\steamapps\common\American Truck Simulator
+```
+
+The installer will create this folder if needed:
+
+```text
+bin\win_x64\plugins
+```
+
+and copy `scs-telemetry.dll` into it.
+
+#### Portable ZIP users
+
+Open the extracted TruckSim Widget folder, then open the `plugin` folder inside it. You will find:
 
 ```text
 scs-telemetry.dll
@@ -177,13 +209,13 @@ scs-telemetry.dll
 
 Copy that file into the `plugins` folder of every game you want to use with TruckSim Widget.
 
-#### Euro Truck Simulator 2
+#### Euro Truck Simulator 2 plugin folder
 
 ```text
 ...\Steam\steamapps\common\Euro Truck Simulator 2\bin\win_x64\plugins
 ```
 
-#### American Truck Simulator
+#### American Truck Simulator plugin folder
 
 ```text
 ...\Steam\steamapps\common\American Truck Simulator\bin\win_x64\plugins
