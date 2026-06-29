@@ -249,9 +249,12 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="10" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <RadioButton x:Name="TabGeneralBtn" Grid.Column="0" Content="General" Height="30" IsChecked="True" Checked="TabGeneralBtn_Checked" Style="{StaticResource TabButtonStyle}" />
                 <RadioButton x:Name="TabAppearanceBtn" Grid.Column="2" Content="Appearance" Height="30" Checked="TabAppearanceBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                <RadioButton x:Name="TabCloudBtn" Grid.Column="4" Content="Cloud" Height="30" Checked="TabCloudBtn_Checked" Style="{StaticResource TabButtonStyle}" />
             </Grid>
 
             <!-- Tab: General Content -->
@@ -464,6 +467,94 @@
                             </StackPanel>
                         </Grid>
                     </StackPanel>
+                </StackPanel>
+            </Grid>
+
+            <!-- Tab: Cloud Content -->
+            <Grid x:Name="TabCloudContent" Margin="0,0,0,16" Visibility="Collapsed">
+                <StackPanel>
+                    <TextBlock x:Name="CloudSyncTitle" Text="Cloud Sync" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,0,0,8"/>
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                        <TextBlock x:Name="CloudStatusLabel" Text="Status:" Foreground="#8A8F98" FontSize="12" Margin="0,0,5,0" VerticalAlignment="Center"/>
+                        <TextBlock x:Name="CloudStatusValue" Text="Not available" Foreground="White" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    
+                    <StackPanel Margin="0,0,0,16">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock x:Name="CloudEnableLabel" Text="Enable Cloud Sync" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                            <ToggleButton x:Name="CloudSyncToggle" Style="{StaticResource ModernSwitchToggleStyle}" Checked="CloudSyncToggle_Checked" Unchecked="CloudSyncToggle_Unchecked" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="CloudSyncHint" Text="When enabled, widget settings are saved to your TruckSim Cloud profile." Foreground="#8A8F98" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                    </StackPanel>
+
+                    <Grid Margin="0,10,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="10"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Button x:Name="BtnCloudSyncNow" Grid.Row="0" Grid.Column="0" Content="Sync now" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnCloudSyncNow_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#4CAE50"/></Trigger>
+                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button x:Name="BtnCloudDownload" Grid.Row="0" Grid.Column="2" Content="Download from cloud" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnCloudDownload_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#1976D2"/></Trigger>
+                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button x:Name="BtnCloudUpload" Grid.Row="2" Grid.Column="0" Content="Upload this PC" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnCloudUpload_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#1976D2"/></Trigger>
+                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+
+                        <Button x:Name="BtnCloudDelete" Grid.Row="2" Grid.Column="2" Content="Delete cloud backup" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="#E57373" BorderThickness="0" Cursor="Hand" Click="BtnCloudDelete_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#D32F2F"/><Setter Property="Foreground" Value="White"/></Trigger>
+                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </Grid>
                 </StackPanel>
             </Grid>
 

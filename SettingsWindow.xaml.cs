@@ -26,6 +26,7 @@ namespace ETSOverlay
                 {
                     UpdateLicenseUI();
                     SyncAppearanceValues();
+                    UpdateCloudTab();
                 });
             };
         }
@@ -43,20 +44,33 @@ namespace ETSOverlay
 
         private void TabGeneralBtn_Checked(object sender, RoutedEventArgs e)
         {
-            if (TabGeneralContent != null && TabAppearanceContent != null)
+            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null)
             {
                 TabGeneralContent.Visibility = Visibility.Visible;
                 TabAppearanceContent.Visibility = Visibility.Collapsed;
+                TabCloudContent.Visibility = Visibility.Collapsed;
             }
         }
 
         private void TabAppearanceBtn_Checked(object sender, RoutedEventArgs e)
         {
-            if (TabGeneralContent != null && TabAppearanceContent != null)
+            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null)
             {
                 TabGeneralContent.Visibility = Visibility.Collapsed;
                 TabAppearanceContent.Visibility = Visibility.Visible;
+                TabCloudContent.Visibility = Visibility.Collapsed;
                 if (!_suppressEvents) SyncAppearanceValues();
+            }
+        }
+
+        private void TabCloudBtn_Checked(object sender, RoutedEventArgs e)
+        {
+            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null)
+            {
+                TabGeneralContent.Visibility = Visibility.Collapsed;
+                TabAppearanceContent.Visibility = Visibility.Collapsed;
+                TabCloudContent.Visibility = Visibility.Visible;
+                UpdateCloudTab();
             }
         }
 
@@ -425,9 +439,23 @@ namespace ETSOverlay
             LblColorMax.Text = isUk ? "Макс. Швидкість" : "Max Speed";
             LblColorType.Text = isUk ? "Тип доставки" : "Delivery Type";
 
+            // Cloud Tab localization
+            TabCloudBtn.Content = isUk ? "Хмара" : "Cloud";
+            CloudSyncTitle.Text = isUk ? "Хмарна синхронізація" : "Cloud Sync";
+            CloudStatusLabel.Text = isUk ? "Статус:" : "Status:";
+            CloudEnableLabel.Text = isUk ? "Увімкнути хмарну синхронізацію" : "Enable Cloud Sync";
+            CloudSyncHint.Text = isUk
+                ? "Якщо увімкнено, налаштування віджета зберігаються у ваш профіль TruckSim Cloud."
+                : "When enabled, widget settings are saved to your TruckSim Cloud profile.";
+            BtnCloudSyncNow.Content = isUk ? "Синхронізувати зараз" : "Sync now";
+            BtnCloudDownload.Content = isUk ? "Завантажити з хмари" : "Download from cloud";
+            BtnCloudUpload.Content = isUk ? "Вивантажити з цього ПК" : "Upload this PC";
+            BtnCloudDelete.Content = isUk ? "Видалити хмарну копію" : "Delete cloud backup";
+
             _suppressEvents = false;
             UpdateLicenseUI();
             SyncAppearanceValues();
+            UpdateCloudTab();
         }
 
         public void SetUIMode(string mode)
@@ -497,6 +525,146 @@ namespace ETSOverlay
                 }
             }
             _suppressEvents = false;
+        }
+
+        // --- Cloud Sync ---
+        public void UpdateCloudTab()
+        {
+            var licenseManager = LicenseManager.Instance;
+            bool isSupporter = licenseManager.Status == "active";
+
+            CloudSyncToggle.IsEnabled = false;
+            BtnCloudSyncNow.IsEnabled = false;
+            BtnCloudDownload.IsEnabled = false;
+            BtnCloudUpload.IsEnabled = false;
+            BtnCloudDelete.IsEnabled = false;
+
+            if (!isSupporter)
+            {
+                CloudStatusValue.Text = _isUk ? "Доступно для Supporter" : "Available for Supporter";
+                CloudStatusValue.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98"));
+                return;
+            }
+
+            if (!licenseManager.HasValidatedThisSession && licenseManager.GetFeaturesList().Count == 0)
+            {
+                CloudStatusValue.Text = _isUk ? "Перевіряємо можливості ліцензії..." : "Checking license features...";
+                CloudStatusValue.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98"));
+                return;
+            }
+
+            bool hasCloud = licenseManager.HasFeature("cloud_sync");
+
+            if (!hasCloud)
+            {
+                CloudStatusValue.Text = _isUk ? "Cloud Sync не входить до цієї ліцензії" : "Cloud Sync is not included in this license";
+                CloudStatusValue.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98"));
+                return;
+            }
+
+            CloudSyncToggle.IsEnabled = true;
+
+            _suppressEvents = true;
+            CloudSyncToggle.IsChecked = _mainWindow.CloudSyncEnabled;
+            _suppressEvents = false;
+
+            if (!_mainWindow.CloudSyncEnabled)
+            {
+                CloudStatusValue.Text = _isUk ? "Готово" : "Ready";
+                CloudStatusValue.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98"));
+                BtnCloudSyncNow.IsEnabled = false;
+            }
+            else
+            {
+                if (_mainWindow.CloudSyncStatus == "Conflict")
+                {
+                    CloudStatusValue.Text = _isUk ? "Конфлікт" : "Conflict";
+                    CloudStatusValue.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E57373"));
+                }
+                else if (_mainWindow.CloudSyncStatus == "Cloud unavailable" || licenseManager.LastValidationFailed)
+                {
+                    CloudStatusValue.Text = _isUk ? "Хмара недоступна" : "Cloud unavailable";
+                    CloudStatusValue.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#E57373"));
+                }
+                else
+                {
+                    CloudStatusValue.Text = _isUk ? "Увімкнено" : "Enabled";
+                    CloudStatusValue.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#4CAE50"));
+                }
+                
+                BtnCloudSyncNow.IsEnabled = true;
+            }
+            
+            BtnCloudDownload.IsEnabled = true;
+            BtnCloudUpload.IsEnabled = true;
+            BtnCloudDelete.IsEnabled = true;
+        }
+
+        private async void CloudSyncToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            
+            _mainWindow.SetCloudSyncEnabled(true);
+            UpdateCloudTab();
+            
+            // Start upload/download flow silently. The MainWindow InitializeCloudSyncAsync does this.
+        }
+
+        private void CloudSyncToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            _mainWindow.SetCloudSyncEnabled(false);
+            UpdateCloudTab();
+        }
+
+        private void BtnCloudSyncNow_Click(object sender, RoutedEventArgs e)
+        {
+            BtnCloudSyncNow.IsEnabled = false;
+            _ = _mainWindow.UploadCloudSyncAsync(false);
+        }
+
+        private void BtnCloudDownload_Click(object sender, RoutedEventArgs e)
+        {
+            BtnCloudDownload.IsEnabled = false;
+            _ = _mainWindow.DownloadCloudSyncAsync();
+        }
+
+        private void BtnCloudUpload_Click(object sender, RoutedEventArgs e)
+        {
+            BtnCloudUpload.IsEnabled = false;
+            _ = _mainWindow.UploadCloudSyncAsync(false);
+        }
+
+        private async void BtnCloudDelete_Click(object sender, RoutedEventArgs e)
+        {
+            string title = _isUk ? "Видалення з хмари" : "Delete from cloud";
+            string body = _isUk 
+                ? "Видалити хмарну копію? Це видалить лише копію в хмарі. Локальні налаштування на цьому ПК залишаться без змін." 
+                : "Delete cloud backup? This removes only the cloud copy. Local settings on this PC will stay unchanged.";
+            string yesBtn = _isUk ? "Так" : "Yes";
+            string noBtn = _isUk ? "Ні" : "Cancel";
+
+            var result = CustomMessageBox.Show(this, body, title, yesBtn, noBtn);
+            if (result == MessageBoxResult.Yes)
+            {
+                BtnCloudDelete.IsEnabled = false;
+                await _mainWindow.DeleteCloudSyncAsync();
+            }
+        }
+
+        public void SyncFromCloud()
+        {
+            _suppressEvents = true;
+            SetUIMode(_mainWindow.ExportCloudSyncSettings().UiMode);
+            OpacitySlider.Value = _mainWindow.ExportCloudSyncSettings().WindowOpacity * 100;
+            OpacityValue.Text = $"{(int)Math.Round(OpacitySlider.Value)}%";
+            SetLanguage(_mainWindow.ExportCloudSyncSettings().UiLanguage);
+            SetAutoHideEnabled(_mainWindow.ExportCloudSyncSettings().AutoHideEnabled);
+            SetScale(_mainWindow.ExportCloudSyncSettings().UiScale);
+            // Ignore speed warnings to avoid complex logic if gametype differs
+            SyncAppearanceValues();
+            _suppressEvents = false;
+            UpdateCloudTab();
         }
     }
 }

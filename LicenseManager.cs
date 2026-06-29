@@ -18,6 +18,8 @@ namespace ETSOverlay
         public string Status { get; private set; } = "inactive";
         public DateTime LastValidationTime { get; private set; }
         public DateTime? ExpiresAt { get; private set; }
+        public bool HasValidatedThisSession { get; private set; } = false;
+        public bool LastValidationFailed { get; private set; } = false;
 
         public event Action? OnLicenseChanged;
 
@@ -78,15 +80,21 @@ namespace ETSOverlay
                 
                 if (response != null && response.Success && response.License != null)
                 {
+                    HasValidatedThisSession = true;
+                    LastValidationFailed = false;
                     LicenseKey = key;
                     UpdateStateFromResponse(response);
                     return (true, "Activated successfully.");
                 }
                 
+                HasValidatedThisSession = true;
+                LastValidationFailed = false;
+                
                 return (false, response?.Message ?? "Failed to activate. Please check your key.");
             }
             catch (Exception)
             {
+                LastValidationFailed = true;
                 return (false, "Unable to contact the license server. Please try again later.");
             }
         }
@@ -108,6 +116,8 @@ namespace ETSOverlay
 
                 if (response != null)
                 {
+                    HasValidatedThisSession = true;
+                    LastValidationFailed = false;
                     if (response.Success && response.License != null)
                     {
                         UpdateStateFromResponse(response);
@@ -121,10 +131,12 @@ namespace ETSOverlay
             }
             catch (HttpRequestException)
             {
+                LastValidationFailed = true;
                 // Offline mode: Keep last known state
             }
             catch (Exception)
             {
+                LastValidationFailed = true;
                 // Other errors: Keep last known state
             }
         }
@@ -159,6 +171,8 @@ namespace ETSOverlay
             }
         }
 
+        public event Action<List<string>, bool>? OnFeaturesValidated;
+
         private void UpdateStateFromResponse(LicenseResponse response)
         {
             Status = response.License?.Status ?? "active";
@@ -175,6 +189,7 @@ namespace ETSOverlay
                 }
             }
 
+            OnFeaturesValidated?.Invoke(GetFeaturesList(), HasFeature("cloud_sync"));
             OnLicenseChanged?.Invoke();
         }
 

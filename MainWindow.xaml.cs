@@ -163,6 +163,16 @@ namespace ETSOverlay
         private DispatcherTimer? _overlayHideTimer;
         private DispatcherTimer? _licenseCheckTimer;
 
+        // Cloud Sync
+        public bool CloudSyncEnabled { get; private set; } = false;
+        public int? CloudSyncRevision { get; set; } = null;
+        public DateTime? CloudSyncUpdatedAt { get; set; } = null;
+        public DateTime? LastCloudSyncAttempt { get; set; } = null;
+        public string CloudSyncStatus { get; set; } = "";
+        
+        public CloudSyncService SyncService { get; private set; }
+        private DispatcherTimer _cloudSyncDebounceTimer;
+
         private class JobState
         {
             public string TelemetryId { get; set; } = "";
@@ -201,6 +211,12 @@ namespace ETSOverlay
             public string AccentMode { get; set; } = "standard";
             public Dictionary<string, string> CustomCardAccents { get; set; } = new();
             public bool SkipBetaUpdates { get; set; } = false;
+            
+            public bool CloudSyncEnabled { get; set; } = false;
+            public int? CloudSyncRevision { get; set; } = null;
+            public DateTime? CloudSyncUpdatedAt { get; set; } = null;
+            public DateTime? LastCloudSyncAttempt { get; set; } = null;
+            public string CloudSyncStatus { get; set; } = "";
         }
 
         private class GameState
@@ -257,6 +273,16 @@ namespace ETSOverlay
         public MainWindow()
         {
             InitializeComponent();
+            
+            var apiClient = new TruckSimCloudClient();
+            SyncService = new CloudSyncService(apiClient);
+            
+            _cloudSyncDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            _cloudSyncDebounceTimer.Tick += (s, e) =>
+            {
+                _cloudSyncDebounceTimer.Stop();
+                _ = UploadCloudSyncAsync(false);
+            };
 
             MainBorder.Opacity = windowOpacity;
 
@@ -279,6 +305,8 @@ namespace ETSOverlay
             UpdateSpeedWarningText();
             ApplyScale();
             ApplyAppearance();
+
+            _ = InitializeCloudSyncAsync();
 
             MouseLeftButtonDown += (s, e) => { if (!locked) DragMove(); };
             LocationChanged += (s, e) =>
@@ -324,6 +352,14 @@ namespace ETSOverlay
                 // Validate license in the background
                 _ = LicenseManager.Instance.ValidateLicenseAsync(GetCurrentVersion());
                 LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
+                LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
+                {
+                    Dispatcher.Invoke(() =>
+                    {
+                        WriteLog($"License features: {string.Join(", ", features)}");
+                        WriteLog($"Cloud Sync available: {hasCloudSync.ToString().ToLower()}");
+                    });
+                };
                 UpdateSupporterVisuals();
 
                 EnsureHeaderOverlay();
@@ -450,7 +486,7 @@ namespace ETSOverlay
         }
 
         // Метод для записи логов
-        private void WriteLog(string message)
+        public void WriteLog(string message)
         {
             try
             {
@@ -1690,7 +1726,12 @@ namespace ETSOverlay
                     SavedCardStyle = SavedCardStyle,
                     AccentMode = SavedAccentMode,
                     CustomCardAccents = SavedCustomAccents,
-                    SkipBetaUpdates = SkipBetaUpdates
+                    SkipBetaUpdates = SkipBetaUpdates,
+                    CloudSyncEnabled = CloudSyncEnabled,
+                    CloudSyncRevision = CloudSyncRevision,
+                    CloudSyncUpdatedAt = CloudSyncUpdatedAt,
+                    LastCloudSyncAttempt = LastCloudSyncAttempt,
+                    CloudSyncStatus = CloudSyncStatus
                 };
 
                 var json = JsonSerializer.Serialize(state);
@@ -1744,6 +1785,13 @@ namespace ETSOverlay
                             {
                                 _cancelledJobs = new HashSet<string>(state.CancelledJobs);
                             }
+                            
+                            CloudSyncEnabled = state.CloudSyncEnabled;
+                            CloudSyncRevision = state.CloudSyncRevision;
+                            CloudSyncUpdatedAt = state.CloudSyncUpdatedAt;
+                            LastCloudSyncAttempt = state.LastCloudSyncAttempt;
+                            CloudSyncStatus = state.CloudSyncStatus ?? "";
+
                             LicenseManager.Instance.Initialize(state.LicenseKey, state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseStatus, state.LicenseExpiry);
                             // При старте не загружаем сохранённые заказы, только настройки интерфейса.
                         }
@@ -1990,6 +2038,7 @@ namespace ETSOverlay
                 ApplyAppearance();
             });
             SaveState();
+            ScheduleCloudSyncUpload();
         }
 
         // Called by SettingsWindow when Auto-hide enabled toggles
@@ -1997,6 +2046,7 @@ namespace ETSOverlay
         {
             _autoHideEnabled = enabled;
             SaveState();
+            ScheduleCloudSyncUpload();
             if (_autoHideEnabled)
             {
                 _autoHideQuietMs = 0;
@@ -2025,6 +2075,7 @@ namespace ETSOverlay
             ApplyUIMode();
             EnsureAutohideConsistency();
             SaveState();
+            ScheduleCloudSyncUpload();
         }
 
         public void SetAppearance(string theme, string accent, string cardStyle, string accentMode, Dictionary<string, string> customAccents)
@@ -2036,6 +2087,7 @@ namespace ETSOverlay
             SavedCustomAccents = new Dictionary<string, string>(customAccents);
             ApplyAppearance();
             SaveState();
+            ScheduleCloudSyncUpload();
         }
 
         private void ApplyAppearance()
@@ -2069,6 +2121,7 @@ namespace ETSOverlay
             windowOpacity = sliderValue / 100.0;
             ApplyDualLayerOpacity();
             SaveState();
+            ScheduleCloudSyncUpload();
         }
 
         public bool IsLocked => locked;
@@ -2119,6 +2172,7 @@ namespace ETSOverlay
             uiLanguage = lang;
             ApplyLocalization();
             SaveState();
+            ScheduleCloudSyncUpload();
         }
 
         public string GetUiLanguage()
@@ -2133,6 +2187,7 @@ namespace ETSOverlay
             {
                 CurrentSpeedWarning = value;
                 SaveGameState(_currentGame);
+                ScheduleCloudSyncUpload();
             }
             ApplySpeedWarningColor();
         }
@@ -2143,6 +2198,7 @@ namespace ETSOverlay
             _settingsWindow?.SetSpeedWarningText(CurrentSpeedWarning.ToString());
             SaveGameState(_currentGame);
             ApplySpeedWarningColor();
+            ScheduleCloudSyncUpload();
         }
 
         public void OnSpeedWarningDown()
@@ -2151,6 +2207,7 @@ namespace ETSOverlay
             _settingsWindow?.SetSpeedWarningText(CurrentSpeedWarning.ToString());
             SaveGameState(_currentGame);
             ApplySpeedWarningColor();
+            ScheduleCloudSyncUpload();
         }
 
         public void OnCheckUpdate()
@@ -3086,6 +3143,7 @@ namespace ETSOverlay
                 {
                     SkipBetaUpdates = true;
                     SaveState();
+                    ScheduleCloudSyncUpload();
                 }
             });
         }
@@ -3580,6 +3638,225 @@ namespace ETSOverlay
                 // Not autohide -> ensure no idle state remains
                 StopIdleTimer();
                 ExitIdleState();
+            }
+        }
+
+        // --- Cloud Sync ---
+
+        private async Task InitializeCloudSyncAsync()
+        {
+            if (!CloudSyncEnabled) return;
+            if (LicenseManager.Instance.Status != "active" || !LicenseManager.Instance.HasFeature("cloud_sync")) return;
+
+            try
+            {
+                var response = await SyncService.GetStatusAsync(GetCurrentVersion());
+                if (response != null && response.Success && response.Sync != null)
+                {
+                    if (response.Sync.Exists)
+                    {
+                        var settingsResp = await SyncService.GetSettingsAsync(GetCurrentVersion());
+                        if (settingsResp?.Settings != null)
+                        {
+                            ApplyCloudSyncSettings(settingsResp.Settings);
+                            CloudSyncRevision = settingsResp.Sync?.Revision;
+                            if (DateTime.TryParse(settingsResp.Sync?.UpdatedAt, out var dt))
+                                CloudSyncUpdatedAt = dt;
+                            CloudSyncStatus = "Available";
+                            SaveState();
+                            WriteLog("Cloud sync: downloaded settings at startup.");
+                        }
+                    }
+                    else
+                    {
+                        await UploadCloudSyncAsync(true);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"Cloud sync startup error: {ex.Message}");
+                CloudSyncStatus = "Cloud unavailable";
+                SaveState();
+            }
+        }
+
+        public CloudSyncSettings ExportCloudSyncSettings()
+        {
+            return new CloudSyncSettings
+            {
+                UiMode = _uiMode,
+                WindowOpacity = windowOpacity,
+                UiLanguage = uiLanguage,
+                AutoHideEnabled = _autoHideEnabled,
+                UiScale = _uiScale,
+                SpeedWarningEts = _speedWarningEts,
+                SpeedWarningAts = _speedWarningAts,
+                SavedTheme = SavedTheme,
+                SavedAccent = SavedAccent,
+                SavedCardStyle = SavedCardStyle,
+                AccentMode = SavedAccentMode,
+                CustomCardAccents = new Dictionary<string, string>(SavedCustomAccents),
+                SkipBetaUpdates = SkipBetaUpdates
+            };
+        }
+
+        public void ApplyCloudSyncSettings(CloudSyncSettings settings)
+        {
+            _uiMode = settings.UiMode;
+            windowOpacity = settings.WindowOpacity;
+            uiLanguage = settings.UiLanguage;
+            _autoHideEnabled = settings.AutoHideEnabled;
+            _uiScale = settings.UiScale;
+            _speedWarningEts = settings.SpeedWarningEts;
+            _speedWarningAts = settings.SpeedWarningAts;
+            SavedTheme = settings.SavedTheme;
+            SavedAccent = settings.SavedAccent;
+            SavedCardStyle = settings.SavedCardStyle;
+            SavedAccentMode = settings.AccentMode;
+            SavedCustomAccents = new Dictionary<string, string>(settings.CustomCardAccents);
+            SkipBetaUpdates = settings.SkipBetaUpdates;
+
+            ApplyLocalization();
+            ApplyLanguageSelection();
+            ApplyUIMode(false);
+            ApplyScale();
+            ApplyAppearance();
+            UpdateSpeedWarningText();
+
+            if (_settingsWindow != null && _settingsWindow.IsLoaded)
+            {
+                // Update UI without triggering saves
+                _settingsWindow.SyncFromCloud(); 
+            }
+
+            SaveState();
+        }
+
+        public void ScheduleCloudSyncUpload()
+        {
+            if (!CloudSyncEnabled) return;
+            if (LicenseManager.Instance.Status != "active" || !LicenseManager.Instance.HasFeature("cloud_sync")) return;
+
+            _cloudSyncDebounceTimer.Stop();
+            _cloudSyncDebounceTimer.Start();
+        }
+
+        public async Task UploadCloudSyncAsync(bool force = false)
+        {
+            try
+            {
+                LastCloudSyncAttempt = DateTime.Now;
+                var settings = ExportCloudSyncSettings();
+                var resp = await SyncService.SaveSettingsAsync(GetCurrentVersion(), force ? null : CloudSyncRevision, settings);
+                
+                if (resp != null && resp.Success)
+                {
+                    CloudSyncRevision = resp.Sync?.Revision;
+                    if (DateTime.TryParse(resp.Sync?.UpdatedAt, out var dt))
+                        CloudSyncUpdatedAt = dt;
+                    CloudSyncStatus = "Available";
+                    SaveState();
+                    if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                    WriteLog("Cloud sync: uploaded successfully.");
+                }
+                else if (resp != null && resp.Error == "sync_conflict")
+                {
+                    CloudSyncStatus = "Conflict";
+                    SaveState();
+                    if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                    
+                    var dialog = new CloudSyncConflictDialog();
+                    dialog.ShowDialog();
+                    
+                    if (dialog.Result == CloudSyncConflictDialog.ConflictResult.Download)
+                    {
+                        await DownloadCloudSyncAsync();
+                    }
+                    else if (dialog.Result == CloudSyncConflictDialog.ConflictResult.Overwrite)
+                    {
+                        CloudSyncRevision = resp.ServerRevision;
+                        await UploadCloudSyncAsync(false);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                CloudSyncStatus = "Cloud unavailable";
+                SaveState();
+                if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                WriteLog($"Cloud sync upload error: {ex.Message}");
+            }
+        }
+
+        public async Task DownloadCloudSyncAsync()
+        {
+            try
+            {
+                LastCloudSyncAttempt = DateTime.Now;
+                var resp = await SyncService.GetSettingsAsync(GetCurrentVersion());
+                
+                if (resp != null && resp.Success && resp.Settings != null)
+                {
+                    ApplyCloudSyncSettings(resp.Settings);
+                    CloudSyncRevision = resp.Sync?.Revision;
+                    if (DateTime.TryParse(resp.Sync?.UpdatedAt, out var dt))
+                        CloudSyncUpdatedAt = dt;
+                    CloudSyncStatus = "Available";
+                    SaveState();
+                    if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                    WriteLog("Cloud sync: manually downloaded settings.");
+                }
+                else if (resp != null && resp.Success && (resp.Sync == null || !resp.Sync.Exists))
+                {
+                    CloudSyncStatus = "No cloud backup found";
+                    SaveState();
+                    if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                }
+            }
+            catch (Exception ex)
+            {
+                CloudSyncStatus = "Cloud unavailable";
+                SaveState();
+                if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                WriteLog($"Cloud sync download error: {ex.Message}");
+            }
+        }
+
+        public async Task DeleteCloudSyncAsync()
+        {
+            try
+            {
+                LastCloudSyncAttempt = DateTime.Now;
+                var resp = await SyncService.DeleteSettingsAsync(GetCurrentVersion());
+                
+                if (resp != null && resp.Success)
+                {
+                    CloudSyncRevision = null;
+                    CloudSyncUpdatedAt = null;
+                    CloudSyncEnabled = false;
+                    CloudSyncStatus = "Not available";
+                    SaveState();
+                    if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                    WriteLog("Cloud sync: cloud backup deleted.");
+                }
+            }
+            catch (Exception ex)
+            {
+                CloudSyncStatus = "Cloud unavailable";
+                SaveState();
+                if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
+                WriteLog($"Cloud sync delete error: {ex.Message}");
+            }
+        }
+
+        public void SetCloudSyncEnabled(bool enabled)
+        {
+            CloudSyncEnabled = enabled;
+            SaveState();
+            if (enabled)
+            {
+                _ = InitializeCloudSyncAsync();
             }
         }
 

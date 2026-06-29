@@ -94,7 +94,17 @@ namespace ETSOverlay
                 response.EnsureSuccessStatusCode();
             }
 
-            return await response.Content.ReadFromJsonAsync<LicenseResponse>();
+            string rawJson = await response.Content.ReadAsStringAsync();
+            try
+            {
+                if (System.Windows.Application.Current?.MainWindow is MainWindow main)
+                {
+                    main.Dispatcher.Invoke(() => main.WriteLog($"[API] /license/activate RAW JSON: {rawJson}"));
+                }
+            }
+            catch { }
+
+            return System.Text.Json.JsonSerializer.Deserialize<LicenseResponse>(rawJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 
         public async Task<LicenseResponse?> CheckAsync(LicenseCheckRequest request)
@@ -106,7 +116,17 @@ namespace ETSOverlay
                 response.EnsureSuccessStatusCode();
             }
 
-            return await response.Content.ReadFromJsonAsync<LicenseResponse>();
+            string rawJson = await response.Content.ReadAsStringAsync();
+            try
+            {
+                if (System.Windows.Application.Current?.MainWindow is MainWindow main)
+                {
+                    main.Dispatcher.Invoke(() => main.WriteLog($"[API] /license/check RAW JSON: {rawJson}"));
+                }
+            }
+            catch { }
+
+            return System.Text.Json.JsonSerializer.Deserialize<LicenseResponse>(rawJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 
         public async Task<LicenseResponse?> DeactivateAsync(LicenseDeactivationRequest request)
@@ -119,6 +139,42 @@ namespace ETSOverlay
             }
 
             return await response.Content.ReadFromJsonAsync<LicenseResponse>();
+        }
+
+        public async Task<CloudSyncResponse?> GetSyncStatusAsync(CloudSyncStatusRequest request)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/sync/status", request);
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
+                response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<CloudSyncResponse>();
+        }
+
+        public async Task<CloudSyncResponse?> GetSyncSettingsAsync(CloudSyncStatusRequest request)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/sync/settings", request);
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
+                response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<CloudSyncResponse>();
+        }
+
+        public async Task<CloudSyncResponse?> SaveSyncSettingsAsync(CloudSyncSettingsRequest request)
+        {
+            var response = await _httpClient.PutAsJsonAsync($"{BASE_URL}/sync/settings", request);
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
+                response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<CloudSyncResponse>();
+        }
+
+        public async Task<CloudSyncResponse?> DeleteSyncSettingsAsync(CloudSyncStatusRequest request)
+        {
+            var requestMessage = new HttpRequestMessage(HttpMethod.Delete, $"{BASE_URL}/sync/settings")
+            {
+                Content = JsonContent.Create(request)
+            };
+            var response = await _httpClient.SendAsync(requestMessage);
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
+                response.EnsureSuccessStatusCode();
+            return await response.Content.ReadFromJsonAsync<CloudSyncResponse>();
         }
     }
 }
