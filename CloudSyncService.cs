@@ -16,7 +16,7 @@ namespace ETSOverlay
         {
             return new CloudSyncStatusRequest
             {
-                LicenseKey = LicenseManager.Instance.LicenseKey,
+                DeviceToken = LicenseManager.Instance.DeviceToken,
                 HardwareHash = LicenseManager.Instance.HardwareHash,
                 AppVersion = version
             };
@@ -38,7 +38,7 @@ namespace ETSOverlay
         {
             var req = new CloudSyncSettingsRequest
             {
-                LicenseKey = LicenseManager.Instance.LicenseKey,
+                DeviceToken = LicenseManager.Instance.DeviceToken,
                 HardwareHash = LicenseManager.Instance.HardwareHash,
                 AppVersion = version,
                 SchemaVersion = 1,

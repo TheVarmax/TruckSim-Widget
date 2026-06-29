@@ -81,11 +81,6 @@ namespace ETSOverlay
             {
                 ActivePanel.Visibility = Visibility.Collapsed;
                 InactivePanel.Visibility = Visibility.Visible;
-
-                if (!string.IsNullOrWhiteSpace(licenseManager.LicenseKey) && string.IsNullOrWhiteSpace(LicenseKeyInput.Text))
-                {
-                    LicenseKeyInput.Text = licenseManager.LicenseKey;
-                }
             }
         }
 
@@ -140,6 +135,7 @@ namespace ETSOverlay
                 ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Ліцензію успішно активовано." : "License activated successfully.", false);
                 BtnActivate.IsEnabled = true;
                 BtnActivate.Content = _mainWindow.GetUiLanguage() == "uk" ? "Активувати" : "Activate";
+                LicenseKeyInput.Text = string.Empty;
                 _mainWindow.SaveStatePublic();
             }
         }

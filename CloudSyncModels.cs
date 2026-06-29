@@ -36,8 +36,8 @@ namespace ETSOverlay
 
     public class CloudSyncStatusRequest
     {
-        [JsonPropertyName("licenseKey")]
-        public string LicenseKey { get; set; } = string.Empty;
+        [JsonPropertyName("deviceToken")]
+        public string DeviceToken { get; set; } = string.Empty;
         [JsonPropertyName("hardwareHash")]
         public string HardwareHash { get; set; } = string.Empty;
         [JsonPropertyName("appVersion")]

@@ -12,7 +12,9 @@ namespace ETSOverlay
         private readonly TruckSimCloudClient _client = new TruckSimCloudClient();
         private readonly HashSet<string> _features = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        public string LicenseKey { get; private set; } = string.Empty;
+        private string _deviceToken = string.Empty;
+        public string DeviceToken => _deviceToken;
+        public bool HasValidToken => !string.IsNullOrEmpty(_deviceToken);
         public string HardwareHash { get; private set; } = string.Empty;
         public string CurrentPlan { get; private set; } = string.Empty;
         public string Status { get; private set; } = "inactive";
@@ -25,9 +27,14 @@ namespace ETSOverlay
 
         private LicenseManager() { }
 
-        public void Initialize(string licenseKey, string hardwareHash, List<string>? cachedFeatures, DateTime lastValidationTime, string plan, string status, DateTime? expiresAt = null)
+        public void LoadDeviceToken()
         {
-            LicenseKey = licenseKey ?? string.Empty;
+            _deviceToken = DeviceTokenStorage.LoadToken();
+        }
+
+        public void Initialize(string hardwareHash, List<string>? cachedFeatures, DateTime lastValidationTime, string plan, string status, DateTime? expiresAt = null)
+        {
+            LoadDeviceToken();
             
             // Generate device ID if not present
             if (string.IsNullOrWhiteSpace(hardwareHash))
@@ -82,7 +89,13 @@ namespace ETSOverlay
                 {
                     HasValidatedThisSession = true;
                     LastValidationFailed = false;
-                    LicenseKey = key;
+                    
+                    _deviceToken = response.DeviceToken ?? string.Empty;
+                    if (!string.IsNullOrEmpty(_deviceToken))
+                    {
+                        DeviceTokenStorage.SaveToken(_deviceToken);
+                    }
+                    
                     UpdateStateFromResponse(response);
                     return (true, "Activated successfully.");
                 }
@@ -101,13 +114,13 @@ namespace ETSOverlay
 
         public async Task ValidateLicenseAsync(string appVersion)
         {
-            if (string.IsNullOrWhiteSpace(LicenseKey)) return;
+            if (!HasValidToken) return;
 
             try
             {
                 var request = new LicenseCheckRequest
                 {
-                    LicenseKey = LicenseKey,
+                    DeviceToken = DeviceToken,
                     HardwareHash = HardwareHash,
                     AppVersion = appVersion
                 };
@@ -143,13 +156,13 @@ namespace ETSOverlay
 
         public async Task<(bool success, string message)> DeactivateAsync()
         {
-            if (string.IsNullOrWhiteSpace(LicenseKey)) return (true, "");
+            if (!HasValidToken) return (true, "");
 
             try
             {
                 var request = new LicenseDeactivationRequest
                 {
-                    LicenseKey = LicenseKey,
+                    DeviceToken = DeviceToken,
                     HardwareHash = HardwareHash
                 };
 
@@ -195,7 +208,8 @@ namespace ETSOverlay
 
         private void ClearLicenseState()
         {
-            LicenseKey = string.Empty;
+            _deviceToken = string.Empty;
+            DeviceTokenStorage.DeleteToken();
             CurrentPlan = string.Empty;
             Status = "inactive";
             ExpiresAt = null;

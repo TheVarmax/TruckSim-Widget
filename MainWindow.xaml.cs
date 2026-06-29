@@ -198,7 +198,6 @@ namespace ETSOverlay
             public double SettingsTop { get; set; } = double.NaN;
             public int UiScale { get; set; } = 100;
             public List<string> CancelledJobs { get; set; } = new();
-            public string LicenseKey { get; set; } = string.Empty;
             public string HardwareHash { get; set; } = string.Empty;
             public List<string> CachedFeatures { get; set; } = new();
             public DateTime LastLicenseValidation { get; set; }
@@ -1689,6 +1688,12 @@ namespace ETSOverlay
             else
             {
                 StartupLogo.Fill = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#7AC5CD"));
+                
+                CloudSyncEnabled = false;
+                CloudSyncRevision = null;
+                CloudSyncUpdatedAt = null;
+                LastCloudSyncAttempt = null;
+                CloudSyncStatus = "";
             }
 
             ApplyAppearance();
@@ -1713,7 +1718,6 @@ namespace ETSOverlay
                     SettingsTop = _settingsWindow?.Top ?? _savedSettingsTop,
                     UiScale = _uiScale,
                     CancelledJobs = _cancelledJobs.ToList(),
-                    LicenseKey = LicenseManager.Instance.LicenseKey,
                     HardwareHash = LicenseManager.Instance.HardwareHash,
                     CachedFeatures = LicenseManager.Instance.GetFeaturesList(),
                     LastLicenseValidation = LicenseManager.Instance.LastValidationTime,
@@ -1791,7 +1795,7 @@ namespace ETSOverlay
                             LastCloudSyncAttempt = state.LastCloudSyncAttempt;
                             CloudSyncStatus = state.CloudSyncStatus ?? "";
 
-                            LicenseManager.Instance.Initialize(state.LicenseKey, state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseStatus, state.LicenseExpiry);
+                            LicenseManager.Instance.Initialize(state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseStatus, state.LicenseExpiry);
                             // При старте не загружаем сохранённые заказы, только настройки интерфейса.
                         }
                     }
@@ -1835,9 +1839,7 @@ namespace ETSOverlay
             catch { }
 
             if (string.IsNullOrEmpty(LicenseManager.Instance.HardwareHash))
-            {
-                LicenseManager.Instance.Initialize("", "", null, DateTime.MinValue, "", "");
-            }
+                LicenseManager.Instance.Initialize("", null, DateTime.MinValue, "", "");
 
             MainBorder.Opacity = windowOpacity;
             ApplyDualLayerOpacity();

@@ -24,8 +24,8 @@ namespace ETSOverlay
 
     public class LicenseCheckRequest
     {
-        [JsonPropertyName("licenseKey")]
-        public string LicenseKey { get; set; } = string.Empty;
+        [JsonPropertyName("deviceToken")]
+        public string DeviceToken { get; set; } = string.Empty;
 
         [JsonPropertyName("hardwareHash")]
         public string HardwareHash { get; set; } = string.Empty;
@@ -36,8 +36,8 @@ namespace ETSOverlay
 
     public class LicenseDeactivationRequest
     {
-        [JsonPropertyName("licenseKey")]
-        public string LicenseKey { get; set; } = string.Empty;
+        [JsonPropertyName("deviceToken")]
+        public string DeviceToken { get; set; } = string.Empty;
 
         [JsonPropertyName("hardwareHash")]
         public string HardwareHash { get; set; } = string.Empty;
@@ -47,6 +47,9 @@ namespace ETSOverlay
     {
         [JsonPropertyName("success")]
         public bool Success { get; set; }
+
+        [JsonPropertyName("deviceToken")]
+        public string? DeviceToken { get; set; }
 
         [JsonPropertyName("license")]
         public LicenseInfo? License { get; set; }
