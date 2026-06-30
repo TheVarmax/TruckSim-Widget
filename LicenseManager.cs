@@ -39,7 +39,16 @@ namespace ETSOverlay
             // Generate device ID if not present
             if (string.IsNullOrWhiteSpace(hardwareHash))
             {
-                HardwareHash = Guid.NewGuid().ToString();
+                try
+                {
+                    using var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\Cryptography");
+                    var guid = key?.GetValue("MachineGuid")?.ToString();
+                    HardwareHash = !string.IsNullOrWhiteSpace(guid) ? guid : Guid.NewGuid().ToString();
+                }
+                catch
+                {
+                    HardwareHash = Guid.NewGuid().ToString();
+                }
             }
             else
             {
