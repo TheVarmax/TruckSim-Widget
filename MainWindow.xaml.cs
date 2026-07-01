@@ -2835,48 +2835,47 @@ namespace ETSOverlay
         }
 
         /// <summary>
-        /// Извлекает номер версии из тега релиза GitHub (например "v1.0.4-stable" -> "1.0.4-stable")
+        /// Извлекает номер версии из тега релиза GitHub (например "v1.0.4-stable" -> "1.0.4")
         /// </summary>
         private static string ExtractVersionFromTag(string tag)
         {
             if (string.IsNullOrWhiteSpace(tag)) return "0.0.0";
-            var match = Regex.Match(tag, @"(\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9\.]+)?)\b");
-            return match.Success ? match.Groups[1].Value : "0.0.0";
+            string versionStr = tag.TrimStart('v', 'V', '.');
+            versionStr = versionStr.Replace("-stable", "", StringComparison.OrdinalIgnoreCase);
+            return versionStr;
         }
 
         /// <summary>
-        /// Сравнивает две версии (SemVer). Возвращает true, если remote новее current
+        /// Сравнивает две версии. Возвращает true, если remote новее current
         /// </summary>
         private static bool IsNewerVersion(string remote, string current)
         {
             try
             {
-                var remoteParts = remote.Split('-');
-                var currentParts = current.Split('-');
+                string remoteNum = remote.Split('-')[0];
+                string currentNum = current.Split('-')[0];
 
-                var remoteNum = remoteParts[0].Split('.').Select(int.Parse).ToArray();
-                var currentNum = currentParts[0].Split('.').Select(int.Parse).ToArray();
+                var remoteParts = remoteNum.Split('.').Select(int.Parse).ToArray();
+                var currentParts = currentNum.Split('.').Select(int.Parse).ToArray();
 
-                for (int i = 0; i < Math.Min(remoteNum.Length, currentNum.Length); i++)
+                for (int i = 0; i < Math.Min(remoteParts.Length, currentParts.Length); i++)
                 {
-                    if (remoteNum[i] > currentNum[i]) return true;
-                    if (remoteNum[i] < currentNum[i]) return false;
+                    if (remoteParts[i] > currentParts[i]) return true;
+                    if (remoteParts[i] < currentParts[i]) return false;
                 }
+                
+                if (remoteParts.Length > currentParts.Length) return true;
+                if (remoteParts.Length < currentParts.Length) return false;
 
-                if (remoteNum.Length > currentNum.Length) return true;
-                if (remoteNum.Length < currentNum.Length) return false;
+                bool remoteIsPrerelease = remote.Contains("-");
+                bool currentIsPrerelease = current.Contains("-");
 
-                // Numbers are exactly equal. Check suffixes (e.g. -beta, -stable).
-                bool remoteHasSuffix = remoteParts.Length > 1;
-                bool currentHasSuffix = currentParts.Length > 1;
+                if (!remoteIsPrerelease && currentIsPrerelease) return true;
+                if (remoteIsPrerelease && !currentIsPrerelease) return false;
 
-                if (!remoteHasSuffix && currentHasSuffix) return true; // 1.5.1 > 1.5.1-beta
-                if (remoteHasSuffix && !currentHasSuffix) return false; // 1.5.1-beta < 1.5.1
-
-                if (remoteHasSuffix && currentHasSuffix)
+                if (remoteIsPrerelease && currentIsPrerelease)
                 {
-                    // Both have suffixes, compare them lexically (e.g. stable > beta)
-                    return string.Compare(remoteParts[1], currentParts[1], StringComparison.OrdinalIgnoreCase) > 0;
+                    return string.Compare(remote, current, StringComparison.OrdinalIgnoreCase) > 0;
                 }
 
                 return false;
@@ -2979,41 +2978,21 @@ namespace ETSOverlay
                     return;
                 }
 
-                JsonElement? selectedRelease = null;
-                string tagName = "";
-                string releaseName = "";
-                bool isBeta = false;
-                string remoteVersion = "0.0.0";
+                var latestRelease = doc.RootElement[0];
+                string tagName = latestRelease.GetProperty("tag_name").GetString() ?? "";
+                string releaseName = latestRelease.GetProperty("name").GetString() ?? tagName;
+                bool isBeta = tagName.Contains("beta", StringComparison.OrdinalIgnoreCase) || releaseName.Contains("beta", StringComparison.OrdinalIgnoreCase);
+                string remoteVersion = ExtractVersionFromTag(tagName);
+                string currentVersion = GetCurrentVersion();
 
-                foreach (var release in doc.RootElement.EnumerateArray())
+                WriteLog($"Current version: {currentVersion}, Latest: {remoteVersion} ({tagName}) - Beta: {isBeta}");
+
+                if (isBeta && SkipBetaUpdates && silent)
                 {
-                    string tName = release.GetProperty("tag_name").GetString() ?? "";
-                    string rName = release.GetProperty("name").GetString() ?? tName;
-                    bool betaFlag = tName.Contains("beta", StringComparison.OrdinalIgnoreCase) || rName.Contains("beta", StringComparison.OrdinalIgnoreCase);
-                    
-                    if (betaFlag && SkipBetaUpdates && silent)
-                    {
-                        WriteLog($"Skipping beta release {tName} because SkipBetaUpdates is true (silent mode).");
-                        continue;
-                    }
-
-                    selectedRelease = release;
-                    tagName = tName;
-                    releaseName = rName;
-                    isBeta = betaFlag;
-                    remoteVersion = ExtractVersionFromTag(tagName);
-                    break;
-                }
-
-                if (selectedRelease == null)
-                {
-                    WriteLog("No suitable updates found (betas were skipped).");
+                    WriteLog("Beta update found, but user chose to skip betas. Ignoring silently.");
                     _isCheckingUpdate = false;
                     return;
                 }
-
-                string currentVersion = GetCurrentVersion();
-                WriteLog($"Current version: {currentVersion}, Latest found: {remoteVersion} ({tagName}) - Beta: {isBeta}");
 
                 if (IsNewerVersion(remoteVersion, currentVersion))
                 {
@@ -3021,7 +3000,7 @@ namespace ETSOverlay
                     string? downloadUrl = null;
                     string? assetName = null;
 
-                    if (selectedRelease.Value.TryGetProperty("assets", out var assets))
+                    if (latestRelease.TryGetProperty("assets", out var assets))
                     {
                         foreach (var asset in assets.EnumerateArray())
                         {

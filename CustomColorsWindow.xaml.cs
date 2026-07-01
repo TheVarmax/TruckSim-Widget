@@ -14,6 +14,8 @@ namespace ETSOverlay
         public string Key { get; set; } = "";
         public string DisplayName { get; set; } = "";
 
+        public Action? OnHexChanged;
+
         private string _hexValue = "";
         public string HexValue
         {
@@ -25,6 +27,7 @@ namespace ETSOverlay
                     _hexValue = value;
                     OnPropertyChanged(nameof(HexValue));
                     UpdateBrush();
+                    OnHexChanged?.Invoke();
                 }
             }
         }
@@ -67,6 +70,8 @@ namespace ETSOverlay
         public bool IsSaved { get; private set; }
         private bool _isUk;
 
+        public event Action<Dictionary<string, string>>? OnPreviewColors;
+
         public CustomColorsWindow(Dictionary<string, string> initialColors, bool isUk)
         {
             _isUk = isUk;
@@ -92,6 +97,23 @@ namespace ETSOverlay
             MouseLeftButtonDown += (s, e) => { DragMove(); };
         }
 
+        private void TriggerPreview()
+        {
+            var currentColors = new Dictionary<string, string>();
+            foreach (var tile in TileColors)
+            {
+                if (tile.HexValue.StartsWith("#") && (tile.HexValue.Length == 4 || tile.HexValue.Length == 7 || tile.HexValue.Length == 9))
+                {
+                    currentColors[tile.Key] = tile.HexValue;
+                }
+                else
+                {
+                    currentColors[tile.Key] = "#7AC5CD";
+                }
+            }
+            OnPreviewColors?.Invoke(currentColors);
+        }
+
         private void AddTile(string key, string displayName, Dictionary<string, string> initialColors)
         {
             string hex = "#7AC5CD"; // Default fallback (Teal)
@@ -110,12 +132,14 @@ namespace ETSOverlay
                 };
             }
 
-            TileColors.Add(new TileColorViewModel
+            var vm = new TileColorViewModel
             {
                 Key = key,
                 DisplayName = displayName,
                 HexValue = hex
-            });
+            };
+            vm.OnHexChanged = TriggerPreview;
+            TileColors.Add(vm);
         }
 
 
@@ -124,14 +148,25 @@ namespace ETSOverlay
         {
             if (sender is Button btn && btn.DataContext is TileColorViewModel vm)
             {
+                string originalHex = vm.HexValue;
+
                 var dialog = new ModernColorPickerWindow(vm.HexValue, _isUk)
                 {
                     Owner = this
                 };
 
+                dialog.LivePreview += (newHex) =>
+                {
+                    vm.HexValue = newHex;
+                };
+
                 if (dialog.ShowDialog() == true)
                 {
                     vm.HexValue = dialog.SelectedHex;
+                }
+                else
+                {
+                    vm.HexValue = originalHex;
                 }
             }
         }

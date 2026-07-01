@@ -169,6 +169,8 @@ namespace ETSOverlay
             }
         }
 
+        public event Action<string>? LivePreview;
+
         private void UpdatePreview()
         {
             var color = HsvToRgb(_currentHue, _currentSaturation, _currentValue);
@@ -180,6 +182,8 @@ namespace ETSOverlay
             
             if (PreviewHex != null)
                 PreviewHex.Text = SelectedHex;
+
+            LivePreview?.Invoke(SelectedHex);
         }
 
         private Color HsvToRgb(double h, double s, double v)

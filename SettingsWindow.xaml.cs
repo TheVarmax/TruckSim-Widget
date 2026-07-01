@@ -337,12 +337,26 @@ namespace ETSOverlay
             {
                 Owner = this
             };
+
+            dialog.OnPreviewColors += (previewColors) =>
+            {
+                var activeTheme = _mainWindow.ActiveTheme;
+                var activeAccent = _mainWindow.ActiveAccent;
+                var activeCardStyle = _mainWindow.ActiveCardStyle;
+                var activeAccentMode = _mainWindow.ActiveAccentMode;
+                ThemeManager.Instance.ApplyTheme(activeTheme, activeAccent, activeCardStyle, activeAccentMode, previewColors);
+            };
             
             dialog.ShowDialog();
             
             if (dialog.IsSaved)
             {
                 _mainWindow.SavedCustomAccents = dialog.FinalColors;
+                ApplyAppearanceSettings();
+            }
+            else
+            {
+                // Restore original appearance if cancelled
                 ApplyAppearanceSettings();
             }
         }

@@ -55,17 +55,28 @@ namespace ETSOverlay
                 HardwareHash = hardwareHash;
             }
 
-            LastValidationTime = lastValidationTime;
-            CurrentPlan = plan ?? "";
-            Status = string.IsNullOrWhiteSpace(status) ? "inactive" : status;
-            ExpiresAt = expiresAt;
-
-            _features.Clear();
-            if (cachedFeatures != null)
+            if (!HasValidToken)
             {
-                foreach (var f in cachedFeatures)
+                LastValidationTime = DateTime.MinValue;
+                CurrentPlan = "";
+                Status = "inactive";
+                ExpiresAt = null;
+                _features.Clear();
+            }
+            else
+            {
+                LastValidationTime = lastValidationTime;
+                CurrentPlan = plan ?? "";
+                Status = string.IsNullOrWhiteSpace(status) ? "inactive" : status;
+                ExpiresAt = expiresAt;
+
+                _features.Clear();
+                if (cachedFeatures != null)
                 {
-                    _features.Add(f);
+                    foreach (var f in cachedFeatures)
+                    {
+                        _features.Add(f);
+                    }
                 }
             }
         }
@@ -177,19 +188,17 @@ namespace ETSOverlay
 
                 var response = await _client.DeactivateAsync(request);
 
-                ClearLicenseState();
-                
                 if (response != null && response.Success)
                 {
+                    ClearLicenseState();
                     return (true, "Deactivated successfully.");
                 }
 
-                return (false, response?.Message ?? "Deactivated locally, server failed.");
+                return (false, response?.Message ?? "Failed to deactivate on server.");
             }
             catch (Exception)
             {
-                ClearLicenseState();
-                return (false, "Deactivated locally. Unable to contact the license server.");
+                return (false, "Unable to contact the license server. Please try again later.");
             }
         }
 
@@ -223,6 +232,7 @@ namespace ETSOverlay
             Status = "inactive";
             ExpiresAt = null;
             _features.Clear();
+            OnFeaturesValidated?.Invoke(new List<string>(), false);
             OnLicenseChanged?.Invoke();
         }
     }
