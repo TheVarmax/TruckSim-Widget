@@ -147,7 +147,7 @@ namespace ETSOverlay
         public string SavedAccent { get; private set; } = "teal";
         public string SavedCardStyle { get; private set; } = "standard";
         public string SavedAccentMode { get; private set; } = "standard";
-        public Dictionary<string, string> SavedCustomAccents { get; private set; } = new();
+        public Dictionary<string, string> SavedCustomAccents { get; set; } = new();
         public bool SkipBetaUpdates { get; set; } = false;
 
         // Appearance Active State (What is actually rendered, downgraded if necessary)

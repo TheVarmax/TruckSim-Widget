@@ -117,15 +117,27 @@ namespace ETSOverlay
                 if (accentMode == "uniform") return globalAccent;
                 if (accentMode == "custom")
                 {
-                    if (customAccents.TryGetValue(cardName, out string colorName))
+                    if (customAccents.TryGetValue(cardName, out string colorNameOrHex))
                     {
-                        switch (colorName.ToLowerInvariant())
+                        // Backward compatibility for old string-based settings
+                        var lowerStr = colorNameOrHex.ToLowerInvariant();
+                        switch (lowerStr)
                         {
                             case "blue": return CreateBrush("#4DA8DA");
                             case "amber": return CreateBrush("#FFC107");
                             case "violet": return CreateBrush("#9D4EDD");
                             case "red": return CreateBrush("#E63946");
                             case "teal": return CreateBrush("#7AC5CD");
+                            case "green": return CreateBrush("#4CAF50");
+                        }
+
+                        try
+                        {
+                            return CreateBrush(colorNameOrHex);
+                        }
+                        catch
+                        {
+                            return globalAccent;
                         }
                     }
                     return globalAccent;

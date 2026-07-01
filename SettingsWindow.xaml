@@ -416,56 +416,21 @@
                     <TextBlock x:Name="AccentModeHint" Text="Uniform applies your accent everywhere. Custom allows picking per tile." Foreground="#8A8F98" FontSize="11" Margin="0,0,0,16" TextWrapping="Wrap"/>
                     
                     <StackPanel x:Name="CustomAccentsPanel" Visibility="Collapsed">
-                        <TextBlock x:Name="CustomAccentsTitle" Text="Tile Colors" Foreground="White" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="10"/>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                            </Grid.RowDefinitions>
-
-                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorSim" Text="TrucksBook / Sim" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorSim" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-                            <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorStatus" Text="Status" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorStatus" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorGame" Text="Game" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorGame" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-                            <StackPanel Grid.Row="1" Grid.Column="2" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorDistance" Text="Distance" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorDistance" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorRoute" Text="Route" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorRoute" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-                            <StackPanel Grid.Row="2" Grid.Column="2" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorSpeed" Text="Speed" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorSpeed" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-
-                            <StackPanel Grid.Row="3" Grid.Column="0" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorMax" Text="Max Speed" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorMax" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-                            <StackPanel Grid.Row="3" Grid.Column="2" Margin="0,0,0,8">
-                                <TextBlock x:Name="LblColorType" Text="Delivery Type" Foreground="#8A8F98" FontSize="11" Margin="0,0,0,2"/>
-                                <ComboBox x:Name="CmbColorType" Height="24" FontSize="11" SelectionChanged="CustomColor_SelectionChanged"/>
-                            </StackPanel>
-                        </Grid>
+                        <TextBlock x:Name="CustomAccentsTitle" Text="Tile Colors" Foreground="{DynamicResource MainTextBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
+                        <Button x:Name="BtnCustomizeTileColors" Content="Customize Tile Colors" Click="BtnCustomizeTileColors_Click" Height="28" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Cursor="Hand">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
                     </StackPanel>
                 </StackPanel>
             </Grid>

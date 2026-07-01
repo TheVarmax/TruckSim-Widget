@@ -238,14 +238,6 @@ namespace ETSOverlay
 
             PopulateCombo(GlobalAccentSelector, GetAccentOptions(), _mainWindow.ActiveAccent, canUseAccents);
 
-            PopulateCustomAccentCombo(CmbColorSim, "Sim");
-            PopulateCustomAccentCombo(CmbColorStatus, "Status");
-            PopulateCustomAccentCombo(CmbColorGame, "Game");
-            PopulateCustomAccentCombo(CmbColorDistance, "Distance");
-            PopulateCustomAccentCombo(CmbColorRoute, "Route");
-            PopulateCustomAccentCombo(CmbColorSpeed, "Speed");
-            PopulateCustomAccentCombo(CmbColorMax, "Max");
-            PopulateCustomAccentCombo(CmbColorType, "Type");
 
             UpdateAppearanceVisibility();
 
@@ -296,19 +288,7 @@ namespace ETSOverlay
                 combo.SelectedIndex = 0;
         }
 
-        private void PopulateCustomAccentCombo(ComboBox combo, string tileKey)
-        {
-            var options = GetAccentOptions();
-            var hasFeature = LicenseManager.Instance.Status == "active" || LicenseManager.Instance.HasFeature("appearance.accents");
-            
-            string activeValue = "teal";
-            if (_mainWindow.SavedCustomAccents != null && _mainWindow.SavedCustomAccents.TryGetValue(tileKey, out var v))
-            {
-                activeValue = v;
-            }
 
-            PopulateCombo(combo, options, activeValue, hasFeature);
-        }
 
         private void AppearanceSetting_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -321,10 +301,7 @@ namespace ETSOverlay
             ApplyAppearanceSettings();
         }
 
-        private void CustomColor_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            ApplyAppearanceSettings();
-        }
+
 
         private void UpdateAppearanceVisibility()
         {
@@ -342,6 +319,31 @@ namespace ETSOverlay
             {
                 GlobalAccentPanel.Visibility = Visibility.Visible;
                 CustomAccentsPanel.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void BtnCustomizeTileColors_Click(object sender, RoutedEventArgs e)
+        {
+            var license = LicenseManager.Instance;
+            bool canUseAccents = license.Status == "active" || license.HasFeature("appearance.accents");
+            
+            if (!canUseAccents)
+            {
+                // Optionally show a premium message
+                return;
+            }
+
+            var dialog = new CustomColorsWindow(_mainWindow.SavedCustomAccents, _isUk)
+            {
+                Owner = this
+            };
+            
+            dialog.ShowDialog();
+            
+            if (dialog.IsSaved)
+            {
+                _mainWindow.SavedCustomAccents = dialog.FinalColors;
+                ApplyAppearanceSettings();
             }
         }
 
@@ -363,14 +365,10 @@ namespace ETSOverlay
             var customAccents = new Dictionary<string, string>();
             if (accentMode == "custom")
             {
-                customAccents["Sim"] = (CmbColorSim.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
-                customAccents["Status"] = (CmbColorStatus.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
-                customAccents["Game"] = (CmbColorGame.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
-                customAccents["Distance"] = (CmbColorDistance.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
-                customAccents["Route"] = (CmbColorRoute.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
-                customAccents["Speed"] = (CmbColorSpeed.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
-                customAccents["Max"] = (CmbColorMax.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
-                customAccents["Type"] = (CmbColorType.SelectedItem as ComboBoxItem)?.Tag as string ?? "teal";
+                foreach(var kvp in _mainWindow.SavedCustomAccents)
+                {
+                    customAccents[kvp.Key] = kvp.Value;
+                }
             }
             else if (!canUseAccents && _mainWindow.SavedAccentMode == "custom")
             {
@@ -430,14 +428,6 @@ namespace ETSOverlay
                 ? "Однаковий застосовує акцент всюди. Користувацький дозволяє вибрати колір для кожної плитки." 
                 : "Uniform applies your accent everywhere. Custom allows picking per tile.";
 
-            LblColorSim.Text = isUk ? "TrucksBook / Симулятор" : "TrucksBook / Sim";
-            LblColorStatus.Text = isUk ? "Статус" : "Status";
-            LblColorGame.Text = isUk ? "Гра" : "Game";
-            LblColorDistance.Text = isUk ? "Відстань" : "Distance";
-            LblColorRoute.Text = isUk ? "Маршрут" : "Route";
-            LblColorSpeed.Text = isUk ? "Швидкість" : "Speed";
-            LblColorMax.Text = isUk ? "Макс. Швидкість" : "Max Speed";
-            LblColorType.Text = isUk ? "Тип доставки" : "Delivery Type";
 
             // Cloud Tab localization
             TabCloudBtn.Content = isUk ? "Хмара" : "Cloud";
