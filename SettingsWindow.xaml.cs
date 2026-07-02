@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Linq;
+using Microsoft.Win32;
 
 namespace ETSOverlay
 {
@@ -27,6 +29,10 @@ namespace ETSOverlay
                     UpdateLicenseUI();
                     SyncAppearanceValues();
                     UpdateCloudTab();
+                    if (TabLogbookContent != null && TabLogbookContent.Visibility == Visibility.Visible)
+                    {
+                        LoadLogbookTrips();
+                    }
                 });
             };
         }
@@ -44,33 +50,48 @@ namespace ETSOverlay
 
         private void TabGeneralBtn_Checked(object sender, RoutedEventArgs e)
         {
-            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null)
+            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null && TabLogbookContent != null)
             {
                 TabGeneralContent.Visibility = Visibility.Visible;
                 TabAppearanceContent.Visibility = Visibility.Collapsed;
                 TabCloudContent.Visibility = Visibility.Collapsed;
+                TabLogbookContent.Visibility = Visibility.Collapsed;
             }
         }
 
         private void TabAppearanceBtn_Checked(object sender, RoutedEventArgs e)
         {
-            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null)
+            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null && TabLogbookContent != null)
             {
                 TabGeneralContent.Visibility = Visibility.Collapsed;
                 TabAppearanceContent.Visibility = Visibility.Visible;
                 TabCloudContent.Visibility = Visibility.Collapsed;
+                TabLogbookContent.Visibility = Visibility.Collapsed;
                 if (!_suppressEvents) SyncAppearanceValues();
             }
         }
 
         private void TabCloudBtn_Checked(object sender, RoutedEventArgs e)
         {
-            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null)
+            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null && TabLogbookContent != null)
             {
                 TabGeneralContent.Visibility = Visibility.Collapsed;
                 TabAppearanceContent.Visibility = Visibility.Collapsed;
                 TabCloudContent.Visibility = Visibility.Visible;
+                TabLogbookContent.Visibility = Visibility.Collapsed;
                 UpdateCloudTab();
+            }
+        }
+
+        private void TabLogbookBtn_Checked(object sender, RoutedEventArgs e)
+        {
+            if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null && TabLogbookContent != null)
+            {
+                TabGeneralContent.Visibility = Visibility.Collapsed;
+                TabAppearanceContent.Visibility = Visibility.Collapsed;
+                TabCloudContent.Visibility = Visibility.Collapsed;
+                TabLogbookContent.Visibility = Visibility.Visible;
+                LoadLogbookTrips();
             }
         }
 
@@ -445,6 +466,7 @@ namespace ETSOverlay
 
             // Cloud Tab localization
             TabCloudBtn.Content = isUk ? "Хмара" : "Cloud";
+            TabLogbookBtn.Content = isUk ? "Журнал" : "Logbook";
             CloudSyncTitle.Text = isUk ? "Хмарна синхронізація" : "Cloud Sync";
             CloudStatusLabel.Text = isUk ? "Статус:" : "Status:";
             CloudEnableLabel.Text = isUk ? "Увімкнути хмарну синхронізацію" : "Enable Cloud Sync";
@@ -669,6 +691,225 @@ namespace ETSOverlay
             SyncAppearanceValues();
             _suppressEvents = false;
             UpdateCloudTab();
+        }
+
+        // --- Logbook Logic ---
+
+        private List<TripRecord> _currentTrips = new();
+
+        private void LoadLogbookTrips()
+        {
+            var license = LicenseManager.Instance;
+            bool isSupporter = license.Status == "active";
+
+            _currentTrips = TripLogbookService.Instance.LoadTrips(isSupporter ? null : 5);
+
+            LogbookTripsList.Children.Clear();
+            LogbookDetailView.Visibility = Visibility.Collapsed;
+            LogbookListView.Visibility = Visibility.Visible;
+
+            LogbookTitleLabel.Text = _isUk ? $"Останні рейси ({_currentTrips.Count})" : $"Recent Trips ({_currentTrips.Count})";
+
+            if (_currentTrips.Count == 0)
+            {
+                LogbookEmptyText.Visibility = Visibility.Visible;
+                LogbookEmptyText.Text = _isUk ? "Ще немає записаних рейсів." : "No trips recorded yet.";
+            }
+            else
+            {
+                LogbookEmptyText.Visibility = Visibility.Collapsed;
+                foreach (var trip in _currentTrips)
+                {
+                    LogbookTripsList.Children.Add(CreateTripCard(trip));
+                }
+            }
+
+            if (!isSupporter && _currentTrips.Count > 0)
+            {
+                LogbookFreeLimitText.Visibility = Visibility.Visible;
+                LogbookFreeLimitText.Text = _isUk 
+                    ? "Показано останні 5 рейсів. Supporter відкриває всю історію."
+                    : "Showing last 5 trips. Supporter unlocks full history.";
+            }
+            else
+            {
+                LogbookFreeLimitText.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private UIElement CreateTripCard(TripRecord trip)
+        {
+            var border = new Border
+            {
+                Background = (Brush)FindResource("CardBackgroundBrush"),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(12),
+                Margin = new Thickness(0, 0, 0, 8),
+                Cursor = System.Windows.Input.Cursors.Hand
+            };
+
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var routeBlock = new TextBlock
+            {
+                Text = $"{_mainWindow.GetLocalizedCity(trip.Origin).ToUpper()} → {_mainWindow.GetLocalizedCity(trip.Destination).ToUpper()}",
+                Foreground = (Brush)FindResource("AccentColorBrush"),
+                FontWeight = FontWeights.SemiBold,
+                FontSize = 13,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            Grid.SetRow(routeBlock, 0);
+            grid.Children.Add(routeBlock);
+
+            var cargoBlock = new TextBlock
+            {
+                Text = string.IsNullOrEmpty(trip.CargoName) ? (_isUk ? "Вантаж відсутній" : "No cargo") : trip.CargoName,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B0B0B0")),
+                FontSize = 12,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            Grid.SetRow(cargoBlock, 1);
+            grid.Children.Add(cargoBlock);
+
+            string distUnit = _mainWindow.UseMiles ? (_isUk ? "миль" : "mi") : (_isUk ? "км" : "km");
+            var statsBlock = new TextBlock
+            {
+                Text = $"{(_mainWindow.UseMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm):F0} {distUnit}  •  {trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}  •  {trip.EndTimeUtc.ToLocalTime():dd.MM.yyyy HH:mm}",
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98")),
+                FontSize = 11
+            };
+            Grid.SetRow(statsBlock, 2);
+            grid.Children.Add(statsBlock);
+
+            border.Child = grid;
+
+            border.MouseLeftButtonUp += (s, e) => ShowTripDetail(trip);
+            border.MouseEnter += (s, e) => border.Background = new SolidColorBrush(Color.FromArgb(100, 255, 255, 255)); // Very light highlight
+            border.MouseLeave += (s, e) => border.Background = (Brush)FindResource("CardBackgroundBrush");
+
+            return border;
+        }
+
+        private void ShowTripDetail(TripRecord trip)
+        {
+            if (trip == null) return;
+
+            var license = LicenseManager.Instance;
+            bool isSupporter = license.Status == "active";
+
+            LogbookListView.Visibility = Visibility.Collapsed;
+            LogbookDetailView.Visibility = Visibility.Visible;
+
+            LogbookDetailTitle.Text = _isUk ? "Деталі рейсу" : "Trip Details";
+            LogbookDetailPanel.Children.Clear();
+            
+            bool useMiles = trip.GameType == "ATS";
+
+            string distUnit = useMiles ? (_isUk ? "миль" : "mi") : (_isUk ? "км" : "km");
+            
+            // Free tier details
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Маршрут:" : "Route:", $"{_mainWindow.GetLocalizedCity(trip.Origin)} → {_mainWindow.GetLocalizedCity(trip.Destination)}"));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Вантаж:" : "Cargo:", string.IsNullOrEmpty(trip.CargoName) ? "-" : trip.CargoName));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Відстань:" : "Distance:", $"{(useMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm):F1} {distUnit}"));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Час в дорозі:" : "Duration:", $"{trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}:{trip.Duration.Seconds:D2}"));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Початок:" : "Started:", trip.StartTimeUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Завершено:" : "Completed:", trip.EndTimeUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Гра:" : "Game:", trip.GameType));
+
+            string speedUnit = useMiles ? (_isUk ? "миль/год" : "mph") : (_isUk ? "км/год" : "km/h");
+            
+            // Convert to gallons if UseMiles is true, otherwise keep Liters.
+            float fuelVol = useMiles ? trip.TotalFuelConsumedL / 3.78541f : trip.TotalFuelConsumedL;
+            string volUnit = useMiles ? (_isUk ? "гал" : "gal") : (_isUk ? "л" : "L");
+            
+            // If UseMiles is true, calculate gal/100mi. Else L/100km.
+            float fuelCons = useMiles ? (fuelVol / (trip.DistanceKm / 1.60934f)) * 100f : trip.AvgFuelConsumptionLPer100Km;
+            string consUnit = useMiles ? (_isUk ? "гал/100миль" : "gal/100mi") : (_isUk ? "л/100км" : "L/100km");
+
+            // Supporter tier details
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Дохід:" : "Income:", isSupporter ? $"€{trip.Income:N0}" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Сер. швидкість:" : "Avg Speed:", isSupporter ? $"{trip.AverageSpeedKmh / (useMiles ? 1.60934f : 1f):F0} {speedUnit}" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Макс. швидкість:" : "Max Speed:", isSupporter ? $"{trip.MaxSpeedKmh / (useMiles ? 1.60934f : 1f):F0} {speedUnit}" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Витрачено палива:" : "Fuel Consumed:", isSupporter ? $"{fuelVol:F1} {volUnit}" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Сер. витрата:" : "Avg Consumption:", isSupporter ? $"{fuelCons:F1} {consUnit}" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Пошкодження вантажівки:" : "Truck Damage:", isSupporter ? $"{trip.TruckDamagePercent:F1}%" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Пошкодження причепа:" : "Trailer Damage:", isSupporter ? $"{trip.TrailerDamagePercent:F1}%" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Пошкодження вантажу:" : "Cargo Damage:", isSupporter ? $"{trip.CargoDamagePercent:F1}%" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Вантажівка:" : "Truck:", isSupporter ? $"{trip.TruckBrand} {trip.TruckName}" : "🔒 •••••", !isSupporter));
+
+            LogbookExportGrid.Visibility = isSupporter ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private UIElement CreateDetailRow(string labelText, string valueText, bool isLocked = false)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(175) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var label = new TextBlock
+            {
+                Text = labelText,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B0B0B0")),
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(label, 0);
+            grid.Children.Add(label);
+
+            var valBlock = new TextBlock
+            {
+                Text = valueText,
+                Foreground = isLocked ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98")) : Brushes.White,
+                FontSize = 13,
+                FontWeight = isLocked ? FontWeights.Normal : FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetColumn(valBlock, 1);
+            grid.Children.Add(valBlock);
+
+            return grid;
+        }
+
+        private void BtnLogbookBack_Click(object sender, RoutedEventArgs e)
+        {
+            LogbookDetailView.Visibility = Visibility.Collapsed;
+            LogbookListView.Visibility = Visibility.Visible;
+        }
+
+        private void BtnExportCsv_Click(object sender, RoutedEventArgs e)
+        {
+            var sfd = new SaveFileDialog
+            {
+                Filter = "CSV files (*.csv)|*.csv|All files (*.*)|*.*",
+                FileName = $"TripLogbook_Export_{DateTime.Now:yyyyMMdd}.csv",
+                Title = _isUk ? "Експорт в CSV" : "Export to CSV"
+            };
+
+            if (sfd.ShowDialog() == true)
+            {
+                TripLogbookService.Instance.ExportToCsv(_currentTrips, sfd.FileName);
+                CustomMessageBox.Show(this, _isUk ? "Дані успішно експортовано." : "Data exported successfully.", _isUk ? "Експорт" : "Export", "OK", "");
+            }
+        }
+
+        private void BtnExportJson_Click(object sender, RoutedEventArgs e)
+        {
+            var sfd = new SaveFileDialog
+            {
+                Filter = "JSON files (*.json)|*.json|All files (*.*)|*.*",
+                FileName = $"TripLogbook_Export_{DateTime.Now:yyyyMMdd}.json",
+                Title = _isUk ? "Експорт в JSON" : "Export to JSON"
+            };
+
+            if (sfd.ShowDialog() == true)
+            {
+                TripLogbookService.Instance.ExportToJson(_currentTrips, sfd.FileName);
+                CustomMessageBox.Show(this, _isUk ? "Дані успішно експортовано." : "Data exported successfully.", _isUk ? "Експорт" : "Export", "OK", "");
+            }
         }
     }
 }

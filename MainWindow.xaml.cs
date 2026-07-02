@@ -60,6 +60,26 @@ namespace ETSOverlay
         private bool _cargoWasLoaded = false; // Флаг, чтобы засекать одометр именно в момент сцепки
         private bool _trailerWasAttachedBeforeLoading = false; // Был ли прицеплен свой прицеп до загрузки груза
         private bool _isTrailerAttached = false; // Подцеплен ли прицеп в данный момент
+
+        // Trip Logbook tracking
+        private DateTime _tripStartTimeUtc;
+        private float _tripStartFuel;
+        private float _tripLastFuel;
+        private float _tripTotalFuelConsumed;
+        private double _tripSpeedSumKmh;
+        private int _tripSpeedSamples;
+        private string _tripOrigin = "";
+        private string _tripDestination = "";
+        private string _tripCargoName = "";
+        private ulong _tripIncome;
+        private string _tripTruckBrand = "";
+        private string _tripTruckName = "";
+        private float _tripPlannedDistKm;
+        private bool _tripTrackingActive = false;
+        private float _tripTruckDamage;
+        private float _tripTrailerDamage;
+        private float _tripCargoDamage;
+        private float _tripMaxSpeedKmh = 0f;
         private int _navZeroTicks = 0; // Для отслеживания сброса GPS-маршрута
         private int _navPositiveTicks = 0; // Для отслеживания возврата GPS-маршрута
         private float _lastValidNavDist = 0; // Для отслеживания внезапного обрыва маршрута
@@ -477,6 +497,51 @@ namespace ETSOverlay
         {
             WriteLog("[EVENT] Job Delivered fired by telemetry.");
             _jobCancelledOrDeliveredFlag = true;
+
+            // Trip Logbook: save completed trip
+            if (_tripTrackingActive && _cargoWasLoaded && jobDrivenDistance > 0
+                && !string.IsNullOrWhiteSpace(_tripOrigin)
+                && !string.IsNullOrWhiteSpace(_tripDestination))
+            {
+                try
+                {
+                    var trip = new TripRecord
+                    {
+                        StartTimeUtc = _tripStartTimeUtc,
+                        EndTimeUtc = DateTime.UtcNow,
+                        Origin = _tripOrigin,
+                        Destination = _tripDestination,
+                        CargoName = _tripCargoName,
+                        DistanceKm = jobDrivenDistance / (UseMiles ? KmToMiles : 1f), // convert back to km
+                        Duration = DateTime.UtcNow - _tripStartTimeUtc,
+                        AverageSpeedKmh = _tripSpeedSamples > 0 ? (float)(_tripSpeedSumKmh / _tripSpeedSamples) : 0,
+                        MaxSpeedKmh = (int)Math.Round(_tripMaxSpeedKmh),
+                        TotalFuelConsumedL = _tripTotalFuelConsumed,
+                        TruckDamagePercent = _tripTruckDamage * 100f,
+                        TrailerDamagePercent = _tripTrailerDamage * 100f,
+                        CargoDamagePercent = _tripCargoDamage * 100f,
+                        Income = _tripIncome,
+                        TruckBrand = _tripTruckBrand,
+                        TruckName = _tripTruckName,
+                        GameType = _currentGame == GameType.Ats ? "ATS" : "ETS",
+                    };
+
+                    // Calculate avg fuel consumption (L/100km)
+                    if (trip.DistanceKm > 0.1f)
+                    {
+                        trip.AvgFuelConsumptionLPer100Km = (trip.TotalFuelConsumedL / trip.DistanceKm) * 100f;
+                    }
+
+                    TripLogbookService.Instance.SaveTrip(trip);
+                    WriteLog($"[LOGBOOK] Trip saved: {trip.Origin} -> {trip.Destination}, {trip.DistanceKm:F1} km, {trip.Duration}");
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"[LOGBOOK] Error saving trip: {ex.Message}");
+                }
+            }
+            _tripTrackingActive = false;
+
             Dispatcher.Invoke(() => {
                 _deliveredIndicatorUntil = DateTime.Now.AddSeconds(15);
                 UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), true);
@@ -683,10 +748,15 @@ namespace ETSOverlay
                         }
 
                         _awaitingTelemetryJob = false;
+                        string previousJobId = CurrentLastJobId;
                         CurrentLastJobId = resolvedJobId;
-                        // isNewJob=true если TB говорит «нет активного заказа» —
-                        // значит загруженный файл может быть от прошлой сессии
-                        LoadOrInitJobState(resolvedJobId, isNewJob: !_tbHasActiveJob);
+                        
+                        // Всегда проверяем, изменился ли ID заказа по сравнению с сохраненным.
+                        // Нельзя полагаться на TB (_tbHasActiveJob), так как при загрузке профиля TB 
+                        // может временно рапортовать об отсутствии заказа, что приведет к ложному сбросу.
+                        bool isNew = previousJobId != resolvedJobId;
+                        
+                        LoadOrInitJobState(resolvedJobId, isNewJob: isNew);
                     }
 
                     if (!hasJobInfo)
@@ -796,7 +866,28 @@ namespace ETSOverlay
                                         
                                     WriteLog($"Cargo physically loaded! Tracking started. Total Dist: {plannedDist}{GetDistanceUnitShort()}, Dest: {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}");
                                     WriteLog($"[DIAGNOSTICS] CargoLoaded: {data.JobValues.CargoLoaded}, TrailerValues: {trailerLog}");
-                                    
+
+                                    // Trip Logbook: snapshot trip start data
+                                    _tripStartTimeUtc = DateTime.UtcNow;
+                                    _tripStartFuel = data.TruckValues.CurrentValues.DashboardValues.FuelValue.Amount;
+                                    _tripLastFuel = _tripStartFuel;
+                                    _tripTotalFuelConsumed = 0;
+                                    _tripSpeedSumKmh = 0;
+                                    _tripSpeedSamples = 0;
+                                    _tripOrigin = data.JobValues.CitySource ?? "";
+                                    _tripDestination = data.JobValues.CityDestination ?? "";
+                                    _tripCargoName = data.JobValues.CargoValues?.Name ?? "";
+                                    _tripIncome = data.JobValues.Income;
+                                    _tripTruckBrand = data.TruckValues.ConstantsValues.Brand ?? "";
+                                    _tripTruckName = data.TruckValues.ConstantsValues.Name ?? "";
+                                    _tripPlannedDistKm = data.JobValues.PlannedDistanceKm;
+                                    _tripTruckDamage = 0f;
+                                    _tripTrailerDamage = 0f;
+                                    _tripCargoDamage = 0f;
+                                    _tripMaxSpeedKmh = 0f;
+                                    _tripTrackingActive = true;
+                                    WriteLog($"[LOGBOOK] Trip tracking started: {_tripOrigin} -> {_tripDestination}, Cargo: {_tripCargoName}");
+
                                     SaveJobState();
                                 }
                                 else
@@ -837,6 +928,47 @@ namespace ETSOverlay
                                     SaveJobState();
                                 }
                                 UpdateDeliveryTypeUI(currentSpeed);
+
+                                // Trip Logbook: accumulate speed & fuel data
+                                if (_tripTrackingActive && !isPaused && currentSpeed > 0)
+                                {
+                                    // Speed in km/h (always metric for storage)
+                                    float rawSpeedKmh = Math.Abs(data.TruckValues.CurrentValues.DashboardValues.Speed.Value) * 3.6f;
+                                    _tripSpeedSumKmh += rawSpeedKmh;
+                                    _tripSpeedSamples++;
+                                    if (rawSpeedKmh > _tripMaxSpeedKmh) _tripMaxSpeedKmh = rawSpeedKmh;
+
+                                    // Fuel consumed via delta tracking
+                                    float curFuel = data.TruckValues.CurrentValues.DashboardValues.FuelValue.Amount;
+                                    if (_tripLastFuel > curFuel && (_tripLastFuel - curFuel) < 50f)
+                                    {
+                                        _tripTotalFuelConsumed += (_tripLastFuel - curFuel);
+                                    }
+                                    _tripLastFuel = curFuel;
+
+                                    // Capture maximum observed damage values
+                                    float truckDmg = Math.Max(Math.Max(Math.Max(Math.Max(
+                                        data.TruckValues.CurrentValues.DamageValues.Cabin,
+                                        data.TruckValues.CurrentValues.DamageValues.Chassis),
+                                        data.TruckValues.CurrentValues.DamageValues.Engine),
+                                        data.TruckValues.CurrentValues.DamageValues.Transmission),
+                                        data.TruckValues.CurrentValues.DamageValues.WheelsAvg);
+                                    
+                                    _tripTruckDamage = Math.Max(_tripTruckDamage, truckDmg);
+
+                                    if (data.TrailerValues != null && data.TrailerValues.Length > 0)
+                                    {
+                                        float trailerDmg = Math.Max(Math.Max(Math.Max(
+                                            data.TrailerValues[0].DamageValues.Body,
+                                            data.TrailerValues[0].DamageValues.Cargo),
+                                            data.TrailerValues[0].DamageValues.Chassis),
+                                            data.TrailerValues[0].DamageValues.Wheels);
+                                        _tripTrailerDamage = Math.Max(_tripTrailerDamage, trailerDmg);
+                                    }
+                                    
+                                    float cargoDmg = data.JobValues.CargoValues?.CargoDamage ?? 0f;
+                                    _tripCargoDamage = Math.Max(_tripCargoDamage, cargoDmg);
+                                }
 
                                 // Отрисовка прогресса
                                 // Используем данные от навигатора (advisor) в реальном времени, чтобы итоговый километраж
@@ -1562,19 +1694,26 @@ namespace ETSOverlay
 
         private void LoadCurrentGameJobState()
         {
-            if (_tbHasActiveJob && !string.IsNullOrWhiteSpace(CurrentTbJobId))
+            // Якщо ТБ має активний заказ, ми синхронізуємо ID
+            if (_isTbRunning && _tbHasActiveJob && !string.IsNullOrWhiteSpace(CurrentTbJobId))
             {
                 if (CurrentLastJobId != CurrentTbJobId)
                 {
                     CurrentLastJobId = CurrentTbJobId;
                 }
-                WriteLog($"Loading job state from TB ID: {CurrentLastJobId}");
-                LoadOrInitJobState(CurrentLastJobId);
-                return;
             }
 
-            WriteLog("No active TB job to load, clearing current job data");
-            ClearCurrentGameJobData();
+            // Відновлюємо замовлення з пам'яті за ID, незалежно від стану ТБ
+            if (!string.IsNullOrWhiteSpace(CurrentLastJobId))
+            {
+                WriteLog($"Loading job state from memory: {CurrentLastJobId}");
+                LoadOrInitJobState(CurrentLastJobId);
+            }
+            else
+            {
+                WriteLog("No saved job to load, clearing current job data");
+                ClearCurrentGameJobData();
+            }
         }
 
         private void SaveJobState()
@@ -2404,7 +2543,7 @@ namespace ETSOverlay
             }
         }
 
-        private bool UseMiles => _currentGame == GameType.Ats;
+        public bool UseMiles => _currentGame == GameType.Ats;
         private string CurrentLastJobId
         {
             get => _currentGame == GameType.Ats ? _lastJobIdAts : _lastJobIdEts;
@@ -2555,7 +2694,7 @@ namespace ETSOverlay
             }
         }
 
-        private string GetLocalizedCity(string? city)
+        public string GetLocalizedCity(string? city)
         {
             if (string.IsNullOrWhiteSpace(city)) return city ?? string.Empty;
 

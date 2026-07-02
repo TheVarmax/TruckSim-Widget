@@ -12,6 +12,100 @@
         WindowStartupLocation="Manual">
 
     <Window.Resources>
+        <Style x:Key="ModernScrollThumb" TargetType="Thumb">
+            <Setter Property="Background" Value="{DynamicResource InputBorderBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="2" MinHeight="20"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Thumb">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="2" MinHeight="20"/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+                <Trigger Property="IsDragging" Value="True">
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="Thumb">
+                                <Border Background="{TemplateBinding Background}" CornerRadius="2" MinHeight="20"/>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="EmptyRepeatButton" TargetType="RepeatButton">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernScrollBar" TargetType="ScrollBar">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Width" Value="4"/>
+            <Setter Property="Margin" Value="0,2,0,2"/>
+            <Setter Property="Orientation" Value="Vertical"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="true">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource EmptyRepeatButton}" Command="ScrollBar.PageUpCommand"/>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Style="{StaticResource EmptyRepeatButton}" Command="ScrollBar.PageDownCommand"/>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource ModernScrollThumb}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="ModernScrollViewer" TargetType="ScrollViewer">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollViewer">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="0" CanContentScroll="{TemplateBinding CanContentScroll}" />
+                            <ScrollBar x:Name="PART_VerticalScrollBar"
+                                       Grid.Column="1"
+                                       Opacity="1"
+                                       Width="4"
+                                       Value="{Binding VerticalOffset, Mode=OneWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                       Maximum="{TemplateBinding ScrollableHeight}"
+                                       ViewportSize="{TemplateBinding ViewportHeight}"
+                                       Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                       Style="{StaticResource ModernScrollBar}"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="TabButtonStyle" TargetType="RadioButton">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/>
@@ -251,10 +345,13 @@
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="10" />
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="10" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <RadioButton x:Name="TabGeneralBtn" Grid.Column="0" Content="General" Height="30" IsChecked="True" Checked="TabGeneralBtn_Checked" Style="{StaticResource TabButtonStyle}" />
                 <RadioButton x:Name="TabAppearanceBtn" Grid.Column="2" Content="Appearance" Height="30" Checked="TabAppearanceBtn_Checked" Style="{StaticResource TabButtonStyle}" />
                 <RadioButton x:Name="TabCloudBtn" Grid.Column="4" Content="Cloud" Height="30" Checked="TabCloudBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                <RadioButton x:Name="TabLogbookBtn" Grid.Column="6" Content="Logbook" Height="30" Checked="TabLogbookBtn_Checked" Style="{StaticResource TabButtonStyle}" />
             </Grid>
 
             <!-- Tab: General Content -->
@@ -521,6 +618,111 @@
                         </Button>
                     </Grid>
                 </StackPanel>
+            </Grid>
+
+            <!-- Tab: Logbook Content -->
+            <Grid x:Name="TabLogbookContent" Margin="0,0,0,16" Visibility="Collapsed">
+                <!-- Logbook List View -->
+                <Grid x:Name="LogbookListView" Visibility="Visible">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Grid.Row="0" x:Name="LogbookTitleLabel" Text="Recent Trips (0)" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+                    
+                    <!-- Scrolling List -->
+                    <ScrollViewer Grid.Row="2" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="320" Margin="0,0,-10,0">
+                        <StackPanel x:Name="LogbookTripsList" Margin="0,0,10,0">
+                            <!-- Cards added programmatically -->
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <TextBlock x:Name="LogbookEmptyText" Grid.Row="2" Text="No trips recorded yet." Foreground="#8A8F98" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                    <TextBlock x:Name="LogbookFreeLimitText" Grid.Row="4" Text="Showing last 5 trips. Supporter unlocks full history." Foreground="#EABF20" FontSize="12" HorizontalAlignment="Center" Visibility="Collapsed"/>
+                </Grid>
+
+                <!-- Logbook Detail View -->
+                <Grid x:Name="LogbookDetailView" Visibility="Collapsed">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="12"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
+                    
+                    <!-- Detail Header with Back Button -->
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <Button x:Name="BtnLogbookBack" Grid.Column="0" Width="30" Height="30" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" FontSize="16" FontWeight="Bold" Cursor="Hand" Click="BtnLogbookBack_Click">
+                            <Button.Content>
+                                <TextBlock Text="←" Margin="0,-2,0,0"/>
+                            </Button.Content>
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        <TextBlock Grid.Column="2" x:Name="LogbookDetailTitle" Text="Trip Details" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </Grid>
+                    
+                    <!-- Details Scroll -->
+                    <ScrollViewer Grid.Row="2" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="320" Margin="0,0,-10,0">
+                        <StackPanel x:Name="LogbookDetailPanel" Margin="0,0,10,0">
+                            <!-- Detail rows added programmatically -->
+                        </StackPanel>
+                    </ScrollViewer>
+                    
+                    <!-- Export Buttons -->
+                    <Grid Grid.Row="4" x:Name="LogbookExportGrid" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        
+                        <Button x:Name="BtnExportCsv" Grid.Column="0" Content="Export CSV" Height="30" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Cursor="Hand" Click="BtnExportCsv_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                        
+                        <Button x:Name="BtnExportJson" Grid.Column="2" Content="Export JSON" Height="30" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Cursor="Hand" Click="BtnExportJson_Click">
+                            <Button.Template>
+                                <ControlTemplate TargetType="Button">
+                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
+                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/></Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Button.Template>
+                        </Button>
+                    </Grid>
+                </Grid>
             </Grid>
 
             <!-- Bottom Section -->
