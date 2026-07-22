@@ -160,7 +160,7 @@ Open the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/
 | Format | Best for | What to do |
 | --- | --- | --- |
 | **Installer (recommended)** `TruckSimWidgetSetup-<version>.exe` | Most users | Run the setup, choose an installation folder, and optionally configure the telemetry plugin for ETS2 and/or ATS during setup. The installer creates Windows shortcuts and an uninstall entry. |
-| **Portable ZIP** `TruckSimWidget-<version>-portable.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. |
+| **Portable ZIP** `TruckSimWidget-<version>.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. |
 
 > **Important:** Do not run the portable version from inside the ZIP archive. Extract it first.
 
