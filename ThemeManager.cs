@@ -53,7 +53,7 @@ namespace ETSOverlay
                 case "oled black":
                     dict["WindowBackgroundBrush"] = CreateBrush("#000000");
                     dict["CardBackgroundBrush"] = CreateBrush("#050505");
-                    dict["CardBorderBrush"] = CreateBrush("#141414");
+                    dict["CardBorderBrush"] = CreateBrush("#2C2C2C");
                     dict["MainTextBrush"] = CreateBrush("#F0F0F0");
                     dict["MutedTextBrush"] = CreateBrush("#666666");
                     dict["ShadowOpacity"] = 0.8;
@@ -63,7 +63,7 @@ namespace ETSOverlay
                     dict["HeaderTextBrush"] = CreateBrush("#F0F0F0");
                     dict["HeaderIconBrush"] = CreateBrush("#888888");
                     dict["InputBackgroundBrush"] = CreateBrush("#0A0A0A");
-                    dict["InputBorderBrush"] = CreateBrush("#1A1A1A");
+                    dict["InputBorderBrush"] = CreateBrush("#303030");
                     dict["InputHoverBrush"] = CreateBrush("#2A2A2A");
                     break;
                 case "classic":
@@ -117,7 +117,7 @@ namespace ETSOverlay
                 if (accentMode == "uniform") return globalAccent;
                 if (accentMode == "custom")
                 {
-                    if (customAccents.TryGetValue(cardName, out string colorNameOrHex))
+                    if (customAccents.TryGetValue(cardName, out string? colorNameOrHex))
                     {
                         // Backward compatibility for old string-based settings
                         var lowerStr = colorNameOrHex.ToLowerInvariant();
@@ -168,13 +168,6 @@ namespace ETSOverlay
                     dict["GaugeCardPadding"] = new Thickness(5, 3, 5, 3);
                     dict["CardMargin"] = new Thickness(0, 0, 0, 6);
                     dict["CardGapWidth"] = new GridLength(6);
-                    break;
-                case "compact":
-                    dict["CardCornerRadius"] = new CornerRadius(5);
-                    dict["InfoCardPadding"] = new Thickness(8, 6, 8, 6);
-                    dict["GaugeCardPadding"] = new Thickness(4, 2, 4, 2);
-                    dict["CardMargin"] = new Thickness(0, 0, 0, 4);
-                    dict["CardGapWidth"] = new GridLength(4);
                     break;
                 case "standard":
                 default:

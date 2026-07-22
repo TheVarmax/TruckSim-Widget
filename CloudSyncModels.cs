@@ -32,6 +32,13 @@ namespace ETSOverlay
         public Dictionary<string, string> CustomCardAccents { get; set; } = new();
         [JsonPropertyName("skipBetaUpdates")]
         public bool SkipBetaUpdates { get; set; } = false;
+        
+        [JsonPropertyName("showDistance")]
+        public bool ShowDistance { get; set; } = true;
+        [JsonPropertyName("showBottomInfo")]
+        public bool ShowBottomInfo { get; set; } = true;
+        [JsonPropertyName("showRoute")]
+        public bool ShowRoute { get; set; } = true;
     }
 
     public class CloudSyncStatusRequest

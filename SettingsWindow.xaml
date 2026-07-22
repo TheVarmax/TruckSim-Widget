@@ -316,9 +316,9 @@
         <Border.Effect>
             <DropShadowEffect Color="Black" BlurRadius="25" Opacity="{DynamicResource ShadowOpacity}" Direction="270" ShadowDepth="5"/>
         </Border.Effect>
-
-        <StackPanel>
-            <!-- Header -->
+        <Grid>
+            <StackPanel>
+                <!-- Header -->
             <Grid Margin="0,0,0,18">
                 <TextBlock x:Name="SettingsTitle" Text="SETTINGS" Foreground="{DynamicResource MainTextBrush}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
                 <Button Click="BtnCloseSettings_Click" HorizontalAlignment="Right" Width="32" Height="32" Cursor="Hand">
@@ -365,17 +365,26 @@
                 <!-- Left Column -->
                 <StackPanel Grid.Column="0">
                     <!-- UI Mode -->
-                    <Grid VerticalAlignment="Center" Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="UIModeLabel" Grid.Column="0" Text="UI Mode" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="UIModeSelector" Grid.Column="1" SelectionChanged="UIModeSelector_SelectionChanged">
-                            <ComboBoxItem Content="Full Interface" Tag="full"/>
-                            <ComboBoxItem Content="Minimalism" Tag="minimal"/>
-                        </ComboBox>
-                    </Grid>
+                    <StackPanel Margin="0,0,0,16">
+                        <TextBlock x:Name="UIModeLabel" Text="UI Mode" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="UIModeSelector" Grid.Column="0" SelectionChanged="UIModeSelector_SelectionChanged">
+                            </ComboBox>
+                            <Button x:Name="CustomModeConfigBtn" Grid.Column="1" Content="Change" Foreground="White" FontSize="11" Margin="6,0,0,0" Padding="8,2" VerticalAlignment="Center" Visibility="Collapsed" Click="CustomModeConfigBtn_Click" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </Grid>
+                    </StackPanel>
 
                     <!-- Auto-hide toggle -->
                     <StackPanel Margin="0,0,0,16">
@@ -807,6 +816,23 @@
             <TextBlock x:Name="VersionLabel" Text="v1.0.0" Foreground="#555555" FontSize="11" HorizontalAlignment="Center" Margin="0,16,0,0"/>
             <TextBlock x:Name="UpdateStatusText" Text="" Foreground="#B0B0B0" FontSize="11" HorizontalAlignment="Center" Margin="0,4,0,0"/>
 
-        </StackPanel>
+            </StackPanel>
+            
+            <!-- Toast Notification -->
+            <Border x:Name="ToastOverlay" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,32"
+                    Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16,10"
+                    Opacity="0" IsHitTestVisible="False" Visibility="Collapsed">
+                <Border.Effect>
+                    <DropShadowEffect Color="Black" BlurRadius="15" Opacity="0.5" ShadowDepth="4"/>
+                </Border.Effect>
+                <Border.RenderTransform>
+                    <TranslateTransform x:Name="ToastTranslate" Y="10"/>
+                </Border.RenderTransform>
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="⭐" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="#F5C542"/>
+                    <TextBlock x:Name="ToastText" Text="Requires Supporter subscription" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Border>
 </Window>

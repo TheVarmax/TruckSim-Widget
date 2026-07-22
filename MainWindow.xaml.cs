@@ -135,6 +135,9 @@ namespace ETSOverlay
         private bool _isDesync = false;
 
         private string _uiMode = "full";
+        private bool _showDistance = true;
+        private bool _showRoute = true;
+        private bool _showBottomInfo = true;
         private bool _autoHideEnabled = false;
         private DispatcherTimer? _idleTimer;
         private bool _isIdle = false;
@@ -832,7 +835,7 @@ namespace ETSOverlay
                                 else
                                 {
                                     // ФАЗА 1: Едем за грузом (ещё не брали)
-                                    RouteText = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
+                                    RouteText = $"{GetLocalizedCity(data.JobValues?.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues?.CityDestination).ToUpper()}";
                                     DistanceInfo.Text = uiLanguage == "uk" ? "За вантажем..." : "To pickup...";
                                 }
                             }
@@ -864,8 +867,8 @@ namespace ETSOverlay
                                         ? string.Join(", ", data.TrailerValues.Select(t => $"[Attached:{t.Attached}, Name:{t.Name}, ID:{t.Id}, Body:{t.BodyType}]"))
                                         : "null";
                                         
-                                    WriteLog($"Cargo physically loaded! Tracking started. Total Dist: {plannedDist}{GetDistanceUnitShort()}, Dest: {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}");
-                                    WriteLog($"[DIAGNOSTICS] CargoLoaded: {data.JobValues.CargoLoaded}, TrailerValues: {trailerLog}");
+                                    WriteLog($"Cargo physically loaded! Tracking started. Total Dist: {plannedDist}{GetDistanceUnitShort()}, Dest: {GetLocalizedCity(data.JobValues?.CityDestination).ToUpper()}");
+                                    WriteLog($"[DIAGNOSTICS] CargoLoaded: {data.JobValues?.CargoLoaded}, TrailerValues: {trailerLog}");
 
                                     // Trip Logbook: snapshot trip start data
                                     _tripStartTimeUtc = DateTime.UtcNow;
@@ -874,13 +877,13 @@ namespace ETSOverlay
                                     _tripTotalFuelConsumed = 0;
                                     _tripSpeedSumKmh = 0;
                                     _tripSpeedSamples = 0;
-                                    _tripOrigin = data.JobValues.CitySource ?? "";
-                                    _tripDestination = data.JobValues.CityDestination ?? "";
-                                    _tripCargoName = data.JobValues.CargoValues?.Name ?? "";
-                                    _tripIncome = data.JobValues.Income;
+                                    _tripOrigin = data.JobValues?.CitySource ?? "";
+                                    _tripDestination = data.JobValues?.CityDestination ?? "";
+                                    _tripCargoName = data.JobValues?.CargoValues?.Name ?? "";
+                                    _tripIncome = data.JobValues?.Income ?? 0;
                                     _tripTruckBrand = data.TruckValues.ConstantsValues.Brand ?? "";
                                     _tripTruckName = data.TruckValues.ConstantsValues.Name ?? "";
-                                    _tripPlannedDistKm = data.JobValues.PlannedDistanceKm;
+                                    _tripPlannedDistKm = data.JobValues?.PlannedDistanceKm ?? 0f;
                                     _tripTruckDamage = 0f;
                                     _tripTrailerDamage = 0f;
                                     _tripCargoDamage = 0f;
@@ -966,8 +969,14 @@ namespace ETSOverlay
                                         _tripTrailerDamage = Math.Max(_tripTrailerDamage, trailerDmg);
                                     }
                                     
-                                    float cargoDmg = data.JobValues.CargoValues?.CargoDamage ?? 0f;
+                                    float cargoDmg = data.JobValues?.CargoValues?.CargoDamage ?? 0f;
                                     _tripCargoDamage = Math.Max(_tripCargoDamage, cargoDmg);
+                                }
+
+                                // Обновляем доход в реальном времени, так как при повреждении груза он может уменьшаться
+                                if (_tripTrackingActive && (data.JobValues?.Income ?? 0) > 0)
+                                {
+                                    _tripIncome = data.JobValues?.Income ?? 0;
                                 }
 
                                 // Отрисовка прогресса
@@ -985,13 +994,13 @@ namespace ETSOverlay
                                     ? $"{drivenInt} / {totalInt} {GetDistanceUnitShort()}"
                                     : $"{drivenInt} / {totalInt} {GetDistanceUnitShort()}";
 
-                                if (!string.IsNullOrEmpty(data.JobValues.CitySource))
-                                    RouteText = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
+                                if (!string.IsNullOrEmpty(data.JobValues?.CitySource))
+                                    RouteText = $"{GetLocalizedCity(data.JobValues?.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues?.CityDestination).ToUpper()}";
                             }
                             else
                             {
                                 // Груз не подтверждён TB — показываем фазу 1 (едем за грузом)
-                                RouteText = $"{GetLocalizedCity(data.JobValues.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues.CityDestination).ToUpper()}";
+                                RouteText = $"{GetLocalizedCity(data.JobValues?.CitySource).ToUpper()} -> {GetLocalizedCity(data.JobValues?.CityDestination).ToUpper()}";
                                 DistanceInfo.Text = uiLanguage == "uk" ? "За вантажем..." : "To pickup...";
                             }
                         }
@@ -1833,6 +1842,12 @@ namespace ETSOverlay
                 CloudSyncUpdatedAt = null;
                 LastCloudSyncAttempt = null;
                 CloudSyncStatus = "";
+                
+                if (_uiMode == "custom")
+                {
+                    OnUIModeChanged("full");
+                    _settingsWindow?.SetUIMode("full");
+                }
             }
 
             ApplyAppearance();
@@ -1846,9 +1861,9 @@ namespace ETSOverlay
                 {
                     Left = Left,
                     Top = Top,
-                    ShowDistance = true,
-                    ShowBottomInfo = true,
-                    ShowRoute = true,
+                    ShowDistance = _showDistance,
+                    ShowBottomInfo = _showBottomInfo,
+                    ShowRoute = _showRoute,
                     UIMode = _uiMode,
                     WindowOpacity = windowOpacity,
                     UiLanguage = uiLanguage,
@@ -1900,6 +1915,9 @@ namespace ETSOverlay
                             Left = state.Left;
                             Top = state.Top;
                             _uiMode = state.UIMode ?? "full";
+                            _showDistance = state.ShowDistance;
+                            _showRoute = state.ShowRoute;
+                            _showBottomInfo = state.ShowBottomInfo;
                             windowOpacity = state.WindowOpacity;
                             _autoHideEnabled = state.AutoHideEnabled;
                             uiLanguage = string.IsNullOrWhiteSpace(state.UiLanguage) ? "en" : state.UiLanguage;
@@ -2096,13 +2114,128 @@ namespace ETSOverlay
             _settingsWindow.Activate();
         }
 
+        private void AnimateElementVisibility(FrameworkElement element, bool shouldBeVisible, bool animate, Thickness targetMargin, bool useDynamicMargin = false)
+        {
+            if (shouldBeVisible)
+            {
+                if (element.Visibility != Visibility.Visible)
+                {
+                    element.Opacity = 0;
+                    element.Visibility = Visibility.Visible;
+                    if (animate)
+                    {
+                        element.Height = double.NaN;
+                        double availableWidth = CollapsibleSection.ActualWidth > 0 ? CollapsibleSection.ActualWidth : double.PositiveInfinity;
+                        element.Measure(new Size(availableWidth, double.PositiveInfinity));
+                        double targetHeight = element.DesiredSize.Height - element.Margin.Top - element.Margin.Bottom;
+                        if (targetHeight < 0) targetHeight = 0;
+                        
+                        element.Height = 0;
+                        
+                        element.ClipToBounds = true;
+
+                        var marginAnim = new ThicknessAnimation(new Thickness(0), targetMargin, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                        var grow = new DoubleAnimation(0, targetHeight, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                        var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(0.3));
+
+                        grow.Completed += (s, e) => {
+                            element.BeginAnimation(HeightProperty, null);
+                            element.BeginAnimation(MarginProperty, null);
+                            element.Height = double.NaN;
+                            element.ClipToBounds = false;
+                            if (useDynamicMargin)
+                                element.SetResourceReference(MarginProperty, "CardMargin");
+                            else
+                                element.Margin = targetMargin;
+                        };
+
+                        element.BeginAnimation(MarginProperty, marginAnim);
+                        element.BeginAnimation(HeightProperty, grow);
+                        element.BeginAnimation(OpacityProperty, fadeIn);
+                    }
+                    else
+                    {
+                        element.BeginAnimation(HeightProperty, null);
+                        element.BeginAnimation(OpacityProperty, null);
+                        element.BeginAnimation(MarginProperty, null);
+                        element.Opacity = 1;
+                        element.Height = double.NaN;
+                        if (useDynamicMargin)
+                            element.SetResourceReference(MarginProperty, "CardMargin");
+                        else
+                            element.Margin = targetMargin;
+                    }
+                }
+                else
+                {
+                    // Already visible, just update margin if needed
+                    if (animate)
+                    {
+                        var marginAnim = new ThicknessAnimation(element.Margin, targetMargin, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                        marginAnim.Completed += (s, e) => {
+                            element.BeginAnimation(MarginProperty, null);
+                            if (useDynamicMargin)
+                                element.SetResourceReference(MarginProperty, "CardMargin");
+                            else
+                                element.Margin = targetMargin;
+                        };
+                        element.BeginAnimation(MarginProperty, marginAnim);
+                    }
+                    else
+                    {
+                        element.BeginAnimation(MarginProperty, null);
+                        if (useDynamicMargin)
+                            element.SetResourceReference(MarginProperty, "CardMargin");
+                        else
+                            element.Margin = targetMargin;
+                    }
+                }
+            }
+            else
+            {
+                if (element.Visibility == Visibility.Visible)
+                {
+                    if (animate)
+                    {
+                        element.ClipToBounds = true;
+                        
+                        double currentHeight = element.ActualHeight;
+                        var shrink = new DoubleAnimation(currentHeight, 0, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                        var marginAnim = new ThicknessAnimation(element.Margin, new Thickness(0), TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                        var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromSeconds(0.2));
+
+                        shrink.Completed += (s, e) => {
+                            element.BeginAnimation(HeightProperty, null);
+                            element.BeginAnimation(MarginProperty, null);
+                            element.Visibility = Visibility.Collapsed;
+                            element.Height = double.NaN;
+                            element.ClipToBounds = false;
+                        };
+
+                        element.BeginAnimation(MarginProperty, marginAnim);
+                        element.BeginAnimation(HeightProperty, shrink);
+                        element.BeginAnimation(OpacityProperty, fadeOut);
+                    }
+                    else
+                    {
+                        element.BeginAnimation(HeightProperty, null);
+                        element.BeginAnimation(OpacityProperty, null);
+                        element.BeginAnimation(MarginProperty, null);
+                        element.Visibility = Visibility.Collapsed;
+                        element.Height = double.NaN;
+                    }
+                }
+            }
+        }
+
         private void ApplyUIMode(bool animate = true)
         {
-            if (_uiMode == "minimal")
+            bool isEffectivelyMinimal = _uiMode == "minimal" || (_uiMode == "custom" && !_showDistance && !_showRoute && !_showBottomInfo);
+            if (isEffectivelyMinimal)
             {
-                if (animate)
+                if (animate && CollapsibleSection.Visibility != Visibility.Collapsed)
                 {
-                    var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
+                    var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromSeconds(0.2));
                     var currentHeight = CollapsibleSection.ActualHeight;
                     CollapsibleSection.Height = currentHeight;
                     var shrink = new DoubleAnimation(currentHeight, 0, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
@@ -2128,28 +2261,68 @@ namespace ETSOverlay
             }
             else
             {
+                bool wasCollapsed = CollapsibleSection.Visibility == Visibility.Collapsed;
+                double startingHeight = wasCollapsed ? 0 : CollapsibleSection.ActualHeight;
+                
                 CollapsibleSection.Visibility = Visibility.Visible;
+                
+                if (_uiMode == "custom")
+                {
+                    bool anim = animate && !wasCollapsed;
+                    
+                    Thickness gameCardsMargin = (_showRoute || _showBottomInfo) ? new Thickness(0, 0, 0, 6) : new Thickness(0);
+                    AnimateElementVisibility(GameCardsGrid, _showDistance, anim, gameCardsMargin, false);
+                    
+                    Thickness routeMargin = _showBottomInfo ? (Thickness)(Application.Current.TryFindResource("CardMargin") ?? new Thickness(0, 0, 0, 6)) : new Thickness(0);
+                    AnimateElementVisibility(RouteCard, _showRoute, anim, routeMargin, _showBottomInfo);
+                    
+                    AnimateElementVisibility(BottomInfoGrid, _showBottomInfo, anim, new Thickness(0), false);
+                }
+                else
+                {
+                    bool anim = animate && !wasCollapsed;
+                    
+                    Thickness gameCardsMargin = new Thickness(0, 0, 0, 6);
+                    AnimateElementVisibility(GameCardsGrid, true, anim, gameCardsMargin, false);
+
+                    Thickness routeMargin = (Thickness)(Application.Current.TryFindResource("CardMargin") ?? new Thickness(0, 0, 0, 6));
+                    AnimateElementVisibility(RouteCard, true, anim, routeMargin, true);
+
+                    AnimateElementVisibility(BottomInfoGrid, true, anim, new Thickness(0), false);
+                }
                 
                 if (animate)
                 {
-                    CollapsibleSection.Height = double.NaN;
-                    CollapsibleSection.UpdateLayout();
-                    var targetHeight = CollapsibleSection.ActualHeight;
+                    if (wasCollapsed)
+                    {
+                        CollapsibleSection.Height = double.NaN;
+                        double availableWidth = this.ActualWidth > 0 ? this.ActualWidth : double.PositiveInfinity;
+                        CollapsibleSection.Measure(new Size(availableWidth, double.PositiveInfinity));
+                        double targetHeight = CollapsibleSection.DesiredSize.Height - CollapsibleSection.Margin.Top - CollapsibleSection.Margin.Bottom;
+                        if (targetHeight < 0) targetHeight = 0;
 
-                    CollapsibleSection.Height = 0;
-                    CollapsibleSection.Opacity = 0;
+                        CollapsibleSection.Height = 0;
+                        CollapsibleSection.Opacity = 0;
 
-                    var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3)) { BeginTime = TimeSpan.FromSeconds(0.1) };
-                    var grow = new DoubleAnimation(0, targetHeight, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
+                        var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3)) { BeginTime = TimeSpan.FromSeconds(0.1) };
+                        var grow = new DoubleAnimation(0, targetHeight, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
 
-                    grow.Completed += (s, ev) => 
+                        grow.Completed += (s, ev) => 
+                        {
+                            CollapsibleSection.BeginAnimation(HeightProperty, null);
+                            CollapsibleSection.Height = double.NaN;
+                        };
+
+                        CollapsibleSection.BeginAnimation(OpacityProperty, fadeIn);
+                        CollapsibleSection.BeginAnimation(HeightProperty, grow);
+                    }
+                    else
                     {
                         CollapsibleSection.BeginAnimation(HeightProperty, null);
+                        CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                        CollapsibleSection.Opacity = 1;
                         CollapsibleSection.Height = double.NaN;
-                    };
-
-                    CollapsibleSection.BeginAnimation(OpacityProperty, fadeIn);
-                    CollapsibleSection.BeginAnimation(HeightProperty, grow);
+                    }
                 }
                 else
                 {
@@ -2215,6 +2388,20 @@ namespace ETSOverlay
             ApplyUIMode();
             EnsureAutohideConsistency();
             SaveState();
+            ScheduleCloudSyncUpload();
+        }
+
+        public bool GetShowDistance() => _showDistance;
+        public bool GetShowRoute() => _showRoute;
+        public bool GetShowBottomInfo() => _showBottomInfo;
+
+        public void SetVisibilitySettings(bool gameCards, bool route, bool bottom)
+        {
+            _showDistance = gameCards;
+            _showRoute = route;
+            _showBottomInfo = bottom;
+            SaveState();
+            ApplyUIMode(true);
             ScheduleCloudSyncUpload();
         }
 
@@ -3892,7 +4079,10 @@ namespace ETSOverlay
                 SavedCardStyle = SavedCardStyle,
                 AccentMode = SavedAccentMode,
                 CustomCardAccents = new Dictionary<string, string>(SavedCustomAccents),
-                SkipBetaUpdates = SkipBetaUpdates
+                SkipBetaUpdates = SkipBetaUpdates,
+                ShowDistance = _showDistance,
+                ShowBottomInfo = _showBottomInfo,
+                ShowRoute = _showRoute
             };
         }
 
@@ -3911,6 +4101,9 @@ namespace ETSOverlay
             SavedAccentMode = settings.AccentMode;
             SavedCustomAccents = new Dictionary<string, string>(settings.CustomCardAccents);
             SkipBetaUpdates = settings.SkipBetaUpdates;
+            _showDistance = settings.ShowDistance;
+            _showBottomInfo = settings.ShowBottomInfo;
+            _showRoute = settings.ShowRoute;
 
             ApplyLocalization();
             ApplyLanguageSelection();

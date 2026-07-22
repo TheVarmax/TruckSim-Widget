@@ -108,9 +108,14 @@ namespace ETSOverlay
 
         private void UIModeSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (CheckPremiumSelection((ComboBox)sender, e)) return;
             if (_suppressEvents || _mainWindow == null) return;
             if (UIModeSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag)
             {
+                if (CustomModeConfigBtn != null)
+                {
+                    CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
+                }
                 _mainWindow.OnUIModeChanged(tag);
             }
         }
@@ -129,6 +134,14 @@ namespace ETSOverlay
             {
                 _mainWindow.OnLanguageChanged(tag);
             }
+        }
+
+        private void CustomModeConfigBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mainWindow == null) return;
+            var w = new VisibilitySettingsWindow(_mainWindow);
+            w.Owner = this;
+            w.ShowDialog();
         }
 
         private void SpeedWarningBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -198,10 +211,11 @@ namespace ETSOverlay
             {
                 LicenseSectionTitle.Text = _isUk ? "⭐ Стати Supporter" : "⭐ Become a Supporter";
                 LicenseSectionTitle.Foreground = new SolidColorBrush(Colors.White);
-                LicenseStatusText.Text = "Free";
                 LicenseStatusText.Foreground = new SolidColorBrush(Colors.White);
                 BtnManageLicense.Content = _isUk ? "Стати Supporter" : "Become a Supporter";
             }
+            
+            SyncGeneralValues();
         }
 
         private void ScaleSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -223,6 +237,37 @@ namespace ETSOverlay
         {
             if (_suppressEvents || _mainWindow == null) return;
             _mainWindow.OnAutoHideEnabledChanged(false);
+        }
+
+        private void SyncGeneralValues()
+        {
+            if (_mainWindow == null || UIModeSelector == null) return;
+            _suppressEvents = true;
+
+            var license = LicenseManager.Instance;
+            bool isSupporter = license.Status == "active";
+
+            string activeMode = "full";
+            if (UIModeSelector.SelectedItem is ComboBoxItem cbi && cbi.Tag is string currentSelection)
+            {
+                activeMode = currentSelection;
+            }
+
+            PopulateCombo(UIModeSelector, new[] {
+                ("full", "Full Interface", "Повний інтерфейс", false),
+                ("minimal", "Minimalism", "Мінімалізм", false),
+                ("custom", "Custom", "Кастомний", true)
+            }, activeMode, isSupporter);
+
+            if (UIModeSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+            {
+                if (CustomModeConfigBtn != null)
+                {
+                    CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+
+            _suppressEvents = false;
         }
 
         // --- Appearance Logic ---
@@ -247,8 +292,7 @@ namespace ETSOverlay
 
             PopulateCombo(CardStyleSelector, new[] {
                 ("standard", "Standard", "Стандартний", false),
-                ("rounded", "Rounded", "Заокруглений", true),
-                ("compact", "Compact", "Компактний", true)
+                ("rounded", "Rounded", "Заокруглений", true)
             }, _mainWindow.ActiveCardStyle, canUseCardStyles);
 
             PopulateCombo(AccentModeSelector, new[] {
@@ -288,13 +332,11 @@ namespace ETSOverlay
                 if (item.premium && !hasFeature)
                 {
                     cbi.Content = "⭐ " + text;
-                    cbi.IsEnabled = false;
                     cbi.ToolTip = _isUk ? "Доступно тільки з підпискою Supporter" : "Available only with Supporter subscription";
                 }
                 else
                 {
                     cbi.Content = text;
-                    cbi.IsEnabled = true;
                     cbi.ToolTip = null;
                 }
                 combo.Items.Add(cbi);
@@ -309,15 +351,69 @@ namespace ETSOverlay
                 combo.SelectedIndex = 0;
         }
 
+        private int _toastId = 0;
+        private bool CheckPremiumSelection(ComboBox comboBox, SelectionChangedEventArgs e)
+        {
+            if (_suppressEvents) return false;
+            if (e.AddedItems.Count > 0 && e.AddedItems[0] is ComboBoxItem item && item.Content?.ToString().StartsWith("⭐") == true)
+            {
+                _suppressEvents = true;
+                if (e.RemovedItems.Count > 0)
+                {
+                    comboBox.SelectedItem = e.RemovedItems[0];
+                }
+                else
+                {
+                    comboBox.SelectedIndex = 0;
+                }
+                _suppressEvents = false;
+                ShowToast(_isUk ? "Потрібна підписка Supporter" : "Requires Supporter subscription");
+                return true;
+            }
+            return false;
+        }
+
+        private async void ShowToast(string message)
+        {
+            ToastText.Text = message;
+            ToastOverlay.Visibility = Visibility.Visible;
+            
+            var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromSeconds(0.2));
+            var slideUp = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromSeconds(0.2))
+            {
+                EasingFunction = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut }
+            };
+            
+            ToastOverlay.BeginAnimation(OpacityProperty, fadeIn);
+            ToastTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, slideUp);
+
+            int currentId = ++_toastId;
+            await System.Threading.Tasks.Task.Delay(3000);
+            if (currentId != _toastId) return;
+
+            var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
+            var slideDown = new System.Windows.Media.Animation.DoubleAnimation(10, TimeSpan.FromSeconds(0.2));
+            
+            fadeOut.Completed += (s, ev) => 
+            {
+                if (currentId == _toastId) ToastOverlay.Visibility = Visibility.Collapsed;
+            };
+            
+            ToastOverlay.BeginAnimation(OpacityProperty, fadeOut);
+            ToastTranslate.BeginAnimation(System.Windows.Media.TranslateTransform.YProperty, slideDown);
+        }
+
 
 
         private void AppearanceSetting_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (CheckPremiumSelection((ComboBox)sender, e)) return;
             ApplyAppearanceSettings();
         }
 
         private void AccentMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            if (CheckPremiumSelection((ComboBox)sender, e)) return;
             UpdateAppearanceVisibility();
             ApplyAppearanceSettings();
         }
@@ -432,11 +528,8 @@ namespace ETSOverlay
             LanguageLabel.Text = isUk ? "Мова" : "Language";
             OpacityLabel.Text = isUk ? "Прозорість" : "Opacity";
             UIModeLabel.Text = isUk ? "Режим інтерфейсу" : "UI Mode";
-            if (UIModeSelector.Items.Count >= 2)
-            {
-                ((ComboBoxItem)UIModeSelector.Items[0]).Content = isUk ? "Повний" : "Full Interface";
-                ((ComboBoxItem)UIModeSelector.Items[1]).Content = isUk ? "Мінімалізм" : "Minimalism";
-            }
+            if (CustomModeConfigBtn != null) CustomModeConfigBtn.Content = isUk ? "Змінити" : "Change";
+            
             SpeedWarningLabel.Text = isUk ? "Поріг швидкості" : "Speed warning";
             ScaleLabel.Text = isUk ? "Масштаб" : "Scale";
             AutoHideLabel.Text = isUk ? "Автоскривання" : "Auto-hide";
@@ -492,6 +585,10 @@ namespace ETSOverlay
                 if (item.Tag is string tag && tag == mode)
                 {
                     UIModeSelector.SelectedItem = item;
+                    if (CustomModeConfigBtn != null)
+                    {
+                        CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
+                    }
                     break;
                 }
             }
