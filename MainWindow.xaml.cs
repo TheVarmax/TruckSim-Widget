@@ -3150,9 +3150,9 @@ namespace ETSOverlay
                 var plusIndex = versionStr.IndexOf('+');
                 if (plusIndex >= 0)
                 {
-                    return versionStr.Substring(0, plusIndex);
+                    versionStr = versionStr.Substring(0, plusIndex);
                 }
-                return versionStr;
+                return versionStr.Replace("-stable", "", StringComparison.OrdinalIgnoreCase);
             }
 
             var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
