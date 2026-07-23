@@ -122,7 +122,10 @@ namespace ETSOverlay
         private bool _isRecordingBroken = false;
         private bool _awaitingTbResponse = false;
         private bool _awaitingTbUpload = false;
+        public int SpeedWarningEts { get => _speedWarningEts; set { _speedWarningEts = Math.Max(0, value); ApplySpeedWarningColor(); } }
         private int _speedWarningEts = 0;
+        
+        public int SpeedWarningAts { get => _speedWarningAts; set { _speedWarningAts = Math.Max(0, value); ApplySpeedWarningColor(); } }
         private int _speedWarningAts = 0;
 
         private const float KmToMiles = 0.621371f;
@@ -172,6 +175,7 @@ namespace ETSOverlay
         public string SavedAccentMode { get; private set; } = "standard";
         public Dictionary<string, string> SavedCustomAccents { get; set; } = new();
         public bool SkipBetaUpdates { get; set; } = false;
+        public string? LatestReleaseUrl { get; set; } = null;
 
         // Appearance Active State (What is actually rendered, downgraded if necessary)
         public string ActiveTheme { get; private set; } = "classic";
@@ -233,12 +237,17 @@ namespace ETSOverlay
             public string AccentMode { get; set; } = "standard";
             public Dictionary<string, string> CustomCardAccents { get; set; } = new();
             public bool SkipBetaUpdates { get; set; } = false;
+            public string? LatestReleaseUrl { get; set; } = null;
             
             public bool CloudSyncEnabled { get; set; } = false;
             public int? CloudSyncRevision { get; set; } = null;
             public DateTime? CloudSyncUpdatedAt { get; set; } = null;
             public DateTime? LastCloudSyncAttempt { get; set; } = null;
             public string CloudSyncStatus { get; set; } = "";
+            public bool SpeedLimiterEnabled { get; set; } = false;
+            public int SpeedLimiterThresholdKmh { get; set; } = 99;
+            public int SpeedLimiterThresholdMph { get; set; } = 79;
+            public string SpeedLimiterBrakeKey { get; set; } = "S";
         }
 
         private class GameState
@@ -307,6 +316,8 @@ namespace ETSOverlay
             };
 
             MainBorder.Opacity = windowOpacity;
+
+            SpeedLimiterService.Instance.LogAction = msg => WriteLog($"[SPEED LIMITER] {msg}");
 
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
             string folder = Path.Combine(appData, "TruckSimWidget");
@@ -442,9 +453,13 @@ namespace ETSOverlay
                 var args = Environment.GetCommandLineArgs();
                 if (Array.Exists(args, arg => arg == "--updated"))
                 {
-                    var successWindow = new UpdateSuccessWindow(uiLanguage);
+                    var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl);
                     successWindow.Owner = this;
                     successWindow.ShowDialog();
+                    
+                    // Clear the URL after showing it
+                    LatestReleaseUrl = null;
+                    SaveState();
                 }
 
                 // 4. Финализация: сброс анимации opacity для чистого idle-перехода
@@ -603,6 +618,8 @@ namespace ETSOverlay
                     int currentSpeed = isPaused ? 0 : (int)Math.Round(Math.Abs(rawSpeed) * (UseMiles ? 2.236936f : 3.6f));
                     SpeedValue.Text = currentSpeed.ToString();
                     ApplySpeedWarningColor(currentSpeed);
+
+                    SpeedLimiterService.Instance.OnSpeedUpdate(rawSpeed, UseMiles);
 
                     float distanceFactor = UseMiles ? KmToMiles : 1f;
                     float plannedDistKm = data.JobValues.PlannedDistanceKm;
@@ -1074,6 +1091,7 @@ namespace ETSOverlay
                     WriteLog($"Resetting display and game state");
                     isGameOnline = false;
                     ResetDisplay(true); // Полная очистка интерфейса и состояния
+                    SpeedLimiterService.Instance.ReleaseBrake();
                 }
                 TbStatus.Text = _isTbRunning ? LocalizeStatus("TB_ONLINE") : LocalizeStatus("TB_OFFLINE");
                 if (_isTbRunning)
@@ -1884,11 +1902,16 @@ namespace ETSOverlay
                     AccentMode = SavedAccentMode,
                     CustomCardAccents = SavedCustomAccents,
                     SkipBetaUpdates = SkipBetaUpdates,
+                    LatestReleaseUrl = LatestReleaseUrl,
                     CloudSyncEnabled = CloudSyncEnabled,
                     CloudSyncRevision = CloudSyncRevision,
                     CloudSyncUpdatedAt = CloudSyncUpdatedAt,
                     LastCloudSyncAttempt = LastCloudSyncAttempt,
-                    CloudSyncStatus = CloudSyncStatus
+                    CloudSyncStatus = CloudSyncStatus,
+                    SpeedLimiterEnabled = SpeedLimiterService.Instance.IsEnabled,
+                    SpeedLimiterThresholdKmh = SpeedLimiterService.Instance.SpeedThresholdKmh,
+                    SpeedLimiterThresholdMph = SpeedLimiterService.Instance.SpeedThresholdMph,
+                    SpeedLimiterBrakeKey = SpeedLimiterService.Instance.BrakeKey.ToString()
                 };
 
                 var json = JsonSerializer.Serialize(state);
@@ -1941,6 +1964,9 @@ namespace ETSOverlay
                                 SavedCustomAccents = state.CustomCardAccents;
                             }
                             
+                            SkipBetaUpdates = state.SkipBetaUpdates;
+                            LatestReleaseUrl = state.LatestReleaseUrl;
+                            
                             if (state.CancelledJobs != null)
                             {
                                 _cancelledJobs = new HashSet<string>(state.CancelledJobs);
@@ -1951,6 +1977,12 @@ namespace ETSOverlay
                             CloudSyncUpdatedAt = state.CloudSyncUpdatedAt;
                             LastCloudSyncAttempt = state.LastCloudSyncAttempt;
                             CloudSyncStatus = state.CloudSyncStatus ?? "";
+
+                            SpeedLimiterService.Instance.IsEnabled = state.SpeedLimiterEnabled;
+                            SpeedLimiterService.Instance.SpeedThresholdKmh = state.SpeedLimiterThresholdKmh;
+                            SpeedLimiterService.Instance.SpeedThresholdMph = state.SpeedLimiterThresholdMph;
+                            if (Enum.TryParse<System.Windows.Input.Key>(state.SpeedLimiterBrakeKey, out var brakeKey))
+                                SpeedLimiterService.Instance.BrakeKey = brakeKey;
 
                             LicenseManager.Instance.Initialize(state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseStatus, state.LicenseExpiry);
                             // При старте не загружаем сохранённые заказы, только настройки интерфейса.
@@ -3134,7 +3166,7 @@ namespace ETSOverlay
         {
             _headerOverlay?.UpdatePinIcon(Topmost);
         }
-        protected override void OnClosed(EventArgs e) { WriteLog("=== OVERLAY CLOSED ==="); SaveState(); telemetry?.Dispose(); base.OnClosed(e); }
+        protected override void OnClosed(EventArgs e) { WriteLog("=== OVERLAY CLOSED ==="); SaveState(); SpeedLimiterService.Instance.ReleaseBrake(); telemetry?.Dispose(); base.OnClosed(e); }
 
         // ==================== AUTO-UPDATE ====================
 
@@ -3304,21 +3336,46 @@ namespace ETSOverlay
                     return;
                 }
 
-                var latestRelease = doc.RootElement[0];
-                string tagName = latestRelease.GetProperty("tag_name").GetString() ?? "";
-                string releaseName = latestRelease.GetProperty("name").GetString() ?? tagName;
-                bool isBeta = tagName.Contains("beta", StringComparison.OrdinalIgnoreCase) || releaseName.Contains("beta", StringComparison.OrdinalIgnoreCase);
-                string remoteVersion = ExtractVersionFromTag(tagName);
-                string currentVersion = GetCurrentVersion();
+                JsonElement? targetRelease = null;
+                bool isBeta = false;
+                string tagName = "";
+                string releaseName = "";
+                string remoteVersion = "";
 
-                WriteLog($"Current version: {currentVersion}, Latest: {remoteVersion} ({tagName}) - Beta: {isBeta}");
-
-                if (isBeta && SkipBetaUpdates && silent)
+                foreach (var release in doc.RootElement.EnumerateArray())
                 {
-                    WriteLog("Beta update found, but user chose to skip betas. Ignoring silently.");
+                    string tName = release.GetProperty("tag_name").GetString() ?? "";
+                    string rName = release.GetProperty("name").GetString() ?? tName;
+                    bool beta = tName.Contains("beta", StringComparison.OrdinalIgnoreCase) || rName.Contains("beta", StringComparison.OrdinalIgnoreCase);
+
+                    if (beta)
+                    {
+                        var plan = LicenseManager.Instance.CurrentPlan;
+                        bool isTesterOrDev = plan == "tester" || plan == "developer";
+                        if (!isTesterOrDev) continue;
+                        if (SkipBetaUpdates) continue;
+                    }
+
+                    targetRelease = release;
+                    isBeta = beta;
+                    tagName = tName;
+                    releaseName = rName;
+                    remoteVersion = ExtractVersionFromTag(tagName);
+                    break;
+                }
+
+                if (targetRelease == null)
+                {
+                    WriteLog("No suitable releases found.");
                     _isCheckingUpdate = false;
                     return;
                 }
+
+                var latestRelease = targetRelease.Value;
+                string htmlUrl = latestRelease.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+                string currentVersion = GetCurrentVersion();
+
+                WriteLog($"Current version: {currentVersion}, Selected: {remoteVersion} ({tagName}) - Beta: {isBeta}");
 
                 if (IsNewerVersion(remoteVersion, currentVersion))
                 {
@@ -3356,7 +3413,7 @@ namespace ETSOverlay
                         });
 
                         // Показываем диалог подтверждения
-                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName, isBeta);
+                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName, htmlUrl, isBeta);
                     }
                     else
                     {
@@ -3454,7 +3511,7 @@ namespace ETSOverlay
         /// <summary>
         /// Показывает диалог подтверждения обновления
         /// </summary>
-        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName, bool isBeta = false)
+        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName, string htmlUrl, bool isBeta = false)
         {
             Dispatcher.Invoke(() =>
             {
@@ -3463,29 +3520,18 @@ namespace ETSOverlay
                     ? $"Доступна нова {(isBeta ? "БЕТА " : "")}версія: {releaseName}\n\nВстановити оновлення?\n\nПрограма буде закрита для оновлення файлів."
                     : $"A new {(isBeta ? "BETA " : "")}version is available: {releaseName}\n\nInstall update?\n\nThe application will close to update files.";
 
-                string yesBtn = uiLanguage == "uk" ? "Так" : "Yes";
-                string noBtn = uiLanguage == "uk" ? "Ні" : "No";
+                string yesBtn = isBeta ? (uiLanguage == "uk" ? "Встановити" : "Install") : (uiLanguage == "uk" ? "Так" : "Yes");
+                string noBtn = isBeta ? (uiLanguage == "uk" ? "Пропустити" : "Skip") : (uiLanguage == "uk" ? "Ні" : "No");
 
-                MessageBoxResult result;
-                bool isCheckboxChecked = false;
-
-                if (isBeta)
-                {
-                    string chkText = uiLanguage == "uk" ? "Більше не пропонувати бета-оновлення" : "Do not offer beta updates again";
-                    var dialogResult = CustomMessageBox.ShowWithCheckbox(this, message, title, yesBtn, noBtn, chkText);
-                    result = dialogResult.result;
-                    isCheckboxChecked = dialogResult.isCheckboxChecked;
-                }
-                else
-                {
-                    result = CustomMessageBox.Show(this, message, title, yesBtn, noBtn);
-                }
+                var result = CustomMessageBox.Show(this, message, title, yesBtn, noBtn);
 
                 if (result == MessageBoxResult.Yes)
                 {
+                    LatestReleaseUrl = htmlUrl;
+                    SaveState();
                     LaunchUpdaterAndShutdown(downloadUrl, assetName);
                 }
-                else if (isBeta && isCheckboxChecked)
+                else if (isBeta)
                 {
                     SkipBetaUpdates = true;
                     SaveState();

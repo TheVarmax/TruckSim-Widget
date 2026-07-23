@@ -443,45 +443,152 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
                             <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
                         <TextBlock x:Name="SpeedWarningLabel" Grid.Column="0" Text="Speed warning" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                        <TextBox x:Name="SpeedWarningBox" Grid.Column="1" Height="28" VerticalContentAlignment="Center" TextAlignment="Center" Background="{DynamicResource InputBackgroundBrush}" Foreground="White" BorderBrush="{DynamicResource InputBorderBrush}" TextChanged="SpeedWarningBox_TextChanged"/>
-                        <Grid Grid.Column="2" Margin="6,0,0,0" Width="26" Height="28" VerticalAlignment="Center">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="14"/>
-                                <RowDefinition Height="14"/>
-                            </Grid.RowDefinitions>
-                            <Button x:Name="SpeedWarningUp" Grid.Row="0" Height="14" Click="SpeedWarningUp_Click" Cursor="Hand">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1,1,1,0" CornerRadius="4,4,0,0">
-                                            <TextBlock Text="▲" Foreground="#B0B0B0" FontSize="7" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                        
+                        <ToggleButton x:Name="BtnSpeedWarningConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
+                                        <Path Data="M19.4,13C19.4,12.6 19.5,12.3 19.5,12C19.5,11.7 19.4,11.4 19.4,11L21.5,9.3C21.7,9.1 21.8,8.9 21.7,8.6L19.7,5.1C19.6,4.9 19.3,4.8 19,4.9L16.5,5.9C16,5.5 15.4,5.2 14.8,4.9L14.4,2.3C14.4,2 14.2,1.8 13.9,1.8L9.9,1.8C9.7,1.8 9.4,2 9.4,2.3L9,4.9C8.4,5.2 7.9,5.5 7.4,5.9L4.9,4.9C4.6,4.8 4.3,4.9 4.2,5.1L2.2,8.6C2.1,8.9 2.2,9.1 2.4,9.3L4.5,11C4.4,11.4 4.4,11.7 4.4,12C4.4,12.3 4.4,12.6 4.5,13L2.4,14.7C2.2,14.9 2.1,15.1 2.2,15.4L4.2,18.9C4.3,19.1 4.6,19.2 4.9,19.1L7.4,18.1C7.9,18.5 8.4,18.8 9,19.1L9.4,21.7C9.4,22 9.7,22.2 9.9,22.2L13.9,22.2C14.2,22.2 14.4,22 14.4,21.7L14.8,19.1C15.4,18.8 16,18.5 16.5,18.1L19,19.1C19.3,19.2 19.6,19.1 19.7,18.9L21.7,15.4C21.8,15.1 21.7,14.9 21.5,14.7L19.4,13M11.9,15.5C10,15.5 8.4,13.9 8.4,12C8.4,10.1 10,8.5 11.9,8.5C13.8,8.5 15.4,10.1 15.4,12C15.4,13.9 13.8,15.5 11.9,15.5Z" Fill="White" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        
+                        <Popup x:Name="SpeedWarningPopup" PlacementTarget="{Binding ElementName=BtnSpeedWarningConfig}" Placement="Bottom" HorizontalOffset="-172" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnSpeedWarningConfig, Mode=TwoWay}">
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" Padding="12" Width="200">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="SpeedWarningEtsLabel" Grid.Column="0" Text="ETS2 (km/h)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
+                                            <TextBox x:Name="SpeedWarningEtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningEtsBox_TextChanged"/>
                                         </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                            <Button x:Name="SpeedWarningDown" Grid.Row="1" Height="14" Click="SpeedWarningDown_Click" Cursor="Hand">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1,0,1,1" CornerRadius="0,0,4,4">
-                                            <TextBlock Text="▼" Foreground="#B0B0B0" FontSize="7" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,-1,0,0"/>
+                                    </Grid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock x:Name="SpeedWarningAtsLabel" Grid.Column="0" Text="ATS (mph)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                        <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
+                                            <TextBox x:Name="SpeedWarningAtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningAtsBox_TextChanged"/>
                                         </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                        </Grid>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
                     </Grid>
+                    
+                    <!-- Speed Limiter Settings (Premium) -->
+                    <StackPanel x:Name="SpeedLimiterPanel" Visibility="Collapsed" Margin="0,0,0,16">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock x:Name="SpeedLimiterTitle" Grid.Column="0" Text="🧪 Speed Limiter (Testing)" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
+                            
+                            <ToggleButton x:Name="BtnSpeedLimiterConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
+                                <ToggleButton.Template>
+                                    <ControlTemplate TargetType="ToggleButton">
+                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
+                                            <Path Data="M19.4,13C19.4,12.6 19.5,12.3 19.5,12C19.5,11.7 19.4,11.4 19.4,11L21.5,9.3C21.7,9.1 21.8,8.9 21.7,8.6L19.7,5.1C19.6,4.9 19.3,4.8 19,4.9L16.5,5.9C16,5.5 15.4,5.2 14.8,4.9L14.4,2.3C14.4,2 14.2,1.8 13.9,1.8L9.9,1.8C9.7,1.8 9.4,2 9.4,2.3L9,4.9C8.4,5.2 7.9,5.5 7.4,5.9L4.9,4.9C4.6,4.8 4.3,4.9 4.2,5.1L2.2,8.6C2.1,8.9 2.2,9.1 2.4,9.3L4.5,11C4.4,11.4 4.4,11.7 4.4,12C4.4,12.3 4.4,12.6 4.5,13L2.4,14.7C2.2,14.9 2.1,15.1 2.2,15.4L4.2,18.9C4.3,19.1 4.6,19.2 4.9,19.1L7.4,18.1C7.9,18.5 8.4,18.8 9,19.1L9.4,21.7C9.4,22 9.7,22.2 9.9,22.2L13.9,22.2C14.2,22.2 14.4,22 14.4,21.7L14.8,19.1C15.4,18.8 16,18.5 16.5,18.1L19,19.1C19.3,19.2 19.6,19.1 19.7,18.9L21.7,15.4C21.8,15.1 21.7,14.9 21.5,14.7L19.4,13M11.9,15.5C10,15.5 8.4,13.9 8.4,12C8.4,10.1 10,8.5 11.9,8.5C13.8,8.5 15.4,10.1 15.4,12C15.4,13.9 13.8,15.5 11.9,15.5Z" Fill="White" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                            </Trigger>
+                                            <Trigger Property="IsChecked" Value="True">
+                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </ToggleButton.Template>
+                            </ToggleButton>
+                            
+                            <Popup x:Name="SpeedLimiterPopup" PlacementTarget="{Binding ElementName=BtnSpeedLimiterConfig}" Placement="Bottom" HorizontalOffset="-172" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnSpeedLimiterConfig, Mode=TwoWay}">
+                                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" Padding="12" Width="200">
+                                    <Border.Effect>
+                                        <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
+                                    </Border.Effect>
+                                    <StackPanel>
+                                        <!-- Toggle -->
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="SpeedLimiterEnableLabel" Grid.Column="0" Text="Enable Limiter" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
+                                            <ToggleButton x:Name="SpeedLimiterToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="SpeedLimiterToggle_Checked" Unchecked="SpeedLimiterToggle_Unchecked" VerticalAlignment="Center"/>
+                                        </Grid>
+                                        
+                                        <!-- Threshold ETS2 -->
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="SpeedLimiterEtsLabel" Grid.Column="0" Text="ETS2 (km/h)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
+                                                <TextBox x:Name="SpeedLimiterEtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterEtsBox_TextChanged"/>
+                                            </Border>
+                                        </Grid>
+                                        
+                                        <!-- Threshold ATS -->
+                                        <Grid Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="SpeedLimiterAtsLabel" Grid.Column="0" Text="ATS (mph)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
+                                                <TextBox x:Name="SpeedLimiterAtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterAtsBox_TextChanged"/>
+                                            </Border>
+                                        </Grid>
+                                        
+                                        <!-- Key Binding -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock x:Name="SpeedLimiterKeyLabel" Grid.Column="0" Text="Brake Key" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <Button x:Name="BtnSpeedLimiterKey" Grid.Column="1" Content="S" Height="26" Click="BtnSpeedLimiterKey_Click" Cursor="Hand" Foreground="White">
+                                                <Button.Template>
+                                                    <ControlTemplate TargetType="Button">
+                                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
+                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        </Border>
+                                                        <ControlTemplate.Triggers>
+                                                            <Trigger Property="IsMouseOver" Value="True">
+                                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                                            </Trigger>
+                                                        </ControlTemplate.Triggers>
+                                                    </ControlTemplate>
+                                                </Button.Template>
+                                            </Button>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </Popup>
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
             </Grid>
 
@@ -741,6 +848,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="12"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <!-- Supporter Banner -->
@@ -771,8 +879,57 @@
                         </Button>
                     </Grid>
 
+                    <!-- Beta Updates Toggle -->
+                    <Grid x:Name="BetaUpdatesContainer" Grid.Row="2" Margin="0,0,0,15" Visibility="Collapsed">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="BetaUpdatesLabel" Grid.Column="0" Text="Отримувати бета-оновлення" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        
+                        <CheckBox x:Name="BetaUpdatesToggle" Grid.Column="1" VerticalAlignment="Center" Checked="BetaUpdatesToggle_Checked" Unchecked="BetaUpdatesToggle_Unchecked">
+                            <CheckBox.Template>
+                                <ControlTemplate TargetType="CheckBox">
+                                    <Grid Width="40" Height="22" Cursor="Hand">
+                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="11">
+                                            <Ellipse x:Name="knob" Width="16" Height="16" Fill="#8A8F98" HorizontalAlignment="Left" Margin="2,0,0,0">
+                                                <Ellipse.RenderTransform>
+                                                    <TranslateTransform x:Name="knobTransform" X="0"/>
+                                                </Ellipse.RenderTransform>
+                                            </Ellipse>
+                                        </Border>
+                                    </Grid>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="border" Property="Background" Value="#4CAE50"/>
+                                            <Setter TargetName="border" Property="BorderBrush" Value="#4CAE50"/>
+                                            <Setter TargetName="knob" Property="Fill" Value="White"/>
+                                            <Trigger.EnterActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="knobTransform" Storyboard.TargetProperty="X" To="18" Duration="0:0:0.15"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.EnterActions>
+                                            <Trigger.ExitActions>
+                                                <BeginStoryboard>
+                                                    <Storyboard>
+                                                        <DoubleAnimation Storyboard.TargetName="knobTransform" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.15"/>
+                                                    </Storyboard>
+                                                </BeginStoryboard>
+                                            </Trigger.ExitActions>
+                                        </Trigger>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </CheckBox.Template>
+                        </CheckBox>
+                    </Grid>
+
                     <!-- Action Buttons -->
-                    <Grid Grid.Row="2">
+                    <Grid Grid.Row="3">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="10"/>

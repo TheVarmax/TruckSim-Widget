@@ -144,23 +144,78 @@ namespace ETSOverlay
             w.ShowDialog();
         }
 
-        private void SpeedWarningBox_TextChanged(object sender, TextChangedEventArgs e)
+        private void SpeedWarningEtsBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_suppressEvents || _mainWindow == null) return;
-            if (int.TryParse(SpeedWarningBox.Text, out var value))
+            if (int.TryParse(SpeedWarningEtsBox.Text, out var value))
             {
-                _mainWindow.OnSpeedWarningChanged(Math.Max(0, value));
+                _mainWindow.SpeedWarningEts = Math.Max(0, value);
+                _mainWindow.SaveStatePublic();
             }
         }
 
-        private void SpeedWarningUp_Click(object sender, RoutedEventArgs e)
+        private void SpeedWarningAtsBox_TextChanged(object sender, TextChangedEventArgs e)
         {
-            _mainWindow.OnSpeedWarningUp();
+            if (_suppressEvents || _mainWindow == null) return;
+            if (int.TryParse(SpeedWarningAtsBox.Text, out var value))
+            {
+                _mainWindow.SpeedWarningAts = Math.Max(0, value);
+                _mainWindow.SaveStatePublic();
+            }
         }
 
-        private void SpeedWarningDown_Click(object sender, RoutedEventArgs e)
+        private void SpeedLimiterToggle_Checked(object sender, RoutedEventArgs e)
         {
-            _mainWindow.OnSpeedWarningDown();
+            if (_suppressEvents) return;
+            SpeedLimiterService.Instance.IsEnabled = true;
+            _mainWindow.SaveStatePublic();
+        }
+
+        private void SpeedLimiterToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            SpeedLimiterService.Instance.Disable();
+            _mainWindow.SaveStatePublic();
+        }
+
+        private void SpeedLimiterEtsBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            if (int.TryParse(SpeedLimiterEtsBox.Text, out int val) && val > 0)
+            {
+                SpeedLimiterService.Instance.SpeedThresholdKmh = val;
+                _mainWindow.SaveStatePublic();
+            }
+        }
+
+        private void SpeedLimiterAtsBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_suppressEvents) return;
+            if (int.TryParse(SpeedLimiterAtsBox.Text, out int val) && val > 0)
+            {
+                SpeedLimiterService.Instance.SpeedThresholdMph = val;
+                _mainWindow.SaveStatePublic();
+            }
+        }
+
+        private bool _isWaitingForKey = false;
+        private void BtnSpeedLimiterKey_Click(object sender, RoutedEventArgs e)
+        {
+            _isWaitingForKey = true;
+            BtnSpeedLimiterKey.Content = _isUk ? "Натисніть..." : "Press a key...";
+            this.KeyDown += SettingsWindow_KeyDown_BrakeKey;
+        }
+
+        private void SettingsWindow_KeyDown_BrakeKey(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (!_isWaitingForKey) return;
+            _isWaitingForKey = false;
+            this.KeyDown -= SettingsWindow_KeyDown_BrakeKey;
+            
+            SpeedLimiterService.Instance.BrakeKey = e.Key;
+            BtnSpeedLimiterKey.Content = e.Key.ToString();
+            _mainWindow.SaveStatePublic();
+            e.Handled = true;
         }
 
         private void BtnCheckUpdate_Click(object sender, RoutedEventArgs e)
@@ -211,7 +266,8 @@ namespace ETSOverlay
             {
                 LicenseSectionTitle.Text = _isUk ? "⭐ Стати Supporter" : "⭐ Become a Supporter";
                 LicenseSectionTitle.Foreground = new SolidColorBrush(Colors.White);
-                LicenseStatusText.Foreground = new SolidColorBrush(Colors.White);
+                LicenseStatusText.Text = "Free";
+                LicenseStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A0A0A0"));
                 BtnManageLicense.Content = _isUk ? "Стати Supporter" : "Become a Supporter";
             }
             
@@ -267,7 +323,45 @@ namespace ETSOverlay
                 }
             }
 
+            if (BetaUpdatesContainer != null)
+            {
+                bool isTesterOrDev = license.CurrentPlan == "tester" || license.CurrentPlan == "developer";
+                BetaUpdatesContainer.Visibility = isTesterOrDev ? Visibility.Visible : Visibility.Collapsed;
+                if (isTesterOrDev)
+                {
+                    BetaUpdatesToggle.IsChecked = !_mainWindow.SkipBetaUpdates;
+                }
+            }
+
+            if (SpeedLimiterPanel != null)
+            {
+                bool hasSpeedLimiter = license.HasFeature("speed_limiter");
+                SpeedLimiterPanel.Visibility = hasSpeedLimiter ? Visibility.Visible : Visibility.Collapsed;
+                
+                if (hasSpeedLimiter)
+                {
+                    SpeedLimiterToggle.IsChecked = SpeedLimiterService.Instance.IsEnabled;
+                    SpeedLimiterEtsBox.Text = SpeedLimiterService.Instance.SpeedThresholdKmh.ToString();
+                    SpeedLimiterAtsBox.Text = SpeedLimiterService.Instance.SpeedThresholdMph.ToString();
+                    BtnSpeedLimiterKey.Content = SpeedLimiterService.Instance.BrakeKey.ToString();
+                }
+            }
+
             _suppressEvents = false;
+        }
+
+        private void BetaUpdatesToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            _mainWindow.SkipBetaUpdates = false;
+            _mainWindow.SaveStatePublic();
+        }
+
+        private void BetaUpdatesToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            _mainWindow.SkipBetaUpdates = true;
+            _mainWindow.SaveStatePublic();
         }
 
         // --- Appearance Logic ---
@@ -536,6 +630,9 @@ namespace ETSOverlay
             AutoHideHint.Text = isUk
                 ? "Використовує лише статус TruckBook. Тимчасово приховує вибраний режим інтерфейсу, коли статус спокійний."
                 : "Uses TruckBook status only. Temporarily hides the selected UI mode when status is calm.";
+                
+            if (BetaUpdatesLabel != null) BetaUpdatesLabel.Text = isUk ? "Отримувати бета-оновлення" : "Receive beta updates";
+
             if (!_mainWindow._isCheckingUpdate)
             {
                 BtnCheckUpdate.Content = isUk ? "🔄 Перевірити оновлення" : "🔄 Check for updates";
@@ -556,6 +653,14 @@ namespace ETSOverlay
                 ? "Однаковий застосовує акцент всюди. Користувацький дозволяє вибрати колір для кожної плитки." 
                 : "Uniform applies your accent everywhere. Custom allows picking per tile.";
 
+            if (SpeedLimiterTitle != null)
+            {
+                SpeedLimiterTitle.Text = isUk ? "🧪 Обмежувач швидкості (Тестування)" : "🧪 Speed Limiter (Testing)";
+                SpeedLimiterEnableLabel.Text = isUk ? "Увімкнути обмежувач" : "Enable Limiter";
+                SpeedLimiterEtsLabel.Text = isUk ? "Ліміт ETS2 (км/год)" : "ETS2 Limit (km/h)";
+                SpeedLimiterAtsLabel.Text = isUk ? "Ліміт ATS (миль/год)" : "ATS Limit (mph)";
+                SpeedLimiterKeyLabel.Text = isUk ? "Кнопка гальма" : "Brake Key";
+            }
 
             // Cloud Tab localization
             TabCloudBtn.Content = isUk ? "Хмара" : "Cloud";
@@ -627,7 +732,11 @@ namespace ETSOverlay
         public void SetSpeedWarningText(string text)
         {
             _suppressEvents = true;
-            SpeedWarningBox.Text = text;
+            if (_mainWindow != null)
+            {
+                SpeedWarningEtsBox.Text = _mainWindow.SpeedWarningEts.ToString();
+                SpeedWarningAtsBox.Text = _mainWindow.SpeedWarningAts.ToString();
+            }
             _suppressEvents = false;
         }
 

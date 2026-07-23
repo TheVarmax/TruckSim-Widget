@@ -7,9 +7,13 @@ namespace ETSOverlay
 {
     public partial class UpdateSuccessWindow : Window
     {
-        public UpdateSuccessWindow(string language)
+        private string? _releaseUrl;
+
+        public UpdateSuccessWindow(string language, string? releaseUrl = null)
         {
             InitializeComponent();
+            _releaseUrl = releaseUrl ?? "https://github.com/TheVarmax/TruckSim-Widget/releases/latest";
+
             
             // Set language specific text
             if (language == "uk")
@@ -19,6 +23,7 @@ namespace ETSOverlay
                 SubmessageBlock.Text = "Дякуємо за використання TruckSim Widget. Ви можете слідкувати за новинами на нашому сайті або в репозиторії GitHub.";
                 BtnWebsite.Content = "Сайт проєкту";
                 BtnClose.Content = "Закрити";
+                BtnReleaseNotes.Content = "Опис оновлення";
             }
             else
             {
@@ -27,6 +32,7 @@ namespace ETSOverlay
                 SubmessageBlock.Text = "Thank you for using TruckSim Widget. You can follow news on our website or GitHub repository.";
                 BtnWebsite.Content = "Project Website";
                 BtnClose.Content = "Close";
+                BtnReleaseNotes.Content = "Release Notes";
             }
 
             MouseLeftButtonDown += (s, e) => { DragMove(); };
@@ -38,9 +44,9 @@ namespace ETSOverlay
             Close();
         }
 
-        private void BtnGitHub_Click(object sender, RoutedEventArgs e)
+        private void BtnReleaseNotes_Click(object sender, RoutedEventArgs e)
         {
-            OpenUrl("https://github.com/TheVarmax/TruckSim-Widget");
+            OpenUrl(_releaseUrl!);
             Close();
         }
 

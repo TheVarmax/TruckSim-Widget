@@ -42,7 +42,7 @@
                     </Button.Template>
                 </Button>
 
-                <Button x:Name="BtnGitHub" Content="GitHub" Click="BtnGitHub_Click" Padding="12,0" Height="30" Margin="0,0,10,0" Cursor="Hand" Background="#2b3137" Foreground="White" BorderThickness="0">
+                <Button x:Name="BtnReleaseNotes" Content="Release Notes" Click="BtnReleaseNotes_Click" Padding="12,0" Height="30" Margin="0,0,10,0" Cursor="Hand" Background="#2b3137" Foreground="White" BorderThickness="0">
                     <Button.Template>
                         <ControlTemplate TargetType="Button">
                             <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
