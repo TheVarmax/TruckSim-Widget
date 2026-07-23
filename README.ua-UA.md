@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="assets/icon.png" width="100" alt="TruckSim Widget icon" />
+  <img src="assets/icon.png" width="100" alt="Іконка TruckSim Widget" />
 </p>
 
 <p align="center">
   <sub>
     🌐 Змінити мову →
-    <a href="README.ua-UA.md">🇺🇦 UA</a>
+    <a href="README.md">🇺🇸 EN</a>
   </sub>
 </p>
 
