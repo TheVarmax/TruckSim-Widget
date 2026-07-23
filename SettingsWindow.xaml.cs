@@ -255,7 +255,14 @@ namespace ETSOverlay
                 }
                 else
                 {
-                    statusText += " (Lifetime)";
+                    if (licenseManager.CurrentPlan?.ToLower() == "tester")
+                    {
+                        statusText += _isUk ? " (до кінця тестування)" : " (until testing ends)";
+                    }
+                    else
+                    {
+                        statusText += " (Lifetime)";
+                    }
                 }
                 
                 LicenseStatusText.Text = statusText;
