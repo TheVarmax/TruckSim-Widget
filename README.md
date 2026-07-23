@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  TruckSim Widget is a lightweight telemetry overlay for Euro Truck Simulator 2 and American Truck Simulator. It monitors TrucksBook and game telemetry in real time, provides configurable alerts, interface customization, Supporter subscriptions, and optional cloud synchronization for widget settings.
+  TruckSim Widget is a lightweight telemetry overlay for Euro Truck Simulator 2 and American Truck Simulator. It monitors TrucksBook and game telemetry in real time, provides configurable alerts, a built-in trip logbook, customizable interface options, Supporter features, and optional cloud synchronization.
 </p>
 
 <p align="center">
@@ -77,10 +77,10 @@ See the information that matters during a delivery without filling the screen wi
 
 ### 🎨 Interface customization *(Supporters Exclusive)*
 
-Configure the appearance of the widget to match your preferences.
+Personalize the widget to match your setup and preferences.
 
 - Four built-in themes: **Classic**, **Midnight**, **Carbon**, and **OLED Black**.
-- Three card styles: **Standard**, **Rounded**, and **Compact**.
+- **Custom UI Mode** for creating your own widget layout.
 - Global accent colors and individual colors for each tile.
 - Adjustable opacity and interface scale.
 - Appearance preferences are retained when Supporter access is inactive.
@@ -94,14 +94,25 @@ Synchronize supported widget settings between your computers.
 - Conflict resolution for settings changed on multiple devices.
 - Cloud backup removal without changing local settings.
 
-### 🔐 Supporter subscriptions
+### 📖 Trip Logbook
 
-Supporter subscriptions provide access to premium functionality.
+Automatically saves completed deliveries and lets you review your driving history whenever you want.
 
-- Device-based activation.
-- Device token authentication stored using Windows data protection.
-- Subscription plan, activation details, and validity displayed in settings.
-- Server-managed feature access.
+- Every completed trip is stored locally.
+- Browse previous deliveries directly inside the widget.
+- Quickly review routes, cargo, distance, duration, and other trip information.
+- Free users can access their **5 most recent trips**.
+- Supporters enjoy unlimited trip history and advanced trip statistics.
+
+### ⭐ Supporter Features
+
+Support TruckSim Widget development and unlock additional functionality.
+
+- ☁️ Cloud Sync
+- 🎨 Custom UI Mode
+- 📖 Unlimited Trip Logbook
+- 📊 Advanced trip statistics
+- Future Supporter-exclusive features
 
 ### 🫥 Auto-hide
 
@@ -126,6 +137,50 @@ The interface supports English and Ukrainian. City names can also be translated 
 ### 🔄 Automatic updates
 
 Stay up to date without manually checking for every new release. After a successful update, the widget shows an in-app confirmation window with useful links instead of forcing a browser page open.
+
+---
+
+## Free vs Supporter
+
+TruckSim Widget is **free forever**.
+
+Supporter subscriptions unlock additional convenience features while keeping all essential functionality available to everyone.
+
+| Feature | Free | Supporter |
+| --- | :---: | :---: |
+| TrucksBook monitoring | ✅ | ✅ |
+| Live telemetry | ✅ | ✅ |
+| Delivery tracking | ✅ | ✅ |
+| Auto-hide | ✅ | ✅ |
+| Speed warnings | ✅ | ✅ |
+| Automatic updates | ✅ | ✅ |
+| English & Ukrainian | ✅ | ✅ |
+| Trip Logbook | Last 5 trips | Unlimited |
+| Essential trip information | ✅ | ✅ |
+| Extended trip statistics | ❌ | ✅ |
+| Custom UI Mode | ❌ | ✅ |
+| Cloud Sync | ❌ | ✅ |
+
+### Trip Logbook information
+
+| Available trip data | Free | Supporter |
+| --- | :---: | :---: |
+| Route | ✅ | ✅ |
+| Cargo | ✅ | ✅ |
+| Distance | ✅ | ✅ |
+| Duration | ✅ | ✅ |
+| Started | ✅ | ✅ |
+| Completed | ✅ | ✅ |
+| Game | ✅ | ✅ |
+| Income | ❌ | ✅ |
+| Average Speed | ❌ | ✅ |
+| Maximum Speed | ❌ | ✅ |
+| Fuel Consumed | ❌ | ✅ |
+| Average Fuel Consumption | ❌ | ✅ |
+| Truck Damage | ❌ | ✅ |
+| Trailer Damage | ❌ | ✅ |
+| Cargo Damage | ❌ | ✅ |
+| Truck | ❌ | ✅ |
 
 ---
 
@@ -160,7 +215,7 @@ Open the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/
 | Format | Best for | What to do |
 | --- | --- | --- |
 | **Installer (recommended)** `TruckSimWidgetSetup-<version>.exe` | Most users | Run the setup, choose an installation folder, and optionally configure the telemetry plugin for ETS2 and/or ATS during setup. The installer creates Windows shortcuts and an uninstall entry. |
-| **Portable ZIP** `TruckSimWidget-<version>-portable.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. |
+| **Portable ZIP** `TruckSimWidget-<version>.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. |
 
 > **Important:** Do not run the portable version from inside the ZIP archive. Extract it first.
 
