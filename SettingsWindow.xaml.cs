@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Input;
 using System.Linq;
 using Microsoft.Win32;
 
@@ -116,8 +117,49 @@ namespace ETSOverlay
                 {
                     CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
                 }
+                if (tag != "full" && AutoHideToggle.IsChecked == true)
+                {
+                    AutoHideToggle.IsChecked = false;
+                }
                 _mainWindow.OnUIModeChanged(tag);
             }
+        }
+
+        private void SplitOpacityToggle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var license = LicenseManager.Instance;
+            bool isTesterOrAbove = license.Status == "active" && 
+                (license.CurrentPlan == "tester" || license.CurrentPlan == "developer");
+            
+            if (!isTesterOrAbove)
+            {
+                e.Handled = true;
+                ShowToast(_isUk ? "Потрібна ліцензія Tester" : "Requires Tester license");
+            }
+        }
+
+        private void SplitOpacityToggle_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            GlobalOpacityPanel.IsEnabled = false;
+            GlobalOpacityPanel.Opacity = 0.5;
+            BackgroundOpacityPanel.IsEnabled = true;
+            BackgroundOpacityPanel.Opacity = 1.0;
+            TextOpacityPanel.IsEnabled = true;
+            TextOpacityPanel.Opacity = 1.0;
+            _mainWindow.OnSplitOpacityToggled(true);
+        }
+
+        private void SplitOpacityToggle_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            GlobalOpacityPanel.IsEnabled = true;
+            GlobalOpacityPanel.Opacity = 1.0;
+            BackgroundOpacityPanel.IsEnabled = false;
+            BackgroundOpacityPanel.Opacity = 0.5;
+            TextOpacityPanel.IsEnabled = false;
+            TextOpacityPanel.Opacity = 0.5;
+            _mainWindow.OnSplitOpacityToggled(false);
         }
 
         private void OpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
@@ -125,6 +167,20 @@ namespace ETSOverlay
             if (_suppressEvents || _mainWindow == null) return;
             _mainWindow.OnOpacityChanged(OpacitySlider.Value);
             OpacityValue.Text = $"{(int)Math.Round(OpacitySlider.Value)}%";
+        }
+
+        private void BackgroundOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            _mainWindow.OnBackgroundOpacityChanged(BackgroundOpacitySlider.Value);
+            BackgroundOpacityValue.Text = $"{(int)Math.Round(BackgroundOpacitySlider.Value)}%";
+        }
+
+        private void TextOpacitySlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            _mainWindow.OnTextOpacityChanged(TextOpacitySlider.Value);
+            TextOpacityValue.Text = $"{(int)Math.Round(TextOpacitySlider.Value)}%";
         }
 
         private void LanguageSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -244,7 +300,7 @@ namespace ETSOverlay
                     ? "Supporter" 
                     : char.ToUpper(licenseManager.CurrentPlan[0]) + licenseManager.CurrentPlan.Substring(1);
 
-                LicenseSectionTitle.Text = $"★ {planName}";
+                LicenseSectionText.Text = planName;
                 LicenseSectionTitle.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#F5C542")); // Gold
                 
                 string statusText = _isUk ? "🟢 Активна" : "🟢 Active";
@@ -271,13 +327,21 @@ namespace ETSOverlay
             }
             else
             {
-                LicenseSectionTitle.Text = _isUk ? "⭐ Стати Supporter" : "⭐ Become a Supporter";
+                LicenseSectionText.Text = _isUk ? "Стати Supporter" : "Become a Supporter";
                 LicenseSectionTitle.Foreground = new SolidColorBrush(Colors.White);
                 LicenseStatusText.Text = "Free";
                 LicenseStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A0A0A0"));
                 BtnManageLicense.Content = _isUk ? "Стати Supporter" : "Become a Supporter";
             }
             
+            bool isTesterOrAbove = licenseManager.Status == "active" && 
+                (licenseManager.CurrentPlan == "tester" || licenseManager.CurrentPlan == "developer");
+            if (!isTesterOrAbove && SplitOpacityToggle != null && SplitOpacityToggle.IsChecked == true)
+            {
+                // Uncheck and trigger uncheck logic programmatically
+                SplitOpacityToggle.IsChecked = false;
+            }
+
             SyncGeneralValues();
         }
 
@@ -287,6 +351,17 @@ namespace ETSOverlay
             if (ScaleSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag && int.TryParse(tag, out int scale))
             {
                 _mainWindow.OnScaleChanged(scale);
+            }
+        }
+        
+        private void AutoHideToggle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (UIModeSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag && tag != "full")
+            {
+                e.Handled = true;
+                bool isUk = _mainWindow?.GetUiLanguage() == "uk";
+                string msg = isUk ? "Функція Auto-hide доступна лише в режимі Full Interface." : "Auto-hide is only available in Full Interface mode.";
+                ShowToast(msg, false);
             }
         }
 
@@ -432,12 +507,17 @@ namespace ETSOverlay
                 string text = _isUk ? item.uk : item.en;
                 if (item.premium && !hasFeature)
                 {
-                    cbi.Content = "⭐ " + text;
+                    var sp = new StackPanel { Orientation = Orientation.Horizontal };
+                    sp.Children.Add(new TextBlock { Text = "⭐ ", FontSize = 18, Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5C542")), VerticalAlignment = VerticalAlignment.Center });
+                    sp.Children.Add(new TextBlock { Text = text, VerticalAlignment = VerticalAlignment.Center });
+                    cbi.Content = sp;
+                    cbi.Uid = "premium";
                     cbi.ToolTip = _isUk ? "Доступно тільки з підпискою Supporter" : "Available only with Supporter subscription";
                 }
                 else
                 {
                     cbi.Content = text;
+                    cbi.Uid = "";
                     cbi.ToolTip = null;
                 }
                 combo.Items.Add(cbi);
@@ -456,7 +536,7 @@ namespace ETSOverlay
         private bool CheckPremiumSelection(ComboBox comboBox, SelectionChangedEventArgs e)
         {
             if (_suppressEvents) return false;
-            if (e.AddedItems.Count > 0 && e.AddedItems[0] is ComboBoxItem item && item.Content?.ToString().StartsWith("⭐") == true)
+            if (e.AddedItems.Count > 0 && e.AddedItems[0] is ComboBoxItem item && item.Uid == "premium")
             {
                 _suppressEvents = true;
                 if (e.RemovedItems.Count > 0)
@@ -474,9 +554,14 @@ namespace ETSOverlay
             return false;
         }
 
-        private async void ShowToast(string message)
+        private async void ShowToast(string message, bool showStar = true)
         {
+            if (OpacityPopup != null) OpacityPopup.IsOpen = false;
+            if (SpeedWarningPopup != null) SpeedWarningPopup.IsOpen = false;
+            if (SpeedLimiterPopup != null) SpeedLimiterPopup.IsOpen = false;
+            
             ToastText.Text = message;
+            ToastIcon.Visibility = showStar ? Visibility.Visible : Visibility.Collapsed;
             ToastOverlay.Visibility = Visibility.Visible;
             
             var fadeIn = new System.Windows.Media.Animation.DoubleAnimation(1, TimeSpan.FromSeconds(0.2));
@@ -627,7 +712,11 @@ namespace ETSOverlay
             _suppressEvents = true;
             SettingsTitle.Text = isUk ? "НАЛАШТУВАННЯ" : "SETTINGS";
             LanguageLabel.Text = isUk ? "Мова" : "Language";
-            OpacityLabel.Text = isUk ? "Прозорість" : "Opacity";
+            OpacityLabel.Text = isUk ? "🧪 Прозорість (Тестування)" : "🧪 Opacity (Testing)";
+            SplitOpacityModeLabel.Text = isUk ? "Роздільний режим" : "Split mode";
+            GlobalOpacityLabel.Text = isUk ? "Загальна прозорість" : "Global Opacity";
+            BackgroundOpacityLabel.Text = isUk ? "Прозорість фону" : "Background Opacity";
+            TextOpacityLabel.Text = isUk ? "Прозорість тексту" : "Text Opacity";
             UIModeLabel.Text = isUk ? "Режим інтерфейсу" : "UI Mode";
             if (CustomModeConfigBtn != null) CustomModeConfigBtn.Content = isUk ? "Змінити" : "Change";
             
@@ -714,11 +803,29 @@ namespace ETSOverlay
             _suppressEvents = false;
         }
 
-        public void SetOpacity(double value)
+        public void SetOpacity(double globalOpacity, bool isSplit, double bgOpacity, double txtOpacity)
         {
             _suppressEvents = true;
-            OpacitySlider.Value = value;
-            OpacityValue.Text = $"{(int)Math.Round(value)}%";
+            OpacitySlider.Value = globalOpacity;
+            OpacityValue.Text = $"{(int)Math.Round(globalOpacity)}%";
+            
+            SplitOpacityToggle.IsChecked = isSplit;
+            
+            BackgroundOpacitySlider.Value = bgOpacity;
+            BackgroundOpacityValue.Text = $"{(int)Math.Round(bgOpacity)}%";
+            
+            TextOpacitySlider.Value = txtOpacity;
+            TextOpacityValue.Text = $"{(int)Math.Round(txtOpacity)}%";
+
+            GlobalOpacityPanel.IsEnabled = !isSplit;
+            GlobalOpacityPanel.Opacity = isSplit ? 0.5 : 1.0;
+            
+            BackgroundOpacityPanel.IsEnabled = isSplit;
+            BackgroundOpacityPanel.Opacity = isSplit ? 1.0 : 0.5;
+            
+            TextOpacityPanel.IsEnabled = isSplit;
+            TextOpacityPanel.Opacity = isSplit ? 1.0 : 0.5;
+
             _suppressEvents = false;
         }
 
@@ -897,6 +1004,24 @@ namespace ETSOverlay
             SetUIMode(_mainWindow.ExportCloudSyncSettings().UiMode);
             OpacitySlider.Value = _mainWindow.ExportCloudSyncSettings().WindowOpacity * 100;
             OpacityValue.Text = $"{(int)Math.Round(OpacitySlider.Value)}%";
+            
+            SplitOpacityToggle.IsChecked = _mainWindow.ExportCloudSyncSettings().IsSplitOpacityEnabled;
+            
+            BackgroundOpacitySlider.Value = _mainWindow.ExportCloudSyncSettings().BackgroundOpacity * 100;
+            BackgroundOpacityValue.Text = $"{(int)Math.Round(BackgroundOpacitySlider.Value)}%";
+            
+            TextOpacitySlider.Value = _mainWindow.ExportCloudSyncSettings().TextOpacity * 100;
+            TextOpacityValue.Text = $"{(int)Math.Round(TextOpacitySlider.Value)}%";
+            
+            bool isSplit = SplitOpacityToggle.IsChecked == true;
+            GlobalOpacityPanel.IsEnabled = !isSplit;
+            GlobalOpacityPanel.Opacity = isSplit ? 0.5 : 1.0;
+            
+            BackgroundOpacityPanel.IsEnabled = isSplit;
+            BackgroundOpacityPanel.Opacity = isSplit ? 1.0 : 0.5;
+            
+            TextOpacityPanel.IsEnabled = isSplit;
+            TextOpacityPanel.Opacity = isSplit ? 1.0 : 0.5;
             SetLanguage(_mainWindow.ExportCloudSyncSettings().UiLanguage);
             SetAutoHideEnabled(_mainWindow.ExportCloudSyncSettings().AutoHideEnabled);
             SetScale(_mainWindow.ExportCloudSyncSettings().UiScale);

@@ -154,6 +154,9 @@ namespace ETSOverlay
         private enum HealthStatus { Neutral, Healthy, Warning, Error }
         private HealthStatus _currentHealth = HealthStatus.Neutral;
         private double windowOpacity = 0.85;
+        private bool isSplitOpacityEnabled = false;
+        private double backgroundOpacity = 0.85;
+        private double textOpacity = 1.0;
         private string uiLanguage = "en";
         private readonly Dictionary<string, string> _ets2CityTranslations = new(StringComparer.OrdinalIgnoreCase);
         private readonly Dictionary<string, string> _atsCityTranslations = new(StringComparer.OrdinalIgnoreCase);
@@ -219,6 +222,9 @@ namespace ETSOverlay
             public bool ShowRoute { get; set; } = true;
             public string UIMode { get; set; } = "full";
             public double WindowOpacity { get; set; }
+            public bool IsSplitOpacityEnabled { get; set; }
+            public double BackgroundOpacity { get; set; }
+            public double TextOpacity { get; set; }
             public string UiLanguage { get; set; } = "en";
             public bool AutoHideEnabled { get; set; } = false;
             public double SettingsLeft { get; set; } = double.NaN;
@@ -404,9 +410,10 @@ namespace ETSOverlay
                 IntroOverlay.Visibility = Visibility.Visible;
                 IntroOverlay.Opacity = 1;
 
-                // Плавно проявляем MainBorder от 0 до windowOpacity
+                // Плавно проявляем MainBorder
                 MainBorder.Opacity = 0;
-                var windowFade = new DoubleAnimation(windowOpacity, TimeSpan.FromSeconds(0.4));
+                var targetOp = 1.0;
+                var windowFade = new DoubleAnimation(targetOp, TimeSpan.FromSeconds(0.4));
                 MainBorder.BeginAnimation(OpacityProperty, windowFade);
 
                 // Ждём 1.5 секунды
@@ -464,7 +471,7 @@ namespace ETSOverlay
 
                 // 4. Финализация: сброс анимации opacity для чистого idle-перехода
                 MainBorder.BeginAnimation(OpacityProperty, null);
-                MainBorder.Opacity = windowOpacity;
+                MainBorder.Opacity = 1.0;
                 ApplyDualLayerOpacity();
 
                 _startupComplete = true;
@@ -481,7 +488,8 @@ namespace ETSOverlay
                 if (WindowState == WindowState.Normal)
                 {
                     MainBorder.Opacity = 0;
-                    MainBorder.BeginAnimation(OpacityProperty, new DoubleAnimation(windowOpacity, TimeSpan.FromSeconds(0.3)));
+                    var targetOp = 1.0;
+                    MainBorder.BeginAnimation(OpacityProperty, new DoubleAnimation(targetOp, TimeSpan.FromSeconds(0.3)));
                     
                     if (_settingsWindow != null && _settingsWindow.IsVisible)
                     {
@@ -492,7 +500,8 @@ namespace ETSOverlay
                     if (_headerOverlay != null && _headerOverlayVisible)
                     {
                         _headerOverlay.SetOpacity(0);
-                        _headerOverlay.AnimateOpacity(1, 0.3);
+                        var headerTargetOp = isSplitOpacityEnabled ? backgroundOpacity : windowOpacity;
+                        _headerOverlay.AnimateOpacity(headerTargetOp, 0.3);
                     }
                 }
             };
@@ -1884,6 +1893,9 @@ namespace ETSOverlay
                     ShowRoute = _showRoute,
                     UIMode = _uiMode,
                     WindowOpacity = windowOpacity,
+                    IsSplitOpacityEnabled = isSplitOpacityEnabled,
+                    BackgroundOpacity = backgroundOpacity,
+                    TextOpacity = textOpacity,
                     UiLanguage = uiLanguage,
                     AutoHideEnabled = _autoHideEnabled,
                     SettingsLeft = _settingsWindow?.Left ?? _savedSettingsLeft,
@@ -2030,7 +2042,7 @@ namespace ETSOverlay
             if (string.IsNullOrEmpty(LicenseManager.Instance.HardwareHash))
                 LicenseManager.Instance.Initialize("", null, DateTime.MinValue, "", "");
 
-            MainBorder.Opacity = windowOpacity;
+            MainBorder.Opacity = 1.0;
             ApplyDualLayerOpacity();
             ApplyLanguageSelection();
             ApplyLocalization();
@@ -2121,7 +2133,7 @@ namespace ETSOverlay
             {
                 _settingsWindow = new SettingsWindow(this);
                 _settingsWindow.SetUIMode(_uiMode);
-                _settingsWindow.SetOpacity(windowOpacity * 100);
+                _settingsWindow.SetOpacity(windowOpacity * 100, isSplitOpacityEnabled, backgroundOpacity * 100, textOpacity * 100);
                 _settingsWindow.SetLanguage(uiLanguage);
                 _settingsWindow.SetSpeedWarningText(Math.Max(0, CurrentSpeedWarning).ToString());
                 _settingsWindow.SetVersionText($"v{GetCurrentVersion()}");
@@ -2270,25 +2282,33 @@ namespace ETSOverlay
                     var fadeOut = new DoubleAnimation(1, 0, TimeSpan.FromSeconds(0.2));
                     var currentHeight = CollapsibleSection.ActualHeight;
                     CollapsibleSection.Height = currentHeight;
+                    CollapsibleSection.Height = currentHeight;
                     var shrink = new DoubleAnimation(currentHeight, 0, TimeSpan.FromSeconds(0.3)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
 
                     shrink.Completed += (s, ev) => 
                     {
                         CollapsibleSection.BeginAnimation(HeightProperty, null);
+                        CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                         CollapsibleSection.Visibility = Visibility.Collapsed;
-                        CollapsibleSection.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                     };
 
                     CollapsibleSection.BeginAnimation(OpacityProperty, fadeOut);
+                    CollapsibleSectionBgs.BeginAnimation(OpacityProperty, fadeOut);
                     CollapsibleSection.BeginAnimation(HeightProperty, shrink);
+                    CollapsibleSectionBgs.BeginAnimation(HeightProperty, shrink);
                 }
                 else
                 {
                     CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                    CollapsibleSectionBgs.BeginAnimation(OpacityProperty, null);
                     CollapsibleSection.BeginAnimation(HeightProperty, null);
+                    CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                     CollapsibleSection.Opacity = 0;
                     CollapsibleSection.Visibility = Visibility.Collapsed;
-                    CollapsibleSection.Height = double.NaN;
+                    CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                    CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                 }
             }
             else
@@ -2327,12 +2347,14 @@ namespace ETSOverlay
                 {
                     if (wasCollapsed)
                     {
-                        CollapsibleSection.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                         double availableWidth = this.ActualWidth > 0 ? this.ActualWidth : double.PositiveInfinity;
                         CollapsibleSection.Measure(new Size(availableWidth, double.PositiveInfinity));
                         double targetHeight = CollapsibleSection.DesiredSize.Height - CollapsibleSection.Margin.Top - CollapsibleSection.Margin.Bottom;
                         if (targetHeight < 0) targetHeight = 0;
 
+                        CollapsibleSection.Height = 0;
                         CollapsibleSection.Height = 0;
                         CollapsibleSection.Opacity = 0;
 
@@ -2342,26 +2364,36 @@ namespace ETSOverlay
                         grow.Completed += (s, ev) => 
                         {
                             CollapsibleSection.BeginAnimation(HeightProperty, null);
-                            CollapsibleSection.Height = double.NaN;
+                            CollapsibleSectionBgs?.BeginAnimation(HeightProperty, null);
+                            CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                            CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                         };
 
                         CollapsibleSection.BeginAnimation(OpacityProperty, fadeIn);
+                        CollapsibleSectionBgs?.BeginAnimation(OpacityProperty, fadeIn);
                         CollapsibleSection.BeginAnimation(HeightProperty, grow);
+                        CollapsibleSectionBgs?.BeginAnimation(HeightProperty, grow);
                     }
                     else
                     {
                         CollapsibleSection.BeginAnimation(HeightProperty, null);
+                        CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                         CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                        CollapsibleSectionBgs.BeginAnimation(OpacityProperty, null);
                         CollapsibleSection.Opacity = 1;
-                        CollapsibleSection.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                     }
                 }
                 else
                 {
                     CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                    CollapsibleSectionBgs.BeginAnimation(OpacityProperty, null);
                     CollapsibleSection.BeginAnimation(HeightProperty, null);
+                    CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                     CollapsibleSection.Opacity = 1;
-                    CollapsibleSection.Height = double.NaN;
+                    CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                    CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                 }
             }
         }
@@ -2475,55 +2507,136 @@ namespace ETSOverlay
             ThemeManager.Instance.ApplyTheme(ActiveTheme, ActiveAccent, ActiveCardStyle, ActiveAccentMode, ActiveCustomAccents);
         }
 
-        public void OnOpacityChanged(double sliderValue)
+        public void OnSplitOpacityToggled(bool isSplit)
         {
-            windowOpacity = sliderValue / 100.0;
+            isSplitOpacityEnabled = isSplit;
             ApplyDualLayerOpacity();
             SaveState();
             ScheduleCloudSyncUpload();
         }
 
+        public void OnBackgroundOpacityChanged(double sliderValue)
+        {
+            backgroundOpacity = sliderValue / 100.0;
+            if (isSplitOpacityEnabled)
+            {
+                ApplyDualLayerOpacity();
+                SaveState();
+                ScheduleCloudSyncUpload();
+            }
+        }
+
+        public void OnTextOpacityChanged(double sliderValue)
+        {
+            textOpacity = sliderValue / 100.0;
+            if (isSplitOpacityEnabled)
+            {
+                ApplyDualLayerOpacity();
+                SaveState();
+                ScheduleCloudSyncUpload();
+            }
+        }
+
+        public void OnOpacityChanged(double sliderValue)
+        {
+            windowOpacity = sliderValue / 100.0;
+            if (!isSplitOpacityEnabled)
+            {
+                ApplyDualLayerOpacity();
+                SaveState();
+                ScheduleCloudSyncUpload();
+            }
+        }
+
         public bool IsLocked => locked;
 
         /// <summary>
-        /// Applies opacity so the overall widget uses windowOpacity, but text elements
-        /// use only half of the opacity delta (50% less opacity change for better readability).
-        /// E.g. widget at 90% -> text at 95%.
+        /// Applies opacity to the widget.
+        /// If split opacity is enabled, uses backgroundOpacity and textOpacity independently.
+        /// Otherwise, uses windowOpacity for background and auto-calculates text opacity for readability.
         /// </summary>
         private void ApplyDualLayerOpacity()
         {
             // Remove any active animation that might block local value updates
             MainBorder.BeginAnimation(OpacityProperty, null);
             
-            // The background/border gets the full user opacity
-            MainBorder.Opacity = windowOpacity;
+            // MainBorder stays fully opaque at rest so child layers can have independent opacity up to 1.0
+            MainBorder.Opacity = 1.0;
             
+            // All inner backgrounds in BackgroundsLayer are 1.0, container handles alpha
+            if (WindowBackgroundBorder != null) WindowBackgroundBorder.Opacity = 1.0;
+            if (SimCardBg != null) SimCardBg.Opacity = 1.0;
+            if (StatusCardBg != null) StatusCardBg.Opacity = 1.0;
+            if (GameCardBg != null) GameCardBg.Opacity = 1.0;
+            if (DistanceCardBg != null) DistanceCardBg.Opacity = 1.0;
+            if (RouteCardBg != null) RouteCardBg.Opacity = 1.0;
+            if (CardBg1 != null) CardBg1.Opacity = 1.0;
+            if (CardBg2 != null) CardBg2.Opacity = 1.0;
+            if (CardBg3 != null) CardBg3.Opacity = 1.0;
+
+            double targetBgOpacity = isSplitOpacityEnabled ? backgroundOpacity : windowOpacity;
+            
+            if (BackgroundsLayer != null) BackgroundsLayer.Opacity = targetBgOpacity;
+
             if (_headerOverlay != null && _headerOverlayVisible)
             {
-                _headerOverlay.AnimateOpacity(windowOpacity, 0.1);
+                _headerOverlay.AnimateOpacity(targetBgOpacity, 0.1);
             }
 
-            // Text opacity: midpoint between 1.0 and windowOpacity (half as much change)
-            double textOpacity = windowOpacity + (1.0 - windowOpacity) * 0.5;
-            textOpacity = Math.Max(0.0, Math.Min(1.0, textOpacity));
+            // Icons and decorative lines inside MainUI are part of the interface.
+            // In Split mode, MainUI is 1.0, so these interface elements must fade with targetBgOpacity.
+            // In Normal mode, MainUI fades with windowOpacity, so these elements should be 1.0 relative to MainUI.
+            double interfaceElementsOpacity = isSplitOpacityEnabled ? targetBgOpacity : 1.0;
+            
+            if (SimIconBg != null) SimIconBg.Opacity = interfaceElementsOpacity;
+            if (StatusIconBg != null) StatusIconBg.Opacity = interfaceElementsOpacity;
+            if (GameIconBg != null) GameIconBg.Opacity = interfaceElementsOpacity;
+            if (DistanceIconBg != null) DistanceIconBg.Opacity = interfaceElementsOpacity;
+            if (RouteIconSingleBg != null) RouteIconSingleBg.Opacity = interfaceElementsOpacity;
+            if (RouteIconMultiBg != null) RouteIconMultiBg.Opacity = interfaceElementsOpacity;
+            if (RouteLine1 != null) RouteLine1.Opacity = interfaceElementsOpacity;
+            if (RouteLine2 != null) RouteLine2.Opacity = interfaceElementsOpacity;
+            
+            // Intro overlay elements
+            if (IntroOverlayBg != null) IntroOverlayBg.Opacity = targetBgOpacity;
+            if (IntroLogoBg != null) IntroLogoBg.Opacity = interfaceElementsOpacity;
+            if (StartupLogo != null) StartupLogo.Opacity = interfaceElementsOpacity;
 
-            // Apply to all named text elements
-            TextBlock[] textBlocks = new TextBlock[]
+            // Apply opacity to all named text elements
+            TextBlock?[] textBlocks = new TextBlock?[]
             {
-                GameLabel, GameStatus,
-                SimLabel, TbStatus,
-                StatusLabel, StatusValue,
-                DistanceLabel, DistanceInfo,
-                RouteLabel, RouteLabelMulti,
-                Route, RouteMulti,
+                GameLabel, GameStatus, SimLabel, TbStatus,
+                StatusLabel, StatusValue, DistanceLabel, DistanceInfo,
+                RouteLabel, RouteLabelMulti, Route, RouteMulti,
                 SpeedHeader, SpeedValue, SpeedUnit,
                 MaxHeader, MaxSpeedValue, MaxUnit,
-                TypeHeader, DeliveryType
+                TypeHeader, DeliveryType,
+                IntroText
             };
+            
+            double effectiveTextOpacity;
+            if (isSplitOpacityEnabled)
+            {
+                // In split mode, text opacity is fully independent
+                effectiveTextOpacity = textOpacity;
+            }
+            else
+            {
+                // In normal mode, simulate the old behavior where MainBorder had windowOpacity
+                // and text had an effective multiplier on top of it.
+                effectiveTextOpacity = windowOpacity + (1.0 - windowOpacity) * 0.5;
+                effectiveTextOpacity = Math.Max(0.0, Math.Min(1.0, effectiveTextOpacity));
+            }
+
             foreach (var tb in textBlocks)
             {
-                if (tb != null) tb.Opacity = textOpacity;
+                if (tb != null) tb.Opacity = effectiveTextOpacity;
             }
+
+            // MainUI contains both Text and Interface Elements (Icons, lines).
+            // In Split Mode, MainUI must be 1.0 so text can reach 1.0 opacity.
+            // In Normal Mode, MainUI is set to windowOpacity to smoothly fade everything together.
+            if (MainUI != null) MainUI.Opacity = isSplitOpacityEnabled ? 1.0 : windowOpacity;
         }
 
         public void OnLanguageChanged(string lang)
@@ -3147,7 +3260,7 @@ namespace ETSOverlay
             
             // Восстанавливаем анимацию, чтобы при StateChanged виджет проявился нормально
             MainBorder.BeginAnimation(OpacityProperty, null);
-            MainBorder.Opacity = windowOpacity;
+            MainBorder.Opacity = 1.0;
         }
 
         public void BtnClose_Click(object? sender, RoutedEventArgs e)
@@ -3233,7 +3346,9 @@ namespace ETSOverlay
 
                 if (remoteIsPrerelease && currentIsPrerelease)
                 {
-                    return string.Compare(remote, current, StringComparison.OrdinalIgnoreCase) > 0;
+                    string remotePre = remote.Substring(remote.IndexOf('-') + 1);
+                    string currentPre = current.Substring(current.IndexOf('-') + 1);
+                    return ComparePrerelease(remotePre, currentPre) > 0;
                 }
 
                 return false;
@@ -3242,6 +3357,38 @@ namespace ETSOverlay
             {
                 return false;
             }
+        }
+
+        private static int ComparePrerelease(string remotePre, string currentPre)
+        {
+            var remoteParts = remotePre.Split('.');
+            var currentParts = currentPre.Split('.');
+
+            for (int i = 0; i < Math.Min(remoteParts.Length, currentParts.Length); i++)
+            {
+                bool rIsNum = int.TryParse(remoteParts[i], out int rNum);
+                bool cIsNum = int.TryParse(currentParts[i], out int cNum);
+
+                if (rIsNum && cIsNum)
+                {
+                    if (rNum != cNum) return rNum.CompareTo(cNum);
+                }
+                else if (rIsNum && !cIsNum)
+                {
+                    return -1;
+                }
+                else if (!rIsNum && cIsNum)
+                {
+                    return 1;
+                }
+                else
+                {
+                    int cmp = string.Compare(remoteParts[i], currentParts[i], StringComparison.OrdinalIgnoreCase);
+                    if (cmp != 0) return cmp;
+                }
+            }
+
+            return remoteParts.Length.CompareTo(currentParts.Length);
         }
 
         // BtnCheckUpdate_Click and BtnDonate_Click are now handled via public OnCheckUpdate() / OnDonate() methods called from SettingsWindow
@@ -3778,7 +3925,8 @@ namespace ETSOverlay
             if (_headerOverlayVisible) return;
             _headerOverlayVisible = true;
             _headerOverlay.IsHitTestVisible = true;
-            _headerOverlay.AnimateOpacity(windowOpacity, HeaderOverlayFadeSeconds);
+            var targetOp = isSplitOpacityEnabled ? backgroundOpacity : windowOpacity;
+            _headerOverlay.AnimateOpacity(targetOp, HeaderOverlayFadeSeconds);
         }
 
         private void HideHeaderOverlay()
@@ -3879,29 +4027,38 @@ namespace ETSOverlay
                 // collapse the collapsible section (animate similar to ApplyUIMode minimal)
                 // Clear any existing animations first to avoid stuck animation state
                 CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSectionBgs.BeginAnimation(OpacityProperty, null);
                 CollapsibleSection.BeginAnimation(HeightProperty, null);
+                CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                 if (CollapsibleSection.Visibility == Visibility.Visible)
                 {
                     CollapsibleSection.UpdateLayout();
                     var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.15));
                     var currentHeight = CollapsibleSection.ActualHeight;
                     CollapsibleSection.Height = currentHeight;
+                    CollapsibleSection.Height = currentHeight;
                     var shrink = new DoubleAnimation(currentHeight, 0, TimeSpan.FromSeconds(0.2)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
                     shrink.Completed += (s, ev) => 
                     { 
                         CollapsibleSection.BeginAnimation(HeightProperty, null);
+                        CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                         CollapsibleSection.Visibility = Visibility.Collapsed; 
-                        CollapsibleSection.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                        CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                     };
                     CollapsibleSection.BeginAnimation(OpacityProperty, fadeOut);
+                    CollapsibleSectionBgs.BeginAnimation(OpacityProperty, fadeOut);
                     CollapsibleSection.BeginAnimation(HeightProperty, shrink);
+                    CollapsibleSectionBgs.BeginAnimation(HeightProperty, shrink);
                 }
             }
             else
             {
                 // Keep minimal mode collapsed
                 CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSectionBgs.BeginAnimation(OpacityProperty, null);
                 CollapsibleSection.BeginAnimation(HeightProperty, null);
+                CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                 CollapsibleSection.Visibility = Visibility.Collapsed;
                 CollapsibleSection.Opacity = 0;
             }
@@ -3916,7 +4073,7 @@ namespace ETSOverlay
 
             var currentOpacity = MainBorder.Opacity;
             MainBorder.BeginAnimation(OpacityProperty, null);
-            var restoreOpacityAnim = new DoubleAnimation(currentOpacity, windowOpacity, TimeSpan.FromSeconds(0.18));
+            var restoreOpacityAnim = new DoubleAnimation(currentOpacity, 1.0, TimeSpan.FromSeconds(0.18));
             restoreOpacityAnim.Completed += (s, ev) => ApplyDualLayerOpacity();
             MainBorder.BeginAnimation(OpacityProperty, restoreOpacityAnim);
 
@@ -3924,24 +4081,34 @@ namespace ETSOverlay
             {
                 // restore collapsible section
                 CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSectionBgs.BeginAnimation(OpacityProperty, null);
                 CollapsibleSection.BeginAnimation(HeightProperty, null);
+                CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                 CollapsibleSection.Visibility = Visibility.Visible;
-                CollapsibleSection.Height = double.NaN;
+                CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+                CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
                 CollapsibleSection.UpdateLayout();
                 var targetHeight = CollapsibleSection.ActualHeight;
+                CollapsibleSection.Height = 0;
                 CollapsibleSection.Height = 0;
                 CollapsibleSection.Opacity = 0;
                 var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.18)) { BeginTime = TimeSpan.FromSeconds(0.05) };
                 var grow = new DoubleAnimation(0, targetHeight, TimeSpan.FromSeconds(0.2)) { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseInOut } };
-                grow.Completed += (s, ev) => { CollapsibleSection.BeginAnimation(HeightProperty, null); CollapsibleSection.Height = double.NaN; };
+                grow.Completed += (s, ev) => { CollapsibleSection.BeginAnimation(HeightProperty, null);
+ CollapsibleSectionBgs?.BeginAnimation(HeightProperty, null); CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN;
+ CollapsibleSection.Height = double.NaN; if (CollapsibleSectionBgs != null) CollapsibleSectionBgs.Height = double.NaN; };
                 CollapsibleSection.BeginAnimation(OpacityProperty, fadeIn);
+                CollapsibleSectionBgs?.BeginAnimation(OpacityProperty, fadeIn);
                 CollapsibleSection.BeginAnimation(HeightProperty, grow);
+                CollapsibleSectionBgs?.BeginAnimation(HeightProperty, grow);
             }
             else
             {
                 // Keep minimal mode collapsed
                 CollapsibleSection.BeginAnimation(OpacityProperty, null);
+                CollapsibleSectionBgs?.BeginAnimation(OpacityProperty, null);
                 CollapsibleSection.BeginAnimation(HeightProperty, null);
+                CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
                 CollapsibleSection.Visibility = Visibility.Collapsed;
                 CollapsibleSection.Opacity = 0;
             }
@@ -4115,6 +4282,9 @@ namespace ETSOverlay
             {
                 UiMode = _uiMode,
                 WindowOpacity = windowOpacity,
+                IsSplitOpacityEnabled = isSplitOpacityEnabled,
+                BackgroundOpacity = backgroundOpacity,
+                TextOpacity = textOpacity,
                 UiLanguage = uiLanguage,
                 AutoHideEnabled = _autoHideEnabled,
                 UiScale = _uiScale,
@@ -4136,6 +4306,9 @@ namespace ETSOverlay
         {
             _uiMode = settings.UiMode;
             windowOpacity = settings.WindowOpacity;
+            isSplitOpacityEnabled = settings.IsSplitOpacityEnabled;
+            backgroundOpacity = settings.BackgroundOpacity;
+            textOpacity = settings.TextOpacity;
             uiLanguage = settings.UiLanguage;
             _autoHideEnabled = settings.AutoHideEnabled;
             _uiScale = settings.UiScale;
@@ -4297,4 +4470,4 @@ namespace ETSOverlay
 
     }
 }
-
+

@@ -10,6 +10,12 @@ namespace ETSOverlay
         public string UiMode { get; set; } = "full";
         [JsonPropertyName("windowOpacity")]
         public double WindowOpacity { get; set; } = 0.85;
+        [JsonPropertyName("isSplitOpacityEnabled")]
+        public bool IsSplitOpacityEnabled { get; set; } = false;
+        [JsonPropertyName("backgroundOpacity")]
+        public double BackgroundOpacity { get; set; } = 0.85;
+        [JsonPropertyName("textOpacity")]
+        public double TextOpacity { get; set; } = 1.0;
         [JsonPropertyName("uiLanguage")]
         public string UiLanguage { get; set; } = "en";
         [JsonPropertyName("autoHideEnabled")]
