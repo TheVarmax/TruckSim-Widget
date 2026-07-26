@@ -235,6 +235,7 @@ namespace ETSOverlay
             public List<string> CachedFeatures { get; set; } = new();
             public DateTime LastLicenseValidation { get; set; }
             public string LicensePlan { get; set; } = string.Empty;
+            public string LicenseSource { get; set; } = string.Empty;
             public string LicenseStatus { get; set; } = "inactive";
             public DateTime? LicenseExpiry { get; set; }
             public string SavedTheme { get; set; } = "classic";
@@ -1906,6 +1907,7 @@ namespace ETSOverlay
                     CachedFeatures = LicenseManager.Instance.GetFeaturesList(),
                     LastLicenseValidation = LicenseManager.Instance.LastValidationTime,
                     LicensePlan = LicenseManager.Instance.CurrentPlan,
+                    LicenseSource = LicenseManager.Instance.Source,
                     LicenseStatus = LicenseManager.Instance.Status,
                     LicenseExpiry = LicenseManager.Instance.ExpiresAt,
                     SavedTheme = SavedTheme,
@@ -1996,7 +1998,7 @@ namespace ETSOverlay
                             if (Enum.TryParse<System.Windows.Input.Key>(state.SpeedLimiterBrakeKey, out var brakeKey))
                                 SpeedLimiterService.Instance.BrakeKey = brakeKey;
 
-                            LicenseManager.Instance.Initialize(state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseStatus, state.LicenseExpiry);
+                            LicenseManager.Instance.Initialize(state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseSource, state.LicenseStatus, state.LicenseExpiry);
                             // При старте не загружаем сохранённые заказы, только настройки интерфейса.
                         }
                     }
@@ -2040,7 +2042,7 @@ namespace ETSOverlay
             catch { }
 
             if (string.IsNullOrEmpty(LicenseManager.Instance.HardwareHash))
-                LicenseManager.Instance.Initialize("", null, DateTime.MinValue, "", "");
+                LicenseManager.Instance.Initialize("", null, DateTime.MinValue, "", "", "");
 
             MainBorder.Opacity = 1.0;
             ApplyDualLayerOpacity();

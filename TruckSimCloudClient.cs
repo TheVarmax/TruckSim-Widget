@@ -43,6 +43,24 @@ namespace ETSOverlay
         public string HardwareHash { get; set; } = string.Empty;
     }
 
+    public class PortalSessionRequest
+    {
+        [JsonPropertyName("device_token")]
+        public string DeviceToken { get; set; } = string.Empty;
+    }
+
+    public class PortalSessionResponse
+    {
+        [JsonPropertyName("success")]
+        public bool Success { get; set; }
+
+        [JsonPropertyName("url")]
+        public string? Url { get; set; }
+        
+        [JsonPropertyName("message")]
+        public string? Message { get; set; }
+    }
+
     public class LicenseResponse
     {
         [JsonPropertyName("success")]
@@ -71,6 +89,9 @@ namespace ETSOverlay
 
         [JsonPropertyName("plan")]
         public string Plan { get; set; } = string.Empty;
+        
+        [JsonPropertyName("source")]
+        public string Source { get; set; } = string.Empty;
 
         [JsonPropertyName("validUntil")]
         public DateTime? ExpiresAt { get; set; }
@@ -142,6 +163,18 @@ namespace ETSOverlay
             }
 
             return await response.Content.ReadFromJsonAsync<LicenseResponse>();
+        }
+
+        public async Task<PortalSessionResponse?> CreatePortalSessionAsync(PortalSessionRequest request)
+        {
+            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/stripe/create-portal-session", request);
+            
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
+            {
+                response.EnsureSuccessStatusCode();
+            }
+
+            return await response.Content.ReadFromJsonAsync<PortalSessionResponse>();
         }
 
         public async Task<CloudSyncResponse?> GetSyncStatusAsync(CloudSyncStatusRequest request)

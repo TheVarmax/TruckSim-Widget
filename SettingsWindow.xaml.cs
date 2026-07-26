@@ -306,7 +306,7 @@ namespace ETSOverlay
                 string statusText = _isUk ? "🟢 Активна" : "🟢 Active";
                 if (licenseManager.ExpiresAt.HasValue)
                 {
-                    string dateStr = licenseManager.ExpiresAt.Value.ToString("dd.MM.yyyy");
+                    string dateStr = licenseManager.ExpiresAt.Value.ToUniversalTime().ToString("dd MMM yyyy, HH:mm UTC", System.Globalization.CultureInfo.InvariantCulture);
                     statusText += _isUk ? $" (до {dateStr})" : $" (until {dateStr})";
                 }
                 else

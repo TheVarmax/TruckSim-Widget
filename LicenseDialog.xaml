@@ -16,6 +16,29 @@
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="White"/>
         </Style>
+        <Style TargetType="ToolTip">
+            <Setter Property="Background" Value="#1A1C20"/>
+            <Setter Property="Foreground" Value="#E0E0E0"/>
+            <Setter Property="BorderBrush" Value="#3A3D45"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="HasDropShadow" Value="True"/>
+            <Setter Property="Placement" Value="Top"/>
+            <Setter Property="VerticalOffset" Value="-5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToolTip">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="6"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Border Background="#2A2D35" CornerRadius="12" Padding="20" Margin="15">
@@ -117,6 +140,8 @@
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="10"/>
                         <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="10"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Button x:Name="BtnCloseActive" Grid.Column="0" Content="Close" Click="BtnClose_Click" Height="32" Cursor="Hand" Background="#3A3D45" Foreground="White" BorderThickness="0">
                         <Button.Template>
@@ -132,7 +157,26 @@
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
-                    <Button x:Name="BtnDeactivate" Grid.Column="2" Content="Deactivate" Click="BtnDeactivate_Click" Height="32" Cursor="Hand" Background="#E81123" Foreground="White" BorderThickness="0">
+                    <Button x:Name="BtnManageSubscription" Grid.Column="2" Content="Manage" Click="BtnManageSubscription_Click" Height="32" Cursor="Hand" Background="#2196F3" Foreground="White" BorderThickness="0" ToolTipService.ShowOnDisabled="True" ToolTipService.InitialShowDelay="100">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                                    </Trigger>
+                                    <Trigger Property="IsEnabled" Value="False">
+                                        <Setter TargetName="border" Property="Background" Value="#1A1C20"/>
+                                        <Setter Property="Foreground" Value="#666666"/>
+                                        <Setter TargetName="border" Property="Opacity" Value="0.6"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
+                    <Button x:Name="BtnDeactivate" Grid.Column="4" Content="Deactivate" Click="BtnDeactivate_Click" Height="32" Cursor="Hand" Background="#E81123" Foreground="White" BorderThickness="0">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">

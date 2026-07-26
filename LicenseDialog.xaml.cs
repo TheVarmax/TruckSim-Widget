@@ -33,6 +33,7 @@ namespace ETSOverlay
                 PlanLabel.Text = "План:";
                 LastValidatedLabel.Text = "Остання перевірка:";
                 BtnCloseActive.Content = "Закрити";
+                BtnManageSubscription.Content = "Керувати";
                 BtnDeactivate.Content = "Деактивувати";
             }
             else
@@ -46,6 +47,7 @@ namespace ETSOverlay
                 PlanLabel.Text = "Plan:";
                 LastValidatedLabel.Text = "Last Validated:";
                 BtnCloseActive.Content = "Close";
+                BtnManageSubscription.Content = "Manage";
                 BtnDeactivate.Content = "Deactivate";
             }
         }
@@ -74,8 +76,21 @@ namespace ETSOverlay
 
                 ActivePlanText.Text = string.IsNullOrWhiteSpace(licenseManager.CurrentPlan) ? "Supporter" : licenseManager.CurrentPlan;
                 ActiveValidatedText.Text = licenseManager.LastValidationTime > DateTime.MinValue 
-                    ? licenseManager.LastValidationTime.ToString("g") 
+                    ? licenseManager.LastValidationTime.ToUniversalTime().ToString("dd MMM yyyy, HH:mm UTC", System.Globalization.CultureInfo.InvariantCulture) 
                     : "Never";
+
+                bool isStripe = licenseManager.Source == "stripe";
+                BtnManageSubscription.IsEnabled = isStripe;
+                if (!isStripe)
+                {
+                    BtnManageSubscription.ToolTip = _mainWindow.GetUiLanguage() == "uk" 
+                        ? "Керувати ліцензією можна лише якщо вона була оформлена через Stripe." 
+                        : "You can only manage your license if it was purchased through Stripe.";
+                }
+                else
+                {
+                    BtnManageSubscription.ToolTip = null;
+                }
             }
             else
             {
@@ -160,6 +175,34 @@ namespace ETSOverlay
             BtnDeactivate.IsEnabled = true;
             BtnDeactivate.Content = _mainWindow.GetUiLanguage() == "uk" ? "Деактивувати" : "Deactivate";
             _mainWindow.SaveStatePublic();
+        }
+        private async void BtnManageSubscription_Click(object sender, RoutedEventArgs e)
+        {
+            ClearMessage();
+            BtnManageSubscription.IsEnabled = false;
+            BtnManageSubscription.Content = _mainWindow.GetUiLanguage() == "uk" ? "Відкриваємо..." : "Opening...";
+
+            var (success, message, url) = await LicenseManager.Instance.CreatePortalSessionAsync();
+            
+            if (!success)
+            {
+                ShowMessage(message, true);
+            }
+            else if (!string.IsNullOrEmpty(url))
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+                    ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Відкрито у браузері." : "Opened in browser.", false);
+                }
+                catch (Exception)
+                {
+                    ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Не вдалося відкрити браузер." : "Failed to open browser.", true);
+                }
+            }
+            
+            BtnManageSubscription.IsEnabled = true;
+            BtnManageSubscription.Content = _mainWindow.GetUiLanguage() == "uk" ? "Керувати" : "Manage";
         }
     }
 }

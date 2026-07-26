@@ -17,6 +17,7 @@ namespace ETSOverlay
         public bool HasValidToken => !string.IsNullOrEmpty(_deviceToken);
         public string HardwareHash { get; private set; } = string.Empty;
         public string CurrentPlan { get; private set; } = string.Empty;
+        public string Source { get; private set; } = string.Empty;
         public string Status { get; private set; } = "inactive";
         public DateTime LastValidationTime { get; private set; }
         public DateTime? ExpiresAt { get; private set; }
@@ -32,7 +33,7 @@ namespace ETSOverlay
             _deviceToken = DeviceTokenStorage.LoadToken();
         }
 
-        public void Initialize(string hardwareHash, List<string>? cachedFeatures, DateTime lastValidationTime, string plan, string status, DateTime? expiresAt = null)
+        public void Initialize(string hardwareHash, List<string>? cachedFeatures, DateTime lastValidationTime, string plan, string source, string status, DateTime? expiresAt = null)
         {
             LoadDeviceToken();
             
@@ -59,6 +60,7 @@ namespace ETSOverlay
             {
                 LastValidationTime = DateTime.MinValue;
                 CurrentPlan = "";
+                Source = "";
                 Status = "inactive";
                 ExpiresAt = null;
                 _features.Clear();
@@ -67,6 +69,7 @@ namespace ETSOverlay
             {
                 LastValidationTime = lastValidationTime;
                 CurrentPlan = plan ?? "";
+                Source = source ?? "";
                 Status = string.IsNullOrWhiteSpace(status) ? "inactive" : status;
                 ExpiresAt = expiresAt;
 
@@ -202,12 +205,39 @@ namespace ETSOverlay
             }
         }
 
+        public async Task<(bool success, string message, string url)> CreatePortalSessionAsync()
+        {
+            if (!HasValidToken) return (false, "Not authenticated", "");
+
+            try
+            {
+                var request = new PortalSessionRequest
+                {
+                    DeviceToken = DeviceToken
+                };
+
+                var response = await _client.CreatePortalSessionAsync(request);
+
+                if (response != null && response.Success && !string.IsNullOrEmpty(response.Url))
+                {
+                    return (true, "", response.Url);
+                }
+
+                return (false, response?.Message ?? "Failed to create portal session.", "");
+            }
+            catch (Exception)
+            {
+                return (false, "Unable to contact the license server. Please try again later.", "");
+            }
+        }
+
         public event Action<List<string>, bool>? OnFeaturesValidated;
 
         private void UpdateStateFromResponse(LicenseResponse response)
         {
             Status = response.License?.Status ?? "active";
             CurrentPlan = response.License?.Plan ?? "";
+            Source = response.License?.Source ?? "";
             ExpiresAt = response.License?.ExpiresAt;
             LastValidationTime = DateTime.Now;
 
@@ -229,6 +259,7 @@ namespace ETSOverlay
             _deviceToken = string.Empty;
             DeviceTokenStorage.DeleteToken();
             CurrentPlan = string.Empty;
+            Source = string.Empty;
             Status = "inactive";
             ExpiresAt = null;
             _features.Clear();
