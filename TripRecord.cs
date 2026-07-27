@@ -39,6 +39,7 @@ namespace ETSOverlay
 
         // Metadata
         public string GameType { get; set; } = ""; // "ETS" or "ATS"
+        public bool HasLocationWarning { get; set; }
 
         // Future extensibility
         public Dictionary<string, string> Extra { get; set; } = new();

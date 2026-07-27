@@ -12,7 +12,20 @@ namespace ETSOverlay
         public bool IsEnabled { get; set; }
         public int SpeedThresholdKmh { get; set; } = 98;
         public int SpeedThresholdMph { get; set; } = 78;
-        public bool IsBraking { get; private set; }
+        private bool _isBraking;
+        public bool IsBraking 
+        { 
+            get => _isBraking;
+            private set
+            {
+                if (_isBraking != value)
+                {
+                    _isBraking = value;
+                    BrakeStateChanged?.Invoke(_isBraking);
+                }
+            }
+        }
+        public event Action<bool>? BrakeStateChanged;
         public Key BrakeKey { get; set; } = Key.Down;
 
         [StructLayout(LayoutKind.Sequential)]

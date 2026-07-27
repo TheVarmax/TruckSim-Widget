@@ -253,8 +253,19 @@
 
 
 
-                        <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,0">
-                            <TextBlock x:Name="SpeedValue" Text="0" Foreground="{DynamicResource AccentBrush_Speed}" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,2,0,0" Orientation="Horizontal">
+                            <TextBlock x:Name="SpeedValue" Text="0" Foreground="{DynamicResource AccentBrush_Speed}" FontSize="26" FontWeight="Bold" VerticalAlignment="Center"/>
+                            <Path x:Name="BrakeIcon" Data="M12,4A8,8 0 1,1 4,12A8,8 0 0,1 12,4M12,2A10,10 0 1,0 22,12A10,10 0 0,0 12,2M11,16H13V18H11V16M11,6H13V14H11V6M4,5.46L2.59,4.05C.94,5.93 0,8.36 0,11C0,13.64 .94,16.07 2.59,17.95L4,16.54C2.71,15.04 2,13.11 2,11C2,8.89 2.71,6.96 4,5.46M21.41,4.05L20,5.46C21.29,6.96 22,8.89 22,11C22,13.11 21.29,15.04 20,16.54L21.41,17.95C23.06,16.07 24,13.64 24,11C24,8.36 23.06,5.93 21.41,4.05Z" Fill="#FF3B30" Stretch="Uniform" Width="16" Height="16" Margin="4,0,-20,0" Visibility="Collapsed" VerticalAlignment="Center">
+                                <Path.Triggers>
+                                    <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                                        <BeginStoryboard>
+                                            <Storyboard>
+                                                <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1" To="0.3" Duration="0:0:0.4" AutoReverse="True" RepeatBehavior="Forever"/>
+                                            </Storyboard>
+                                        </BeginStoryboard>
+                                    </EventTrigger>
+                                </Path.Triggers>
+                            </Path>
                         </StackPanel>
 
                         <TextBlock x:Name="SpeedUnit" Grid.Row="2" Text="km/h" Foreground="{DynamicResource MutedTextBrush}" FontSize="9" HorizontalAlignment="Center" Margin="0,-2,0,0"/>

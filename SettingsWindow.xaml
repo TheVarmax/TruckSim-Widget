@@ -310,6 +310,104 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- Beautiful Slider Style -->
+        <Style x:Key="ModernSliderStyle" TargetType="Slider">
+            <Setter Property="Background" Value="{DynamicResource CardBorderBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+            <Setter Property="IsMoveToPointEnabled" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Border Background="Transparent">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto" MinHeight="{TemplateBinding MinHeight}"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Border x:Name="TrackBackground" Grid.Row="1" Height="6" Background="{TemplateBinding Background}" CornerRadius="3" VerticalAlignment="Center"/>
+                                <Track x:Name="PART_Track" Grid.Row="1">
+                                    <Track.DecreaseRepeatButton>
+                                        <RepeatButton Command="Slider.DecreaseLarge">
+                                            <RepeatButton.Template>
+                                                <ControlTemplate TargetType="RepeatButton">
+                                                    <Border Height="6" Background="{DynamicResource AccentBrush}" CornerRadius="3,0,0,3" VerticalAlignment="Center"/>
+                                                </ControlTemplate>
+                                            </RepeatButton.Template>
+                                        </RepeatButton>
+                                    </Track.DecreaseRepeatButton>
+                                    <Track.IncreaseRepeatButton>
+                                        <RepeatButton Command="Slider.IncreaseLarge">
+                                            <RepeatButton.Template>
+                                                <ControlTemplate TargetType="RepeatButton">
+                                                    <Border Background="Transparent"/>
+                                                </ControlTemplate>
+                                            </RepeatButton.Template>
+                                        </RepeatButton>
+                                    </Track.IncreaseRepeatButton>
+                                    <Track.Thumb>
+                                        <Thumb x:Name="Thumb">
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <Grid>
+                                                        <Ellipse x:Name="HoverGlow" Width="20" Height="20" Fill="{DynamicResource AccentBrush}" Opacity="0" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <Ellipse x:Name="ThumbEllipse" Width="14" Height="14" Fill="White" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                                            <Ellipse.Effect>
+                                                                <DropShadowEffect Color="Black" BlurRadius="6" ShadowDepth="1" Opacity="0.3"/>
+                                                            </Ellipse.Effect>
+                                                        </Ellipse>
+                                                    </Grid>
+                                                    <ControlTemplate.Triggers>
+                                                        <Trigger Property="IsMouseOver" Value="True">
+                                                            <Trigger.EnterActions>
+                                                                <BeginStoryboard>
+                                                                    <Storyboard>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Opacity" To="0.2" Duration="0:0:0.1"/>
+                                                                    </Storyboard>
+                                                                </BeginStoryboard>
+                                                            </Trigger.EnterActions>
+                                                            <Trigger.ExitActions>
+                                                                <BeginStoryboard>
+                                                                    <Storyboard>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                                                                    </Storyboard>
+                                                                </BeginStoryboard>
+                                                            </Trigger.ExitActions>
+                                                        </Trigger>
+                                                        <Trigger Property="IsDragging" Value="True">
+                                                            <Trigger.EnterActions>
+                                                                <BeginStoryboard>
+                                                                    <Storyboard>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Opacity" To="0.3" Duration="0:0:0.1"/>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Width" To="24" Duration="0:0:0.1"/>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Height" To="24" Duration="0:0:0.1"/>
+                                                                    </Storyboard>
+                                                                </BeginStoryboard>
+                                                            </Trigger.EnterActions>
+                                                            <Trigger.ExitActions>
+                                                                <BeginStoryboard>
+                                                                    <Storyboard>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.2"/>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Width" To="20" Duration="0:0:0.2"/>
+                                                                        <DoubleAnimation Storyboard.TargetName="HoverGlow" Storyboard.TargetProperty="Height" To="20" Duration="0:0:0.2"/>
+                                                                    </Storyboard>
+                                                                </BeginStoryboard>
+                                                            </Trigger.ExitActions>
+                                                        </Trigger>
+                                                    </ControlTemplate.Triggers>
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
     </Window.Resources>
 
     <Border Background="{DynamicResource WindowBackgroundBrush}" CornerRadius="12" Padding="20,20,20,8" Margin="20">
@@ -414,17 +512,18 @@
                 <!-- Right Column -->
                 <StackPanel Grid.Column="2">
                     <!-- Language -->
-                    <Grid VerticalAlignment="Center" Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="LanguageLabel" Grid.Column="0" Text="Language" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="LanguageSelector" Grid.Column="1" SelectionChanged="LanguageSelector_SelectionChanged">
-                            <ComboBoxItem Content="English" Tag="en"/>
-                            <ComboBoxItem Content="Українська" Tag="uk"/>
-                        </ComboBox>
-                    </Grid>
+                    <StackPanel Margin="0,0,0,16">
+                        <TextBlock x:Name="LanguageLabel" Text="Language" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <ComboBox x:Name="LanguageSelector" Grid.Column="0" SelectionChanged="LanguageSelector_SelectionChanged">
+                                <ComboBoxItem Content="English" Tag="en"/>
+                                <ComboBoxItem Content="Українська" Tag="uk"/>
+                            </ComboBox>
+                        </Grid>
+                    </StackPanel>
 
                     <!-- Speed Warning -->
                     <Grid VerticalAlignment="Center" Margin="0,0,0,16">
@@ -465,7 +564,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="SpeedWarningEtsLabel" Grid.Column="0" Text="ETS2 (km/h)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                         <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                            <TextBox x:Name="SpeedWarningEtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningEtsBox_TextChanged"/>
+                                            <TextBox x:Name="SpeedWarningEtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningEtsBox_TextChanged"/>
                                         </Border>
                                     </Grid>
                                     <Grid>
@@ -475,7 +574,7 @@
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="SpeedWarningAtsLabel" Grid.Column="0" Text="ATS (mph)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                         <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                            <TextBox x:Name="SpeedWarningAtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningAtsBox_TextChanged"/>
+                                            <TextBox x:Name="SpeedWarningAtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningAtsBox_TextChanged"/>
                                         </Border>
                                     </Grid>
                                 </StackPanel>
@@ -490,7 +589,7 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="SpeedLimiterTitle" Grid.Column="0" Text="🧪 Speed Limiter (Testing)" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="Bold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
+                            <TextBlock x:Name="SpeedLimiterTitle" Grid.Column="0" Text="Speed Limiter" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
                             
                             <ToggleButton x:Name="BtnSpeedLimiterConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
                                 <ToggleButton.Template>
@@ -534,7 +633,7 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock x:Name="SpeedLimiterEtsLabel" Grid.Column="0" Text="ETS2 (km/h)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                             <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                                <TextBox x:Name="SpeedLimiterEtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterEtsBox_TextChanged"/>
+                                                <TextBox x:Name="SpeedLimiterEtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterEtsBox_TextChanged"/>
                                             </Border>
                                         </Grid>
                                         
@@ -546,7 +645,7 @@
                                             </Grid.ColumnDefinitions>
                                             <TextBlock x:Name="SpeedLimiterAtsLabel" Grid.Column="0" Text="ATS (mph)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
                                             <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                                <TextBox x:Name="SpeedLimiterAtsBox" Background="Transparent" Foreground="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterAtsBox_TextChanged"/>
+                                                <TextBox x:Name="SpeedLimiterAtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterAtsBox_TextChanged"/>
                                             </Border>
                                         </Grid>
                                         
@@ -583,7 +682,7 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="OpacityLabel" Grid.Column="0" Text="🧪 Opacity (Testing)" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock x:Name="OpacityLabel" Grid.Column="0" Text="Opacity" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
                         
                         <ToggleButton x:Name="BtnOpacityConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
                             <ToggleButton.Template>
@@ -621,41 +720,41 @@
                                     
                                     <!-- Global Opacity -->
                                     <StackPanel x:Name="GlobalOpacityPanel" Margin="0,0,0,10">
-                                        <TextBlock x:Name="GlobalOpacityLabel" Text="Global Opacity" Foreground="White" FontSize="12" Margin="0,0,0,4" />
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <Slider x:Name="OpacitySlider" Grid.Column="0" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="OpacitySlider_ValueChanged"/>
-                                            <TextBlock x:Name="OpacityValue" Grid.Column="1" Text="85%" Foreground="White" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" Width="35" TextAlignment="Right"/>
+                                            <TextBlock x:Name="GlobalOpacityLabel" Grid.Column="0" Text="Global Opacity" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="OpacityValue" Grid.Column="1" Text="85%" Foreground="White" FontSize="12" Width="30" TextAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
+                                        <Slider x:Name="OpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="OpacitySlider_ValueChanged"/>
                                     </StackPanel>
                                     
                                     <!-- Background Opacity -->
                                     <StackPanel x:Name="BackgroundOpacityPanel" Margin="0,0,0,10" IsEnabled="False" Opacity="0.5">
-                                        <TextBlock x:Name="BackgroundOpacityLabel" Text="Background Opacity" Foreground="White" FontSize="12" Margin="0,0,0,4" />
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <Slider x:Name="BackgroundOpacitySlider" Grid.Column="0" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="BackgroundOpacitySlider_ValueChanged"/>
-                                            <TextBlock x:Name="BackgroundOpacityValue" Grid.Column="1" Text="85%" Foreground="White" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" Width="35" TextAlignment="Right"/>
+                                            <TextBlock x:Name="BackgroundOpacityLabel" Grid.Column="0" Text="Background Opacity" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="BackgroundOpacityValue" Grid.Column="1" Text="85%" Foreground="White" FontSize="12" Width="30" TextAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
+                                        <Slider x:Name="BackgroundOpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="BackgroundOpacitySlider_ValueChanged"/>
                                     </StackPanel>
 
                                     <!-- Text Opacity -->
                                     <StackPanel x:Name="TextOpacityPanel" Margin="0,0,0,0" IsEnabled="False" Opacity="0.5">
-                                        <TextBlock x:Name="TextOpacityLabel" Text="Text Opacity" Foreground="White" FontSize="12" Margin="0,0,0,4" />
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <Slider x:Name="TextOpacitySlider" Grid.Column="0" Minimum="40" Maximum="100" Value="100" VerticalAlignment="Center" ValueChanged="TextOpacitySlider_ValueChanged"/>
-                                            <TextBlock x:Name="TextOpacityValue" Grid.Column="1" Text="100%" Foreground="White" FontSize="12" Margin="10,0,0,0" VerticalAlignment="Center" Width="35" TextAlignment="Right"/>
+                                            <TextBlock x:Name="TextOpacityLabel" Grid.Column="0" Text="Text Opacity" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="TextOpacityValue" Grid.Column="1" Text="100%" Foreground="White" FontSize="12" Width="30" TextAlignment="Right" VerticalAlignment="Center"/>
                                         </Grid>
+                                        <Slider x:Name="TextOpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="100" VerticalAlignment="Center" ValueChanged="TextOpacitySlider_ValueChanged"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>

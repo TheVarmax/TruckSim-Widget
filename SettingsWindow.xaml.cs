@@ -1091,16 +1091,27 @@ namespace ETSOverlay
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
+            var routePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+            if (trip.HasLocationWarning)
+            {
+                var warningBorder = new Border { CornerRadius = new CornerRadius(8), Background = Brushes.Orange, Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0) };
+                var warningText = new TextBlock { Text = "¡", Foreground = Brushes.White, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 10, Margin = new Thickness(0,-1,0,0) };
+                warningBorder.ToolTip = _isUk ? "Під час поточного рейсу віджет зафіксував перезапуск гри/віджета, і дані про місцезнаходження вантажівки відрізняються від тих, що були до перезапуску." : "During the current delivery, the widget detected a restart of the game/widget and the truck's location differs from the one before the restart.";
+                warningBorder.Child = warningText;
+                routePanel.Children.Add(warningBorder);
+            }
+            
             var routeBlock = new TextBlock
             {
                 Text = $"{_mainWindow.GetLocalizedCity(trip.Origin).ToUpper()} → {_mainWindow.GetLocalizedCity(trip.Destination).ToUpper()}",
                 Foreground = (Brush)FindResource("AccentColorBrush"),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 13,
-                Margin = new Thickness(0, 0, 0, 4)
+                VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetRow(routeBlock, 0);
-            grid.Children.Add(routeBlock);
+            routePanel.Children.Add(routeBlock);
+            Grid.SetRow(routePanel, 0);
+            grid.Children.Add(routePanel);
 
             var cargoBlock = new TextBlock
             {
@@ -1115,7 +1126,7 @@ namespace ETSOverlay
             string distUnit = _mainWindow.UseMiles ? (_isUk ? "миль" : "mi") : (_isUk ? "км" : "km");
             var statsBlock = new TextBlock
             {
-                Text = $"{(_mainWindow.UseMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm):F0} {distUnit}  •  {trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}  •  {trip.EndTimeUtc.ToLocalTime():dd.MM.yyyy HH:mm}",
+                Text = $"{Math.Floor(_mainWindow.UseMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm)} {distUnit}  •  {trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}  •  {trip.EndTimeUtc.ToLocalTime():dd.MM.yyyy HH:mm}",
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98")),
                 FontSize = 11
             };
@@ -1148,10 +1159,30 @@ namespace ETSOverlay
 
             string distUnit = useMiles ? (_isUk ? "миль" : "mi") : (_isUk ? "км" : "km");
             
+            if (trip.HasLocationWarning)
+            {
+                var warningPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+                var warningBorder = new Border { CornerRadius = new CornerRadius(8), Background = Brushes.Orange, Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0) };
+                var warningText = new TextBlock { Text = "¡", Foreground = Brushes.White, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 10, Margin = new Thickness(0,-1,0,0) };
+                warningBorder.ToolTip = _isUk ? "Під час поточного рейсу віджет зафіксував перезапуск гри/віджета, і дані про місцезнаходження вантажівки відрізняються від тих, що були до перезапуску." : "During the current delivery, the widget detected a restart of the game/widget and the truck's location differs from the one before the restart.";
+                warningBorder.Child = warningText;
+                
+                var warningMessage = new TextBlock
+                {
+                    Text = _isUk ? "Дані рейсу можуть бути неточними через перезапуск" : "Trip data might be inaccurate due to a restart",
+                    Foreground = Brushes.Orange,
+                    FontWeight = FontWeights.Medium,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                warningPanel.Children.Add(warningBorder);
+                warningPanel.Children.Add(warningMessage);
+                LogbookDetailPanel.Children.Add(warningPanel);
+            }
+            
             // Free tier details
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Маршрут:" : "Route:", $"{_mainWindow.GetLocalizedCity(trip.Origin)} → {_mainWindow.GetLocalizedCity(trip.Destination)}"));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Вантаж:" : "Cargo:", string.IsNullOrEmpty(trip.CargoName) ? "-" : trip.CargoName));
-            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Відстань:" : "Distance:", $"{(useMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm):F1} {distUnit}"));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Відстань:" : "Distance:", $"{Math.Floor(useMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm)} {distUnit}"));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Час в дорозі:" : "Duration:", $"{trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}:{trip.Duration.Seconds:D2}"));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Початок:" : "Started:", trip.StartTimeUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Завершено:" : "Completed:", trip.EndTimeUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")));

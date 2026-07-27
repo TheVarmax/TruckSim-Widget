@@ -131,6 +131,7 @@ namespace ETSOverlay
         private const float KmToMiles = 0.621371f;
         private GameType _currentGame = GameType.Unknown;
         private bool _awaitingTelemetryJob = false;
+        private bool _needsLocationCheck = true;
 
         // Рассинхрон
         private int _desyncSeconds = 0;
@@ -203,6 +204,28 @@ namespace ETSOverlay
         public CloudSyncService SyncService { get; private set; }
         private DispatcherTimer _cloudSyncDebounceTimer;
 
+        public class TripState
+        {
+            public DateTime StartTimeUtc { get; set; }
+            public float StartFuel { get; set; }
+            public float LastFuel { get; set; }
+            public float TotalFuelConsumed { get; set; }
+            public double SpeedSumKmh { get; set; }
+            public int SpeedSamples { get; set; }
+            public string Origin { get; set; } = "";
+            public string Destination { get; set; } = "";
+            public string CargoName { get; set; } = "";
+            public ulong Income { get; set; }
+            public string TruckBrand { get; set; } = "";
+            public string TruckName { get; set; } = "";
+            public float PlannedDistKm { get; set; }
+            public bool TrackingActive { get; set; }
+            public float TruckDamage { get; set; }
+            public float TrailerDamage { get; set; }
+            public float CargoDamage { get; set; }
+            public float MaxSpeedKmh { get; set; }
+        }
+
         private class JobState
         {
             public string TelemetryId { get; set; } = "";
@@ -211,6 +234,10 @@ namespace ETSOverlay
             public bool IsRace { get; set; }
             public bool CargoWasLoaded { get; set; }
             public bool TrailerWasAttachedBeforeLoading { get; set; }
+            public double LastLocationX { get; set; }
+            public double LastLocationZ { get; set; }
+            public bool HasLocationWarning { get; set; }
+            public TripState TripData { get; set; } = new();
         }
 
         private class AppState
@@ -311,7 +338,14 @@ namespace ETSOverlay
         public MainWindow()
         {
             InitializeComponent();
-            
+            SpeedLimiterService.Instance.BrakeStateChanged += (isBraking) => 
+            {
+                Dispatcher.InvokeAsync(() => 
+                {
+                    BrakeIcon.Visibility = isBraking ? Visibility.Visible : Visibility.Collapsed;
+                });
+            };
+
             var apiClient = new TruckSimCloudClient();
             SyncService = new CloudSyncService(apiClient);
             
@@ -408,6 +442,8 @@ namespace ETSOverlay
 
                 // 1. Подготовка: скрыть MainUI, показать IntroOverlay
                 MainUI.Opacity = 0;
+                double initialBgOpacity = BackgroundsLayer.Opacity;
+                BackgroundsLayer.Opacity = 0;
                 IntroOverlay.Visibility = Visibility.Visible;
                 IntroOverlay.Opacity = 1;
 
@@ -422,7 +458,9 @@ namespace ETSOverlay
 
                 // 2. Кросс-фейд: исчезает интро, появляется интерфейс
                 var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3));
+                var bgFadeIn = new DoubleAnimation(initialBgOpacity, TimeSpan.FromSeconds(0.3));
                 MainUI.BeginAnimation(OpacityProperty, fadeIn);
+                BackgroundsLayer.BeginAnimation(OpacityProperty, bgFadeIn);
 
                 // Определяем нужна ли анимация высоты (когда IntroOverlay выше MainUI)
                 var introHeight = IntroOverlay.ActualHeight;
@@ -552,6 +590,7 @@ namespace ETSOverlay
                         TruckBrand = _tripTruckBrand,
                         TruckName = _tripTruckName,
                         GameType = _currentGame == GameType.Ats ? "ATS" : "ETS",
+                        HasLocationWarning = _jobStates.TryGetValue(GetJobStateKey(CurrentLastJobId), out var s) ? s.HasLocationWarning : false
                     };
 
                     // Calculate avg fuel consumption (L/100km)
@@ -608,7 +647,11 @@ namespace ETSOverlay
 
             Dispatcher.Invoke(() =>
             {
-                if (!isGameOnline && data.SdkActive) WriteLog("Game telemetry CONNECTED");
+                if (!isGameOnline && data.SdkActive) 
+                {
+                    WriteLog("Game telemetry CONNECTED");
+                    _needsLocationCheck = true;
+                }
                 isGameOnline = data.SdkActive;
                 isPaused = data.Paused;
 
@@ -628,6 +671,11 @@ namespace ETSOverlay
                     int currentSpeed = isPaused ? 0 : (int)Math.Round(Math.Abs(rawSpeed) * (UseMiles ? 2.236936f : 3.6f));
                     SpeedValue.Text = currentSpeed.ToString();
                     ApplySpeedWarningColor(currentSpeed);
+
+                    if (MaxSpeedValue.Text != maxSpeedKmh.ToString())
+                    {
+                        MaxSpeedValue.Text = maxSpeedKmh.ToString();
+                    }
 
                     SpeedLimiterService.Instance.OnSpeedUpdate(rawSpeed, UseMiles);
 
@@ -826,12 +874,13 @@ namespace ETSOverlay
                         if (CurrentLastJobId != resolvedJobId)
                         {
                             WriteLog($"New job detected! (Job changed from '{CurrentLastJobId}' to '{resolvedJobId}'). Resetting cargo flags.");
+                            bool isReallyNewJob = !string.IsNullOrEmpty(CurrentLastJobId);
                             CurrentLastJobId = resolvedJobId;
                             _lastTickOdometer = -1;
                             _cargoLoadedTicks = 0;
                             _trailerWasAttachedBeforeLoading = false;
                             lastPlannedDistance = plannedDist;
-                            LoadOrInitJobState(resolvedJobId, isNewJob: true);
+                            LoadOrInitJobState(resolvedJobId, isNewJob: isReallyNewJob);
                             SaveJobState();
                         }
                         else if (_lastTelemetryJobId != _currentTelemetryJobId || !wasDelivering)
@@ -930,6 +979,25 @@ namespace ETSOverlay
                             // Считаем пройденный путь и обновляем UI только если груз реально подтверждён
                             if (_cargoWasLoaded)
                             {
+                                var currentState = _jobStates[GetJobStateKey(resolvedJobId)];
+                                
+                                if (_needsLocationCheck && (currentState.LastLocationX != 0 || currentState.LastLocationZ != 0))
+                                {
+                                    _needsLocationCheck = false;
+                                    double currentX = data.TruckValues.CurrentValues.PositionValue.Position.X;
+                                    double currentZ = data.TruckValues.CurrentValues.PositionValue.Position.Z;
+                                    double dist = Math.Sqrt(Math.Pow(currentX - currentState.LastLocationX, 2) + Math.Pow(currentZ - currentState.LastLocationZ, 2));
+                                    
+                                    if (dist > 100) // Разница больше 100 метров
+                                    {
+                                        currentState.HasLocationWarning = true;
+                                        WriteLog($"[WARNING] Location jump detected after reconnect. Jump distance: {dist:F1}m");
+                                    }
+                                }
+                                
+                                currentState.LastLocationX = data.TruckValues.CurrentValues.PositionValue.Position.X;
+                                currentState.LastLocationZ = data.TruckValues.CurrentValues.PositionValue.Position.Z;
+
                                 // Считаем пройденный путь дельтами (только пока едем с грузом!)
                                 if (_lastTickOdometer > 0 && currentOdo > _lastTickOdometer)
                                 {
@@ -1010,12 +1078,12 @@ namespace ETSOverlay
                                 // Используем данные от навигатора (advisor) в реальном времени, чтобы итоговый километраж
                                 // обновлялся при перестроении маршрута. Берём пройденное + оставшееся по навигатору.
                                 float remaining = (data.NavigationValues.NavigationDistance / 1000f) * distanceFactor;
-                                int drivenInt = Math.Max(0, (int)Math.Round(jobDrivenDistance));
+                                int drivenInt = Math.Max(0, (int)Math.Floor(jobDrivenDistance));
                                 // totalFromAdvisor — текущее ожидаемое суммарное расстояние (пройдено + оставшееся по навигатору)
                                 float totalFromAdvisor = jobDrivenDistance + remaining;
                                 // На случай, если PlannedDistance из JobValues актуален и больше (редкие случаи), берём максимум
                                 float totalCandidate = Math.Max(totalFromAdvisor, plannedDist);
-                                int totalInt = Math.Max(0, (int)Math.Round(totalCandidate));
+                                int totalInt = Math.Max(0, (int)Math.Floor(totalCandidate));
 
                                 DistanceInfo.Text = uiLanguage == "uk"
                                     ? $"{drivenInt} / {totalInt} {GetDistanceUnitShort()}"
@@ -1725,6 +1793,26 @@ namespace ETSOverlay
             _trailerWasAttachedBeforeLoading = state.TrailerWasAttachedBeforeLoading;
             MaxSpeedValue.Text = maxSpeedKmh.ToString();
             _lastTickOdometer = -1;
+
+            _tripStartTimeUtc = state.TripData.StartTimeUtc;
+            _tripStartFuel = state.TripData.StartFuel;
+            _tripLastFuel = state.TripData.LastFuel;
+            _tripTotalFuelConsumed = state.TripData.TotalFuelConsumed;
+            _tripSpeedSumKmh = state.TripData.SpeedSumKmh;
+            _tripSpeedSamples = state.TripData.SpeedSamples;
+            _tripOrigin = state.TripData.Origin;
+            _tripDestination = state.TripData.Destination;
+            _tripCargoName = state.TripData.CargoName;
+            _tripIncome = state.TripData.Income;
+            _tripTruckBrand = state.TripData.TruckBrand;
+            _tripTruckName = state.TripData.TruckName;
+            _tripPlannedDistKm = state.TripData.PlannedDistKm;
+            _tripTrackingActive = state.TripData.TrackingActive;
+            _tripTruckDamage = state.TripData.TruckDamage;
+            _tripTrailerDamage = state.TripData.TrailerDamage;
+            _tripCargoDamage = state.TripData.CargoDamage;
+            _tripMaxSpeedKmh = state.TripData.MaxSpeedKmh;
+
             // Не вызываем SaveJobState() здесь: не хотим перезаписать CargoWasLoaded=true в файле
             // до того, как телеметрия подтвердит сцепку.
         }
@@ -1776,6 +1864,33 @@ namespace ETSOverlay
                 CargoWasLoaded = _cargoWasLoaded,
                 TrailerWasAttachedBeforeLoading = _trailerWasAttachedBeforeLoading
             };
+
+            if (_jobStates.TryGetValue(stateKey, out var oldState))
+            {
+                jobState.LastLocationX = oldState.LastLocationX;
+                jobState.LastLocationZ = oldState.LastLocationZ;
+                jobState.HasLocationWarning = oldState.HasLocationWarning;
+            }
+
+            jobState.TripData.StartTimeUtc = _tripStartTimeUtc;
+            jobState.TripData.StartFuel = _tripStartFuel;
+            jobState.TripData.LastFuel = _tripLastFuel;
+            jobState.TripData.TotalFuelConsumed = _tripTotalFuelConsumed;
+            jobState.TripData.SpeedSumKmh = _tripSpeedSumKmh;
+            jobState.TripData.SpeedSamples = _tripSpeedSamples;
+            jobState.TripData.Origin = _tripOrigin;
+            jobState.TripData.Destination = _tripDestination;
+            jobState.TripData.CargoName = _tripCargoName;
+            jobState.TripData.Income = _tripIncome;
+            jobState.TripData.TruckBrand = _tripTruckBrand;
+            jobState.TripData.TruckName = _tripTruckName;
+            jobState.TripData.PlannedDistKm = _tripPlannedDistKm;
+            jobState.TripData.TrackingActive = _tripTrackingActive;
+            jobState.TripData.TruckDamage = _tripTruckDamage;
+            jobState.TripData.TrailerDamage = _tripTrailerDamage;
+            jobState.TripData.CargoDamage = _tripCargoDamage;
+            jobState.TripData.MaxSpeedKmh = _tripMaxSpeedKmh;
+
             _jobStates[stateKey] = jobState;
 
             // Сохраняем отдельный файл заказа в папке игры
@@ -1956,6 +2071,9 @@ namespace ETSOverlay
                             _showRoute = state.ShowRoute;
                             _showBottomInfo = state.ShowBottomInfo;
                             windowOpacity = state.WindowOpacity;
+                            isSplitOpacityEnabled = state.IsSplitOpacityEnabled;
+                            backgroundOpacity = state.BackgroundOpacity > 0 ? state.BackgroundOpacity : 0.85;
+                            textOpacity = state.TextOpacity > 0 ? state.TextOpacity : 1.0;
                             _autoHideEnabled = state.AutoHideEnabled;
                             uiLanguage = string.IsNullOrWhiteSpace(state.UiLanguage) ? "en" : state.UiLanguage;
                             if (windowOpacity <= 0 || windowOpacity > 1)
@@ -4331,6 +4449,7 @@ namespace ETSOverlay
             ApplyUIMode(false);
             ApplyScale();
             ApplyAppearance();
+            ApplyDualLayerOpacity();
             UpdateSpeedWarningText();
 
             if (_settingsWindow != null && _settingsWindow.IsLoaded)
