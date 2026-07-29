@@ -125,16 +125,14 @@ namespace ETSOverlay
             }
         }
 
-        private void SplitOpacityToggle_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void BtnSpeedLimiterConfig_Click(object sender, RoutedEventArgs e)
         {
             var license = LicenseManager.Instance;
-            bool isTesterOrAbove = license.Status == "active" && 
-                (license.CurrentPlan == "tester" || license.CurrentPlan == "developer");
-            
-            if (!isTesterOrAbove)
+            if (license.Status != "active")
             {
-                e.Handled = true;
-                ShowToast(_isUk ? "Потрібна ліцензія Tester" : "Requires Tester license");
+                BtnSpeedLimiterConfig.IsChecked = false;
+                if (SpeedLimiterPopup != null) SpeedLimiterPopup.IsOpen = false;
+                ShowToast(_isUk ? "Потрібна ліцензія Supporter" : "Requires Supporter license");
             }
         }
 
@@ -223,6 +221,13 @@ namespace ETSOverlay
         private void SpeedLimiterToggle_Checked(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
+            var license = LicenseManager.Instance;
+            if (license.Status != "active")
+            {
+                SpeedLimiterToggle.IsChecked = false;
+                ShowToast(_isUk ? "Потрібна ліцензія Supporter" : "Requires Supporter license");
+                return;
+            }
             SpeedLimiterService.Instance.IsEnabled = true;
             _mainWindow.SaveStatePublic();
         }
@@ -334,13 +339,7 @@ namespace ETSOverlay
                 BtnManageLicense.Content = _isUk ? "Стати Supporter" : "Become a Supporter";
             }
             
-            bool isTesterOrAbove = licenseManager.Status == "active" && 
-                (licenseManager.CurrentPlan == "tester" || licenseManager.CurrentPlan == "developer");
-            if (!isTesterOrAbove && SplitOpacityToggle != null && SplitOpacityToggle.IsChecked == true)
-            {
-                // Uncheck and trigger uncheck logic programmatically
-                SplitOpacityToggle.IsChecked = false;
-            }
+
 
             SyncGeneralValues();
         }
@@ -417,16 +416,16 @@ namespace ETSOverlay
 
             if (SpeedLimiterPanel != null)
             {
-                bool hasSpeedLimiter = license.HasFeature("speed_limiter");
-                SpeedLimiterPanel.Visibility = hasSpeedLimiter ? Visibility.Visible : Visibility.Collapsed;
-                
-                if (hasSpeedLimiter)
+                SpeedLimiterPanel.Visibility = Visibility.Visible;
+                if (!isSupporter && SpeedLimiterService.Instance.IsEnabled)
                 {
-                    SpeedLimiterToggle.IsChecked = SpeedLimiterService.Instance.IsEnabled;
-                    SpeedLimiterEtsBox.Text = SpeedLimiterService.Instance.SpeedThresholdKmh.ToString();
-                    SpeedLimiterAtsBox.Text = SpeedLimiterService.Instance.SpeedThresholdMph.ToString();
-                    BtnSpeedLimiterKey.Content = SpeedLimiterService.Instance.BrakeKey.ToString();
+                    SpeedLimiterService.Instance.Disable();
                 }
+                
+                SpeedLimiterToggle.IsChecked = SpeedLimiterService.Instance.IsEnabled;
+                SpeedLimiterEtsBox.Text = SpeedLimiterService.Instance.SpeedThresholdKmh.ToString();
+                SpeedLimiterAtsBox.Text = SpeedLimiterService.Instance.SpeedThresholdMph.ToString();
+                BtnSpeedLimiterKey.Content = SpeedLimiterService.Instance.BrakeKey.ToString();
             }
 
             _suppressEvents = false;
@@ -712,7 +711,7 @@ namespace ETSOverlay
             _suppressEvents = true;
             SettingsTitle.Text = isUk ? "НАЛАШТУВАННЯ" : "SETTINGS";
             LanguageLabel.Text = isUk ? "Мова" : "Language";
-            OpacityLabel.Text = isUk ? "🧪 Прозорість (Тестування)" : "🧪 Opacity (Testing)";
+            OpacityLabel.Text = isUk ? "Прозорість" : "Opacity";
             SplitOpacityModeLabel.Text = isUk ? "Роздільний режим" : "Split mode";
             GlobalOpacityLabel.Text = isUk ? "Загальна прозорість" : "Global Opacity";
             BackgroundOpacityLabel.Text = isUk ? "Прозорість фону" : "Background Opacity";
@@ -751,7 +750,7 @@ namespace ETSOverlay
 
             if (SpeedLimiterTitle != null)
             {
-                SpeedLimiterTitle.Text = isUk ? "🧪 Обмежувач швидкості (Тестування)" : "🧪 Speed Limiter (Testing)";
+                SpeedLimiterTitle.Text = isUk ? "Обмежувач швидкості" : "Speed Limiter";
                 SpeedLimiterEnableLabel.Text = isUk ? "Увімкнути обмежувач" : "Enable Limiter";
                 SpeedLimiterEtsLabel.Text = isUk ? "Ліміт ETS2 (км/год)" : "ETS2 Limit (km/h)";
                 SpeedLimiterAtsLabel.Text = isUk ? "Ліміт ATS (миль/год)" : "ATS Limit (mph)";

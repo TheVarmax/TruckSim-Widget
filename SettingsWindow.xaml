@@ -583,7 +583,7 @@
                     </Grid>
                     
                     <!-- Speed Limiter Settings (Premium) -->
-                    <StackPanel x:Name="SpeedLimiterPanel" Visibility="Collapsed" Margin="0,0,0,16">
+                    <StackPanel x:Name="SpeedLimiterPanel" Visibility="Visible" Margin="0,0,0,16">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*"/>
@@ -591,7 +591,7 @@
                             </Grid.ColumnDefinitions>
                             <TextBlock x:Name="SpeedLimiterTitle" Grid.Column="0" Text="Speed Limiter" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
                             
-                            <ToggleButton x:Name="BtnSpeedLimiterConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
+                            <ToggleButton x:Name="BtnSpeedLimiterConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure" Click="BtnSpeedLimiterConfig_Click">
                                 <ToggleButton.Template>
                                     <ControlTemplate TargetType="ToggleButton">
                                         <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
@@ -715,7 +715,7 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <TextBlock x:Name="SplitOpacityModeLabel" Grid.Column="0" Text="Split mode" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
-                                        <ToggleButton x:Name="SplitOpacityToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" PreviewMouseLeftButtonDown="SplitOpacityToggle_PreviewMouseLeftButtonDown" Checked="SplitOpacityToggle_Checked" Unchecked="SplitOpacityToggle_Unchecked" VerticalAlignment="Center"/>
+                                        <ToggleButton x:Name="SplitOpacityToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="SplitOpacityToggle_Checked" Unchecked="SplitOpacityToggle_Unchecked" VerticalAlignment="Center"/>
                                     </Grid>
                                     
                                     <!-- Global Opacity -->
