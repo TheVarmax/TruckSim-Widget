@@ -2696,7 +2696,11 @@ namespace ETSOverlay
 
             double targetBgOpacity = isSplitOpacityEnabled ? backgroundOpacity : windowOpacity;
             
-            if (BackgroundsLayer != null) BackgroundsLayer.Opacity = targetBgOpacity;
+            if (BackgroundsLayer != null) 
+            {
+                BackgroundsLayer.BeginAnimation(OpacityProperty, null);
+                BackgroundsLayer.Opacity = targetBgOpacity;
+            }
 
             if (_headerOverlay != null && _headerOverlayVisible)
             {
