@@ -1122,10 +1122,11 @@ namespace ETSOverlay
             Grid.SetRow(cargoBlock, 1);
             grid.Children.Add(cargoBlock);
 
-            string distUnit = _mainWindow.UseMiles ? (_isUk ? "миль" : "mi") : (_isUk ? "км" : "km");
+            bool useMiles = trip.GameType == "ATS";
+            string distUnit = useMiles ? (_isUk ? "миль" : "mi") : (_isUk ? "км" : "km");
             var statsBlock = new TextBlock
             {
-                Text = $"{Math.Floor(_mainWindow.UseMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm)} {distUnit}  •  {trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}  •  {trip.EndTimeUtc.ToLocalTime():dd.MM.yyyy HH:mm}",
+                Text = $"{trip.GameType}  •  {Math.Floor(useMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm)} {distUnit}  •  {trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}  •  {trip.EndTimeUtc.ToLocalTime():dd.MM.yyyy HH:mm}",
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98")),
                 FontSize = 11
             };
