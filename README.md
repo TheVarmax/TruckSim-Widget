@@ -112,6 +112,7 @@ Support TruckSim Widget development and unlock additional functionality.
 - 🎨 Custom UI Mode
 - 📖 Unlimited Trip Logbook
 - 📊 Advanced trip statistics
+- 🛡️ Smart Braking Assistant
 - Future Supporter-exclusive features
 
 ### 🫥 Auto-hide
@@ -129,6 +130,14 @@ Choose between **Full** and **Minimal** layouts, adjust opacity and scale, and p
 ### ⚠️ Speed warnings
 
 Set a speed warning threshold and receive a clear visual indication when you exceed it.
+
+### 🛡️ Smart Braking Assistant *(Supporters Exclusive)*
+
+Automatically helps maintain your TrucksBook **Real** category by reducing speed when the configured braking threshold is reached.
+
+- Fully configurable braking threshold.
+- Default threshold: **98 km/h for ETS2** and **78 mph for ATS**.
+- Helps prevent accidental speeding during deliveries.
 
 ### 🌍 English and Ukrainian
 
@@ -160,6 +169,7 @@ Supporter subscriptions unlock additional convenience features while keeping all
 | Extended trip statistics | ❌ | ✅ |
 | Custom UI Mode | ❌ | ✅ |
 | Cloud Sync | ❌ | ✅ |
+| Smart Braking Assistant | ❌ | ✅ |
 
 ### Trip Logbook information
 
