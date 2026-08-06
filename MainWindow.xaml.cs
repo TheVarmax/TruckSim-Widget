@@ -72,6 +72,10 @@ namespace ETSOverlay
         private string _tripDestination = "";
         private string _tripCargoName = "";
         private ulong _tripIncome;
+        private long _tripFinesTotal = 0;
+        private List<TripFine> _tripFines = new();
+        private bool _pendingDeliveryData = false;
+        private bool _pendingFineData = false;
         private string _tripTruckBrand = "";
         private string _tripTruckName = "";
         private float _tripPlannedDistKm;
@@ -221,6 +225,8 @@ namespace ETSOverlay
             public string Destination { get; set; } = "";
             public string CargoName { get; set; } = "";
             public ulong Income { get; set; }
+            public long FinesTotal { get; set; }
+            public List<TripFine> Fines { get; set; } = new();
             public string TruckBrand { get; set; } = "";
             public string TruckName { get; set; } = "";
             public float PlannedDistKm { get; set; }
@@ -391,6 +397,7 @@ namespace ETSOverlay
             telemetry.JobStarted += Telemetry_JobStarted;
             telemetry.JobCancelled += Telemetry_JobCancelled;
             telemetry.JobDelivered += Telemetry_JobDelivered;
+            telemetry.Fined += Telemetry_Fined;
 
             tbTimer = new DispatcherTimer();
             tbTimer.Interval = TimeSpan.FromSeconds(1);
@@ -554,7 +561,12 @@ namespace ETSOverlay
         {
             WriteLog("[EVENT] Job Delivered fired by telemetry.");
             _jobCancelledOrDeliveredFlag = true;
+            _pendingDeliveryData = true;
+        }
 
+        private void ProcessJobDelivered()
+        {
+            WriteLog($"[DEBUG] ProcessJobDelivered check: _tripTrackingActive={_tripTrackingActive}, _cargoWasLoaded={_cargoWasLoaded}, dist={jobDrivenDistance}, orig={_tripOrigin}, dest={_tripDestination}");
             // Trip Logbook: save completed trip
             if (_tripTrackingActive && _cargoWasLoaded && jobDrivenDistance > 0
                 && !string.IsNullOrWhiteSpace(_tripOrigin)
@@ -579,6 +591,8 @@ namespace ETSOverlay
                         TrailerDamagePercent = _tripTrailerDamage * 100f,
                         CargoDamagePercent = _tripCargoDamage * 100f,
                         Income = _tripIncome,
+                        FinesTotal = _tripFinesTotal,
+                        Fines = new List<TripFine>(_tripFines),
                         TruckBrand = _tripTruckBrand,
                         TruckName = _tripTruckName,
                         GameType = _currentGame == GameType.Ats ? "ATS" : "ETS",
@@ -605,6 +619,12 @@ namespace ETSOverlay
                 _deliveredIndicatorUntil = DateTime.Now.AddSeconds(15);
                 UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), true);
             });
+        }
+
+        private void Telemetry_Fined(object? sender, EventArgs e)
+        {
+            WriteLog("[EVENT] Fined fired by telemetry.");
+            _pendingFineData = true;
         }
 
         // Метод для записи логов
@@ -635,6 +655,45 @@ namespace ETSOverlay
         private void Telemetry_Data(SCSTelemetry data, bool updated)
         {
             lastTelemetryUpdate = DateTime.Now;
+
+            // Process pending events before the update check
+            if (_pendingDeliveryData)
+            {
+                _pendingDeliveryData = false;
+                Dispatcher.Invoke(() =>
+                {
+                    if (data.GamePlay.JobDelivered.Revenue > 0)
+                    {
+                        _tripIncome = (ulong)data.GamePlay.JobDelivered.Revenue;
+                        WriteLog($"[EVENT] Job Delivered revenue updated from telemetry: {_tripIncome}");
+                    }
+                    try
+                    {
+                        ProcessJobDelivered();
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteLog($"[ERROR] Exception in ProcessJobDelivered: {ex}");
+                    }
+                });
+            }
+
+            if (_pendingFineData)
+            {
+                _pendingFineData = false;
+                Dispatcher.Invoke(() =>
+                {
+                    if (data.GamePlay.FinedEvent.Amount > 0)
+                    {
+                        var fine = new TripFine { Amount = data.GamePlay.FinedEvent.Amount, Offence = data.GamePlay.FinedEvent.Offence.ToString() };
+                        _tripFines.Add(fine);
+                        _tripFinesTotal += fine.Amount;
+                        WriteLog($"[EVENT] Fined processed: {fine.Offence}, amount: {fine.Amount}");
+                        if (jobDrivenDistance > 0) SaveJobState();
+                    }
+                });
+            }
+
             if (!updated) return;
 
             Dispatcher.Invoke(() =>
@@ -854,7 +913,6 @@ namespace ETSOverlay
                             if (jobDrivenDistance > 0) SaveJobState();
                             ClearJobUI();
                         }
-                        maxSpeedKmh = 0;
                         MaxSpeedValue.Text = "0";
                         UpdateDeliveryTypeUI(0);
                         _lastTickOdometer = -1;
@@ -966,6 +1024,8 @@ namespace ETSOverlay
                                     _tripTrailerDamage = 0f;
                                     _tripCargoDamage = 0f;
                                     _tripMaxSpeedKmh = 0f;
+                                    _tripFinesTotal = 0;
+                                    _tripFines.Clear();
                                     
                                     // Determine play mode
                                     bool isTruckersMP = false;
@@ -1109,9 +1169,10 @@ namespace ETSOverlay
                                 // обновлялся при перестроении маршрута. Берём пройденное + оставшееся по навигатору.
                                 float remaining = (data.NavigationValues.NavigationDistance / 1000f) * distanceFactor;
                                 int drivenInt = Math.Max(0, (int)Math.Floor(jobDrivenDistance));
-                                // Общий километраж должен быть независимым (использовать запланированную дистанцию).
-                                // Если PlannedDistance недоступна (например, WoT), используем текущую оценку.
-                                float totalCandidate = plannedDist > 0 ? plannedDist : (jobDrivenDistance + remaining);
+                                // Общий километраж теперь динамический: Пройдено + Осталось по навигатору.
+                                // Это позволяет общему километражу изменяться, если игрок ставит свои точки GPS (вейпоинты).
+                                // Если навигатор выключен (remaining == 0), используем plannedDist как запасной вариант.
+                                float totalCandidate = remaining > 0 ? (jobDrivenDistance + remaining) : Math.Max(plannedDist, jobDrivenDistance);
                                 int totalInt = Math.Max(0, (int)Math.Floor(totalCandidate));
 
                                 DistanceInfo.Text = uiLanguage == "uk"
@@ -1848,6 +1909,8 @@ namespace ETSOverlay
             _tripCargoDamage = state.TripData.CargoDamage;
             _tripMaxSpeedKmh = state.TripData.MaxSpeedKmh;
             _tripPlayMode = state.TripData.PlayMode;
+            _tripFinesTotal = state.TripData.FinesTotal;
+            _tripFines = new List<TripFine>(state.TripData.Fines);
 
             // Не вызываем SaveJobState() здесь: не хотим перезаписать CargoWasLoaded=true в файле
             // до того, как телеметрия подтвердит сцепку.
@@ -1927,6 +1990,8 @@ namespace ETSOverlay
             jobState.TripData.CargoDamage = _tripCargoDamage;
             jobState.TripData.MaxSpeedKmh = _tripMaxSpeedKmh;
             jobState.TripData.PlayMode = _tripPlayMode;
+            jobState.TripData.FinesTotal = _tripFinesTotal;
+            jobState.TripData.Fines = new List<TripFine>(_tripFines);
 
             _jobStates[stateKey] = jobState;
 

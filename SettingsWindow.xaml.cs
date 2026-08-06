@@ -1219,6 +1219,7 @@ namespace ETSOverlay
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Пошкодження причепа:" : "Trailer Damage:", isSupporter ? $"{trip.TrailerDamagePercent:F1}%" : "🔒 •••••", !isSupporter));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Пошкодження вантажу:" : "Cargo Damage:", isSupporter ? $"{trip.CargoDamagePercent:F1}%" : "🔒 •••••", !isSupporter));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Вантажівка:" : "Truck:", isSupporter ? $"{trip.TruckBrand} {trip.TruckName}" : "🔒 •••••", !isSupporter));
+            LogbookDetailPanel.Children.Add(CreateFinesDetailRow(_isUk ? "Штрафи:" : "Fines:", "🔒 •••••", !isSupporter, trip));
 
             LogbookExportGrid.Visibility = isSupporter ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -1253,6 +1254,253 @@ namespace ETSOverlay
 
             return grid;
         }
+
+        private UIElement CreateFinesDetailRow(string labelText, string lockedValue, bool isLocked, TripRecord trip)
+        {
+            var grid = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(175) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var label = new TextBlock
+            {
+                Text = labelText,
+                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B0B0B0")),
+                FontSize = 13,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            Grid.SetColumn(label, 0);
+            grid.Children.Add(label);
+
+            var valPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+
+            var valBlock = new TextBlock
+            {
+                Text = isLocked ? lockedValue : (trip.FinesTotal.HasValue ? $"€{trip.FinesTotal.Value:N0}" : "-"),
+                Foreground = isLocked ? new SolidColorBrush((Color)ColorConverter.ConvertFromString("#8A8F98")) : Brushes.White,
+                FontSize = 13,
+                FontWeight = isLocked ? FontWeights.Normal : FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            valPanel.Children.Add(valBlock);
+
+            if (!isLocked && trip.Fines != null && trip.Fines.Count > 0)
+            {
+                var btnTemplate = new ControlTemplate(typeof(Button));
+                var border = new FrameworkElementFactory(typeof(Border));
+                border.SetResourceReference(Border.BackgroundProperty, "HeaderButtonBackgroundBrush");
+                border.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+                border.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
+                border.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+
+                var contentPresenter = new FrameworkElementFactory(typeof(ContentPresenter));
+                contentPresenter.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+                contentPresenter.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+                border.AppendChild(contentPresenter);
+                btnTemplate.VisualTree = border;
+
+                var btn = new Button
+                {
+                    Content = _isUk ? "Деталі" : "Details",
+                    Margin = new Thickness(14, 0, 0, 0),
+                    Padding = new Thickness(12, 4, 12, 4),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Cursor = Cursors.Hand,
+                    Template = btnTemplate
+                };
+                btn.SetResourceReference(Button.ForegroundProperty, "MainTextBrush");
+                btn.Click += (s, e) => ShowFinesWindow(trip.Fines);
+                valPanel.Children.Add(btn);
+            }
+
+            Grid.SetColumn(valPanel, 1);
+            grid.Children.Add(valPanel);
+
+            return grid;
+        }
+
+        private string TranslateOffence(string offence)
+        {
+            if (!_isUk) return offence;
+
+            return offence switch
+            {
+                "Crash" => "ДТП",
+                "Avoid_sleeping" => "Ігнорування сну",
+                "Wrong_way" => "Рух зустрічною смугою",
+                "Speeding_camera" => "Перевищення швидкості (камера)",
+                "No_lights" => "Вимкнені фари",
+                "Red_signal" => "Проїзд на червоне світло",
+                "Avoid_weighting" => "Ухилення від зважування",
+                "Speeding" => "Перевищення швидкості",
+                "Illegal_trailer" => "Нелегальний причіп",
+                "Avoid_Inspection" => "Ухилення від перевірки",
+                "Illegal_Border_Crossing" => "Нелегальний перетин кордону",
+                "Hard_Shoulder_Violation" => "Рух узбіччям",
+                "Damaged_Vehicle_Usage" => "Експлуатація пошкодженого ТЗ",
+                "Generic" => "Інше",
+                _ => offence
+            };
+        }
+
+        private void ShowFinesWindow(List<TripFine> fines)
+        {
+            var win = new Window
+            {
+                Title = _isUk ? "Штрафи" : "Fines",
+                Width = 350,
+                SizeToContent = SizeToContent.Height,
+                WindowStyle = WindowStyle.None,
+                AllowsTransparency = true,
+                Background = Brushes.Transparent,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = Window.GetWindow(this),
+                ShowInTaskbar = false
+            };
+
+            var mainBorder = new Border
+            {
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(20),
+                Margin = new Thickness(15)
+            };
+            mainBorder.SetResourceReference(Border.BackgroundProperty, "CardBackgroundBrush");
+            mainBorder.Effect = new System.Windows.Media.Effects.DropShadowEffect
+            {
+                Color = Colors.Black,
+                BlurRadius = 20,
+                Opacity = 0.5,
+                Direction = 270,
+                ShadowDepth = 4
+            };
+
+            var grid = new Grid();
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Title
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Table Scroll
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Button
+
+            var title = new TextBlock
+            {
+                Text = (_isUk ? "ШТРАФИ" : "FINES").ToUpper(),
+                FontWeight = FontWeights.Bold,
+                FontSize = 14,
+                Margin = new Thickness(0, 0, 0, 15)
+            };
+            title.SetResourceReference(TextBlock.ForegroundProperty, "MainTextBrush");
+            Grid.SetRow(title, 0);
+            grid.Children.Add(title);
+
+            var scrollViewer = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                MaxHeight = 350,
+                Margin = new Thickness(0, 0, 0, 20)
+            };
+
+            var tableGrid = new Grid();
+            tableGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            tableGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            for (int i = 0; i < fines.Count; i++)
+            {
+                tableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                
+                var offenceText = new TextBlock
+                {
+                    Text = TranslateOffence(fines[i].Offence),
+                    FontSize = 13,
+                    Margin = new Thickness(0, 0, 15, 6)
+                };
+                offenceText.SetResourceReference(TextBlock.ForegroundProperty, "MainTextBrush");
+                Grid.SetRow(offenceText, i);
+                Grid.SetColumn(offenceText, 0);
+                tableGrid.Children.Add(offenceText);
+
+                var amountText = new TextBlock
+                {
+                    Text = $"€{fines[i].Amount:N0}",
+                    FontSize = 13,
+                    FontWeight = FontWeights.SemiBold,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(0, 0, 0, 6)
+                };
+                amountText.SetResourceReference(TextBlock.ForegroundProperty, "MainTextBrush");
+                Grid.SetRow(amountText, i);
+                Grid.SetColumn(amountText, 1);
+                tableGrid.Children.Add(amountText);
+            }
+
+            tableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var separator = new Border { Height = 1, Margin = new Thickness(0, 4, 0, 10) };
+            separator.SetResourceReference(Border.BackgroundProperty, "CardBorderBrush");
+            Grid.SetRow(separator, fines.Count);
+            Grid.SetColumnSpan(separator, 2);
+            tableGrid.Children.Add(separator);
+
+            tableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var totalLabel = new TextBlock
+            {
+                Text = _isUk ? "Всього:" : "Total:",
+                FontSize = 13,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 15, 0)
+            };
+            totalLabel.SetResourceReference(TextBlock.ForegroundProperty, "MainTextBrush");
+            Grid.SetRow(totalLabel, fines.Count + 1);
+            Grid.SetColumn(totalLabel, 0);
+            tableGrid.Children.Add(totalLabel);
+
+            var totalAmount = new TextBlock
+            {
+                Text = $"€{fines.Sum(f => f.Amount):N0}",
+                FontSize = 13,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Right
+            };
+            totalAmount.SetResourceReference(TextBlock.ForegroundProperty, "MainTextBrush");
+            Grid.SetRow(totalAmount, fines.Count + 1);
+            Grid.SetColumn(totalAmount, 1);
+            tableGrid.Children.Add(totalAmount);
+
+            scrollViewer.Content = tableGrid;
+            Grid.SetRow(scrollViewer, 1);
+            grid.Children.Add(scrollViewer);
+
+            var okBtnTemplate = new ControlTemplate(typeof(Button));
+            var okBorder = new FrameworkElementFactory(typeof(Border));
+            okBorder.SetResourceReference(Border.BackgroundProperty, "HeaderButtonBackgroundBrush");
+            okBorder.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+            okBorder.SetResourceReference(Border.BorderBrushProperty, "CardBorderBrush");
+            okBorder.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+
+            var okContent = new FrameworkElementFactory(typeof(ContentPresenter));
+            okContent.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            okContent.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            okBorder.AppendChild(okContent);
+            okBtnTemplate.VisualTree = okBorder;
+
+            var btnOk = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                Height = 30,
+                Cursor = Cursors.Hand,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Template = okBtnTemplate
+            };
+            btnOk.SetResourceReference(Button.ForegroundProperty, "MainTextBrush");
+            btnOk.Click += (s, e) => win.Close();
+            
+            Grid.SetRow(btnOk, 2);
+            grid.Children.Add(btnOk);
+
+            mainBorder.Child = grid;
+            win.Content = mainBorder;
+
+            win.MouseLeftButtonDown += (s, e) => win.DragMove();
+
+            win.ShowDialog();
+        }
+
 
         private void BtnLogbookBack_Click(object sender, RoutedEventArgs e)
         {

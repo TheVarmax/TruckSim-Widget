@@ -54,7 +54,17 @@ namespace ETSOverlay
             }
 
             BtnYes.Content = yesText;
-            BtnNo.Content = noText;
+            if (string.IsNullOrEmpty(noText))
+            {
+                BtnNo.Visibility = Visibility.Collapsed;
+                // Center the Yes button if it's the only one
+                BtnYes.Margin = new Thickness(0);
+                ButtonsPanel.HorizontalAlignment = HorizontalAlignment.Center;
+            }
+            else
+            {
+                BtnNo.Content = noText;
+            }
 
             MouseLeftButtonDown += (s, e) => { DragMove(); };
         }

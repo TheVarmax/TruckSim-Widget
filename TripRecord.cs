@@ -4,6 +4,12 @@ using System.Text.Json.Serialization;
 
 namespace ETSOverlay
 {
+    public class TripFine
+    {
+        public long Amount { get; set; }
+        public string Offence { get; set; } = "";
+    }
+
     public class TripRecord
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
@@ -34,6 +40,8 @@ namespace ETSOverlay
         public float TrailerDamagePercent { get; set; }
         public float CargoDamagePercent { get; set; }
         public ulong Income { get; set; }
+        public long? FinesTotal { get; set; }
+        public List<TripFine> Fines { get; set; } = new();
         public string TruckBrand { get; set; } = "";
         public string TruckName { get; set; } = "";
 
