@@ -1320,7 +1320,7 @@ namespace ETSOverlay
 
         private string TranslateOffence(string offence)
         {
-            if (!_isUk) return offence;
+            if (!_isUk) return offence.Replace("_", " ");
 
             return offence switch
             {
@@ -1338,7 +1338,7 @@ namespace ETSOverlay
                 "Hard_Shoulder_Violation" => "Рух узбіччям",
                 "Damaged_Vehicle_Usage" => "Експлуатація пошкодженого ТЗ",
                 "Generic" => "Інше",
-                _ => offence
+                _ => offence.Replace("_", " ")
             };
         }
 
