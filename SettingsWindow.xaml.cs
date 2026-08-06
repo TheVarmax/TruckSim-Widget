@@ -760,7 +760,8 @@ namespace ETSOverlay
             // Cloud Tab localization
             TabCloudBtn.Content = isUk ? "Хмара" : "Cloud";
             TabLogbookBtn.Content = isUk ? "Журнал" : "Logbook";
-            CloudSyncTitle.Text = isUk ? "Хмарна синхронізація" : "Cloud Sync";
+            
+            CloudSyncTitle.Text = isUk ? "Хмарна Синхронізація" : "Cloud Sync";
             CloudStatusLabel.Text = isUk ? "Статус:" : "Status:";
             CloudEnableLabel.Text = isUk ? "Увімкнути хмарну синхронізацію" : "Enable Cloud Sync";
             CloudSyncHint.Text = isUk
@@ -1102,7 +1103,7 @@ namespace ETSOverlay
             
             var routeBlock = new TextBlock
             {
-                Text = $"{_mainWindow.GetLocalizedCity(trip.Origin).ToUpper()} → {_mainWindow.GetLocalizedCity(trip.Destination).ToUpper()}",
+                Text = $"{_mainWindow.GetLocalizedCity(trip.Origin, trip.GameType).ToUpper()} → {_mainWindow.GetLocalizedCity(trip.Destination, trip.GameType).ToUpper()}",
                 Foreground = (Brush)FindResource("AccentColorBrush"),
                 FontWeight = FontWeights.SemiBold,
                 FontSize = 13,
@@ -1180,13 +1181,23 @@ namespace ETSOverlay
             }
             
             // Free tier details
-            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Маршрут:" : "Route:", $"{_mainWindow.GetLocalizedCity(trip.Origin)} → {_mainWindow.GetLocalizedCity(trip.Destination)}"));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Маршрут:" : "Route:", $"{_mainWindow.GetLocalizedCity(trip.Origin, trip.GameType)} → {_mainWindow.GetLocalizedCity(trip.Destination, trip.GameType)}"));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Вантаж:" : "Cargo:", string.IsNullOrEmpty(trip.CargoName) ? "-" : trip.CargoName));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Відстань:" : "Distance:", $"{Math.Floor(useMiles ? trip.DistanceKm * 0.621371f : trip.DistanceKm)} {distUnit}"));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Час в дорозі:" : "Duration:", $"{trip.Duration.Hours:D2}:{trip.Duration.Minutes:D2}:{trip.Duration.Seconds:D2}"));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Початок:" : "Started:", trip.StartTimeUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")));
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Завершено:" : "Completed:", trip.EndTimeUtc.ToLocalTime().ToString("dd.MM.yyyy HH:mm:ss")));
+            string displayMode = trip.PlayMode;
+            if (string.IsNullOrEmpty(displayMode)) displayMode = "-";
+            else if (_isUk)
+            {
+                if (displayMode == "Singleplayer") displayMode = "Одиночна гра";
+                else if (displayMode == "Convoy") displayMode = "Конвой";
+                // TruckersMP stays as is
+            }
+
             LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Гра:" : "Game:", trip.GameType));
+            LogbookDetailPanel.Children.Add(CreateDetailRow(_isUk ? "Режим:" : "Play Mode:", displayMode));
 
             string speedUnit = useMiles ? (_isUk ? "миль/год" : "mph") : (_isUk ? "км/год" : "km/h");
             

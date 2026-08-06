@@ -80,9 +80,11 @@ namespace ETSOverlay
         private float _tripTrailerDamage;
         private float _tripCargoDamage;
         private float _tripMaxSpeedKmh = 0f;
+        private string _tripPlayMode = "";
         private int _navZeroTicks = 0; // Для отслеживания сброса GPS-маршрута
         private int _navPositiveTicks = 0; // Для отслеживания возврата GPS-маршрута
         private float _lastValidNavDist = 0; // Для отслеживания внезапного обрыва маршрута
+        private float _lastNavDistWithTrailer = -1f; // Расстояние до финиша пока прицеп прицеплен
         private bool _forceProfileUnloaded = false; // Жестко глушим телеметрию, если вышли из профиля
         private int _lastDeliveredLogIndex = -1; // Для предотвращения спама DELIVERED из логов
         private HashSet<string> _cancelledJobs = new(); // Хранит отменённые заказы, чтобы багнутый кэш SDK не воскрешал их после рестарта виджета
@@ -159,8 +161,11 @@ namespace ETSOverlay
         private double backgroundOpacity = 0.85;
         private double textOpacity = 1.0;
         private string uiLanguage = "en";
-        private readonly Dictionary<string, string> _ets2CityTranslations = new(StringComparer.OrdinalIgnoreCase);
-        private readonly Dictionary<string, string> _atsCityTranslations = new(StringComparer.OrdinalIgnoreCase);
+        // City translations: English -> Dictionary<langCode, translatedName>
+        private readonly Dictionary<string, Dictionary<string, string>> _ets2CityTranslations = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, Dictionary<string, string>> _atsCityTranslations = new(StringComparer.OrdinalIgnoreCase);
+
+        public string LastCityExtraction { get; set; } = "Unknown";
 
 
         // Settings window
@@ -224,6 +229,7 @@ namespace ETSOverlay
             public float TrailerDamage { get; set; }
             public float CargoDamage { get; set; }
             public float MaxSpeedKmh { get; set; }
+            public string PlayMode { get; set; } = "";
         }
 
         private class JobState
@@ -278,6 +284,7 @@ namespace ETSOverlay
             public DateTime? CloudSyncUpdatedAt { get; set; } = null;
             public DateTime? LastCloudSyncAttempt { get; set; } = null;
             public string CloudSyncStatus { get; set; } = "";
+            public string LastCityExtraction { get; set; } = "Unknown";
             public bool SpeedLimiterEnabled { get; set; } = false;
             public int SpeedLimiterThresholdKmh { get; set; } = 99;
             public int SpeedLimiterThresholdMph { get; set; } = 79;
@@ -291,15 +298,6 @@ namespace ETSOverlay
             public string LastDeliveredJobId { get; set; } = "";
             public Dictionary<string, JobState> JobStates { get; set; } = new();
             public int SpeedWarning { get; set; }
-        }
-
-        private class CityTranslationEntry
-        {
-            [JsonPropertyName("english")]
-            public string English { get; set; } = "";
-
-            [JsonPropertyName("ukrainian")]
-            public string Ukrainian { get; set; } = "";
         }
 
         private string _currentRouteText = "NOT DEFINED";
@@ -323,16 +321,6 @@ namespace ETSOverlay
                     RouteMultiLineGrid.Visibility = Visibility.Collapsed;
                 }
             }
-        }
-
-
-        private class CityTranslationFile
-        {
-            [JsonPropertyName("ets2")]
-            public List<CityTranslationEntry> Ets2 { get; set; } = new();
-
-            [JsonPropertyName("ats")]
-            public List<CityTranslationEntry> Ats { get; set; } = new();
         }
 
         public MainWindow()
@@ -372,7 +360,10 @@ namespace ETSOverlay
             LoadState();
             LoadGameState(GameType.Ets);
             LoadGameState(GameType.Ats);
+            
             LoadCityTranslations();
+            RunCityTranslationExtraction();
+            
             ResetStartupJobMemory();
             CheckStatusAndProcesses();
             ApplyLocalization();
@@ -575,13 +566,14 @@ namespace ETSOverlay
                     {
                         StartTimeUtc = _tripStartTimeUtc,
                         EndTimeUtc = DateTime.UtcNow,
-                        Origin = _tripOrigin,
-                        Destination = _tripDestination,
+                        Origin = GetLocalizedCity(_tripOrigin),
+                        Destination = GetLocalizedCity(_tripDestination),
                         CargoName = _tripCargoName,
                         DistanceKm = jobDrivenDistance / (UseMiles ? KmToMiles : 1f), // convert back to km
                         Duration = DateTime.UtcNow - _tripStartTimeUtc,
                         AverageSpeedKmh = _tripSpeedSamples > 0 ? (float)(_tripSpeedSumKmh / _tripSpeedSamples) : 0,
                         MaxSpeedKmh = (int)Math.Round(_tripMaxSpeedKmh),
+                        PlayMode = _tripPlayMode,
                         TotalFuelConsumedL = _tripTotalFuelConsumed,
                         TruckDamagePercent = _tripTruckDamage * 100f,
                         TrailerDamagePercent = _tripTrailerDamage * 100f,
@@ -757,10 +749,10 @@ namespace ETSOverlay
                             // If they just arrived at pickup, it's fine, it will recover when they load.
                             hasJobInfo = false;
                         }
-                        else if (_lastValidNavDist > 250f)
+                        else if (_lastValidNavDist > 1000f)
                         {
                             // Phase 3 (already loaded). Only drop to Free Roam if the route abruptly vanished
-                            // while they were far (>250m) from the destination (i.e. cancelled/suspended).
+                            // while they were far (>1000m) from the destination (i.e. cancelled/suspended).
                             hasJobInfo = false;
                         }
 
@@ -776,6 +768,11 @@ namespace ETSOverlay
                     // даже когда Trailer[0] отцеплен от грузовика!
                     bool isTrailerAttached = data.TrailerValues != null && data.TrailerValues.Length > 0 && data.TrailerValues[0].Attached;
                     _isTrailerAttached = isTrailerAttached;
+                    
+                    if (isTrailerAttached)
+                    {
+                        _lastNavDistWithTrailer = data.NavigationValues.NavigationDistance;
+                    }
                     bool rawIsCargoLoaded = data.JobValues.CargoLoaded && isTrailerAttached;
 
                     // Дебаунс: ждём 3 тика подряд, чтобы убедиться, что это не фантомный всплеск при загрузке
@@ -918,10 +915,15 @@ namespace ETSOverlay
                             else
                             {
                                 // ФАЗА 3: Прицеп отцепили / Заказ приостановлен
-                                RouteText = uiLanguage == "uk" ? "ЗАМОВЛЕННЯ ПРИЗУПИНЕНО" : "ORDER SUSPENDED";
-                                DistanceInfo.Text = uiLanguage == "uk" 
-                                    ? "Призупинено" 
-                                    : "Suspended";
+                                if (_lastNavDistWithTrailer > 1000)
+                                {
+                                    RouteText = uiLanguage == "uk" ? "ЗАМОВЛЕННЯ ПРИЗУПИНЕНО" : "ORDER SUSPENDED";
+                                    DistanceInfo.Text = uiLanguage == "uk" ? "Відчеплено" : "Suspended";
+                                }
+                                else
+                                {
+                                    DistanceInfo.Text = uiLanguage == "uk" ? "Здаємо вантаж..." : "Delivering...";
+                                }
                             }
                         }
                         else
@@ -964,6 +966,34 @@ namespace ETSOverlay
                                     _tripTrailerDamage = 0f;
                                     _tripCargoDamage = 0f;
                                     _tripMaxSpeedKmh = 0f;
+                                    
+                                    // Determine play mode
+                                    bool isTruckersMP = false;
+                                    try
+                                    {
+                                        string processName = _currentGame == GameType.Ats ? "amtrucks" : "eurotrucks2";
+                                        var procs = System.Diagnostics.Process.GetProcessesByName(processName);
+                                        if (procs.Length > 0)
+                                        {
+                                            foreach (System.Diagnostics.ProcessModule module in procs[0].Modules)
+                                            {
+                                                if (module.ModuleName != null && (module.ModuleName.Contains("ets2mp") || module.ModuleName.Contains("atsmp")))
+                                                {
+                                                    isTruckersMP = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    catch { /* Access denied or process exited */ }
+
+                                    if (isTruckersMP || System.Diagnostics.Process.GetProcessesByName("TruckersMP").Length > 0 || System.Diagnostics.Process.GetProcessesByName("TruckersMP-Launcher").Length > 0)
+                                        _tripPlayMode = "TruckersMP";
+                                    else if (data.MultiplayerTimeOffset != 0)
+                                        _tripPlayMode = "Convoy";
+                                    else
+                                        _tripPlayMode = "Singleplayer";
+
                                     _tripTrackingActive = true;
                                     WriteLog($"[LOGBOOK] Trip tracking started: {_tripOrigin} -> {_tripDestination}, Cargo: {_tripCargoName}");
 
@@ -1079,10 +1109,9 @@ namespace ETSOverlay
                                 // обновлялся при перестроении маршрута. Берём пройденное + оставшееся по навигатору.
                                 float remaining = (data.NavigationValues.NavigationDistance / 1000f) * distanceFactor;
                                 int drivenInt = Math.Max(0, (int)Math.Floor(jobDrivenDistance));
-                                // totalFromAdvisor — текущее ожидаемое суммарное расстояние (пройдено + оставшееся по навигатору)
-                                float totalFromAdvisor = jobDrivenDistance + remaining;
-                                // На случай, если PlannedDistance из JobValues актуален и больше (редкие случаи), берём максимум
-                                float totalCandidate = Math.Max(totalFromAdvisor, plannedDist);
+                                // Общий километраж должен быть независимым (использовать запланированную дистанцию).
+                                // Если PlannedDistance недоступна (например, WoT), используем текущую оценку.
+                                float totalCandidate = plannedDist > 0 ? plannedDist : (jobDrivenDistance + remaining);
                                 int totalInt = Math.Max(0, (int)Math.Floor(totalCandidate));
 
                                 DistanceInfo.Text = uiLanguage == "uk"
@@ -1163,7 +1192,7 @@ namespace ETSOverlay
 
             if (!isGameRunning)
             {
-                if (isGameOnline || GameStatus.Text != "OFFLINE")
+                if (isGameOnline || (GameStatus.Text != "OFFLINE" && GameStatus.Text != LocalizeStatus("GAME_OFFLINE")))
                 {
                     WriteLog("Game closed or went offline");
                     WriteLog($"Resetting display and game state");
@@ -1653,7 +1682,7 @@ namespace ETSOverlay
             if (!_isTbRunning && _telHasActiveJob) UpdateStatusUI(LocalizeStatus("TB_CLOSED_NO_REC"), Brushes.Red, false);
             else if (_isRecordingBroken && _telHasActiveJob) UpdateStatusUI(LocalizeStatus("NOT_RECORDING"), Brushes.Red, false);
             else if (_awaitingTbResponse || _forceProfileUnloaded) UpdateStatusUI(LocalizeStatus("PROFILE_MENU"), Brushes.Orange, false);
-            else if (isDelivering && _cargoWasLoaded && !_isTrailerAttached) UpdateStatusUI(LocalizeStatus("TRAILER_DETACHED"), Brushes.Red, false);
+            else if (isDelivering && _cargoWasLoaded && !_isTrailerAttached && _lastNavDistWithTrailer > 1000) UpdateStatusUI(LocalizeStatus("TRAILER_DETACHED"), Brushes.Red, false);
             else if (_isDesync) UpdateStatusUI(uiLanguage == "uk" ? "Гра ≠ TB" : "Game ≠ TB", Brushes.Red, false);
             else if (_isRecordingBroken && _telHasJobInfo) UpdateStatusUI(LocalizeStatus("TB_ERROR_CHECK"), Brushes.Red, false);
             else if ((_deliveredIndicatorUntil > DateTime.Now || _deliveredFromLogUntil > DateTime.Now) && isPaused && !_telHasActiveJob) UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), false);
@@ -1661,7 +1690,13 @@ namespace ETSOverlay
             else if (!isDelivering) UpdateStatusUI(LocalizeStatus("FREE_ROAM"), Brushes.White, false);
             else if (isDelivering && !_telHasActiveJob)
             {
-                if (_telHasJobInfo) UpdateStatusUI(LocalizeStatus("DRIVING_TO_PICKUP"), new SolidColorBrush(Color.FromRgb(122, 197, 205)), false);
+                if (_telHasJobInfo)
+                {
+                    if (_cargoWasLoaded && !_isTrailerAttached && _lastNavDistWithTrailer <= 1000)
+                        UpdateStatusUI(uiLanguage == "uk" ? "Здаємо вантаж..." : "Delivering...", Brushes.Orange, false);
+                    else
+                        UpdateStatusUI(LocalizeStatus("DRIVING_TO_PICKUP"), new SolidColorBrush(Color.FromRgb(122, 197, 205)), false);
+                }
                 else UpdateStatusUI(LocalizeStatus("WAIT_TB"), Brushes.Orange, false);
             }
             else if (isPaused && _telHasActiveJob) UpdateStatusUI(uiLanguage == "uk" ? "ПАУЗА (Меню)" : "PAUSED (Menu)", Brushes.Yellow, false);
@@ -1812,6 +1847,7 @@ namespace ETSOverlay
             _tripTrailerDamage = state.TripData.TrailerDamage;
             _tripCargoDamage = state.TripData.CargoDamage;
             _tripMaxSpeedKmh = state.TripData.MaxSpeedKmh;
+            _tripPlayMode = state.TripData.PlayMode;
 
             // Не вызываем SaveJobState() здесь: не хотим перезаписать CargoWasLoaded=true в файле
             // до того, как телеметрия подтвердит сцепку.
@@ -1890,6 +1926,7 @@ namespace ETSOverlay
             jobState.TripData.TrailerDamage = _tripTrailerDamage;
             jobState.TripData.CargoDamage = _tripCargoDamage;
             jobState.TripData.MaxSpeedKmh = _tripMaxSpeedKmh;
+            jobState.TripData.PlayMode = _tripPlayMode;
 
             _jobStates[stateKey] = jobState;
 
@@ -2252,6 +2289,8 @@ namespace ETSOverlay
             if (_settingsWindow == null)
             {
                 _settingsWindow = new SettingsWindow(this);
+                _settingsWindow.Owner = this;
+                _settingsWindow.Topmost = this.Topmost;
                 _settingsWindow.SetUIMode(_uiMode);
                 _settingsWindow.SetOpacity(windowOpacity * 100, isSplitOpacityEnabled, backgroundOpacity * 100, textOpacity * 100);
                 _settingsWindow.SetLanguage(uiLanguage);
@@ -3106,41 +3145,42 @@ namespace ETSOverlay
             return $"0 / 0 {GetDistanceUnitShort()}";
         }
 
-        private void LoadCityTranslations()
+        public void LoadCityTranslations()
         {
             try
             {
-                var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "city_translations_uk.json");
-                if (!File.Exists(path))
+                // Try new multi-language format first (auto-extracted from game files)
+                var newPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Resources", "city_translations.json");
+                if (File.Exists(newPath))
                 {
-                    WriteLog($"City translations not found: {path}");
-                    return;
-                }
+                    var json = File.ReadAllText(newPath);
+                    var data = JsonSerializer.Deserialize<CityTranslationExtractor.MultiLangTranslationFile>(json,
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-                var json = File.ReadAllText(path);
-                var data = JsonSerializer.Deserialize<CityTranslationFile>(json);
-                if (data == null)
-                {
-                    WriteLog("City translations file is empty or invalid.");
-                    return;
-                }
-
-                _ets2CityTranslations.Clear();
-                _atsCityTranslations.Clear();
-
-                foreach (var entry in data.Ets2)
-                {
-                    if (!string.IsNullOrWhiteSpace(entry.English) && !string.IsNullOrWhiteSpace(entry.Ukrainian))
+                    if (data != null)
                     {
-                        _ets2CityTranslations[entry.English] = entry.Ukrainian;
-                    }
-                }
+                        _ets2CityTranslations.Clear();
+                        _atsCityTranslations.Clear();
 
-                foreach (var entry in data.Ats)
-                {
-                    if (!string.IsNullOrWhiteSpace(entry.English) && !string.IsNullOrWhiteSpace(entry.Ukrainian))
-                    {
-                        _atsCityTranslations[entry.English] = entry.Ukrainian;
+                        foreach (var (englishName, langDict) in data.Ets2)
+                        {
+                            if (!string.IsNullOrWhiteSpace(englishName) && langDict.Count > 0)
+                            {
+                                _ets2CityTranslations[englishName] = new Dictionary<string, string>(langDict, StringComparer.OrdinalIgnoreCase);
+                            }
+                        }
+
+                        foreach (var (englishName, langDict) in data.Ats)
+                        {
+                            if (!string.IsNullOrWhiteSpace(englishName) && langDict.Count > 0)
+                            {
+                                _atsCityTranslations[englishName] = new Dictionary<string, string>(langDict, StringComparer.OrdinalIgnoreCase);
+                            }
+                        }
+
+                        int totalCities = _ets2CityTranslations.Count + _atsCityTranslations.Count;
+                        WriteLog($"Loaded {totalCities} city translations from auto-extracted file.");
+                        return;
                     }
                 }
             }
@@ -3150,24 +3190,67 @@ namespace ETSOverlay
             }
         }
 
-        public string GetLocalizedCity(string? city)
+        /// <summary>
+        /// Run city translation extraction from game files in background.
+        /// </summary>
+        public void RunCityTranslationExtraction(string? ets2Path = null, string? atsPath = null)
+        {
+            Task.Run(() =>
+            {
+                var outputPath = CityTranslationExtractor.GetDefaultOutputPath();
+                WriteLog("[EXTRACTOR] Starting city translation extraction from game files...");
+
+                var result = CityTranslationExtractor.Extract(ets2Path, atsPath, outputPath, msg => WriteLog($"[EXTRACTOR] {msg}"));
+
+                if (result.Success)
+                {
+                    WriteLog($"[EXTRACTOR] Done! ETS2: {result.Ets2CityCount} cities, ATS: {result.AtsCityCount} cities, Languages: {result.LanguageCount}");
+                    Dispatcher.Invoke(() => 
+                    {
+                        LastCityExtraction = DateTime.Now.ToString("dd.MM.yyyy HH:mm");
+                        SaveStatePublic();
+                        LoadCityTranslations();
+                    });
+                }
+                else
+                {
+                    WriteLog($"[EXTRACTOR] Failed: {result.ErrorMessage}");
+                }
+            });
+        }
+
+        public string GetLocalizedCity(string? city, string? gameType = null)
         {
             if (string.IsNullOrWhiteSpace(city)) return city ?? string.Empty;
 
             var translations = _currentGame == GameType.Ats ? _atsCityTranslations : _ets2CityTranslations;
+            if (gameType == "ATS") translations = _atsCityTranslations;
+            else if (gameType == "ETS") translations = _ets2CityTranslations;
 
-            if (uiLanguage == "uk")
+            if (uiLanguage != "en" && translations.TryGetValue(city, out var langDict))
             {
-                // Attempt to find the Ukrainian translation for the given English city (case-insensitive key match)
-                var pair = translations.FirstOrDefault(x => x.Key.Equals(city, StringComparison.OrdinalIgnoreCase));
-                return pair.Value != null ? pair.Value : city;
+                // Try to find translation for the current UI language
+                if (langDict.TryGetValue(uiLanguage, out var translated) && !string.IsNullOrWhiteSpace(translated))
+                {
+                    return translated;
+                }
             }
-            else
+
+            // If UI language is English, or no translation found, try reverse lookup
+            // (in case the city name is already in a translated form)
+            if (uiLanguage == "en")
             {
-                // Attempt to find the English original for the given Ukrainian city (case-insensitive value match)
-                var pair = translations.FirstOrDefault(x => x.Value.Equals(city, StringComparison.OrdinalIgnoreCase));
-                return pair.Key != null ? pair.Key : city;
+                foreach (var (englishName, langDict2) in translations)
+                {
+                    foreach (var (_, translatedName) in langDict2)
+                    {
+                        if (translatedName.Equals(city, StringComparison.OrdinalIgnoreCase))
+                            return englishName;
+                    }
+                }
             }
+
+            return city;
         }
 
         private string GetJobStateKey(string jobId)
@@ -3389,7 +3472,8 @@ namespace ETSOverlay
 
         public void BtnClose_Click(object? sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            try { SaveState(); telemetry?.Dispose(); } catch { }
+            Environment.Exit(0);
         }
 
         public void BtnTopmost_Click(object? sender, RoutedEventArgs e)
@@ -3397,6 +3481,11 @@ namespace ETSOverlay
             Topmost = !Topmost;
             UpdatePinIcon();
             SaveState();
+            
+            if (_settingsWindow != null)
+            {
+                _settingsWindow.Topmost = Topmost;
+            }
         }
 
         private void UpdatePinIcon()
@@ -3856,7 +3945,7 @@ namespace ETSOverlay
                 // Сохраняем состояние и сразу закрываем приложение
                 SaveState();
                 telemetry?.Dispose();
-                Application.Current.Shutdown();
+                Environment.Exit(0);
             }
             catch (Exception ex)
             {
@@ -4232,7 +4321,7 @@ namespace ETSOverlay
                 CollapsibleSection.BeginAnimation(OpacityProperty, null);
                 CollapsibleSectionBgs?.BeginAnimation(OpacityProperty, null);
                 CollapsibleSection.BeginAnimation(HeightProperty, null);
-                CollapsibleSectionBgs.BeginAnimation(HeightProperty, null);
+                CollapsibleSectionBgs?.BeginAnimation(HeightProperty, null);
                 CollapsibleSection.Visibility = Visibility.Collapsed;
                 CollapsibleSection.Opacity = 0;
             }

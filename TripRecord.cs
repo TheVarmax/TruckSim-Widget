@@ -39,6 +39,7 @@ namespace ETSOverlay
 
         // Metadata
         public string GameType { get; set; } = ""; // "ETS" or "ATS"
+        public string PlayMode { get; set; } = ""; // "Singleplayer", "Convoy", "TruckersMP", or empty for old trips
         public bool HasLocationWarning { get; set; }
 
         // Future extensibility

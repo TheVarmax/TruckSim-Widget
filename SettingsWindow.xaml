@@ -446,11 +446,11 @@
                     <ColumnDefinition Width="10" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <RadioButton x:Name="TabGeneralBtn" Grid.Column="0" Content="General" Height="30" IsChecked="True" Checked="TabGeneralBtn_Checked" Style="{StaticResource TabButtonStyle}" />
-                <RadioButton x:Name="TabAppearanceBtn" Grid.Column="2" Content="Appearance" Height="30" Checked="TabAppearanceBtn_Checked" Style="{StaticResource TabButtonStyle}" />
-                <RadioButton x:Name="TabCloudBtn" Grid.Column="4" Content="Cloud" Height="30" Checked="TabCloudBtn_Checked" Style="{StaticResource TabButtonStyle}" />
-                <RadioButton x:Name="TabLogbookBtn" Grid.Column="6" Content="Logbook" Height="30" Checked="TabLogbookBtn_Checked" Style="{StaticResource TabButtonStyle}" />
-            </Grid>
+                    <RadioButton x:Name="TabGeneralBtn" Grid.Column="0" Content="General" Height="30" IsChecked="True" Checked="TabGeneralBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                    <RadioButton x:Name="TabAppearanceBtn" Grid.Column="2" Content="Appearance" Height="30" Checked="TabAppearanceBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                    <RadioButton x:Name="TabCloudBtn" Grid.Column="4" Content="Cloud" Height="30" Checked="TabCloudBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                    <RadioButton x:Name="TabLogbookBtn" Grid.Column="6" Content="Logbook" Height="30" Checked="TabLogbookBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                </Grid>
 
             <!-- Tab: General Content -->
             <Grid x:Name="TabGeneralContent" Margin="0,0,0,16" Visibility="Visible">
