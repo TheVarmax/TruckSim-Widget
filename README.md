@@ -141,7 +141,7 @@ Automatically helps maintain your TrucksBook **Real** category by reducing speed
 
 ### 🌍 English and Ukrainian
 
-The interface supports English and Ukrainian. City names can also be translated from English to Ukrainian; this feature is still in beta.
+The interface supports English and Ukrainian. City names can also be translated from English to Ukrainian.
 
 ### 🔄 Automatic updates
 
@@ -308,10 +308,6 @@ If something behaves unexpectedly, use the project website or the Telegram link 
 ---
 
 ## Notes
-
-### City translation
-
-City localization is still in beta. Some city names may be missing or inaccurate because ETS2 and ATS have a large amount of map and DLC content. Coverage is being improved over time.
 
 ### Compatibility
 
