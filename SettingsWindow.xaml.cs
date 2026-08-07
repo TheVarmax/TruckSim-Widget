@@ -1376,6 +1376,7 @@ namespace ETSOverlay
             var grid = new Grid();
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Title
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // Table Scroll
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Separator & Total
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); // Button
 
             var title = new TextBlock
@@ -1393,7 +1394,7 @@ namespace ETSOverlay
             {
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 MaxHeight = 350,
-                Margin = new Thickness(0, 0, 0, 20)
+                Margin = new Thickness(0, 0, 0, 5)
             };
 
             var tableGrid = new Grid();
@@ -1429,14 +1430,22 @@ namespace ETSOverlay
                 tableGrid.Children.Add(amountText);
             }
 
-            tableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            var separator = new Border { Height = 1, Margin = new Thickness(0, 4, 0, 10) };
-            separator.SetResourceReference(Border.BackgroundProperty, "CardBorderBrush");
-            Grid.SetRow(separator, fines.Count);
-            Grid.SetColumnSpan(separator, 2);
-            tableGrid.Children.Add(separator);
+            scrollViewer.Content = tableGrid;
+            Grid.SetRow(scrollViewer, 1);
+            grid.Children.Add(scrollViewer);
 
-            tableGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            var totalGrid = new Grid { Margin = new Thickness(0, 0, 10, 20) };
+            totalGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            totalGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            totalGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            totalGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var separator = new Border { Height = 1, Margin = new Thickness(0, 0, 0, 10) };
+            separator.SetResourceReference(Border.BackgroundProperty, "CardBorderBrush");
+            Grid.SetRow(separator, 0);
+            Grid.SetColumnSpan(separator, 2);
+            totalGrid.Children.Add(separator);
+
             var totalLabel = new TextBlock
             {
                 Text = _isUk ? "Всього:" : "Total:",
@@ -1445,9 +1454,9 @@ namespace ETSOverlay
                 Margin = new Thickness(0, 0, 15, 0)
             };
             totalLabel.SetResourceReference(TextBlock.ForegroundProperty, "MainTextBrush");
-            Grid.SetRow(totalLabel, fines.Count + 1);
+            Grid.SetRow(totalLabel, 1);
             Grid.SetColumn(totalLabel, 0);
-            tableGrid.Children.Add(totalLabel);
+            totalGrid.Children.Add(totalLabel);
 
             var totalAmount = new TextBlock
             {
@@ -1457,13 +1466,12 @@ namespace ETSOverlay
                 HorizontalAlignment = HorizontalAlignment.Right
             };
             totalAmount.SetResourceReference(TextBlock.ForegroundProperty, "MainTextBrush");
-            Grid.SetRow(totalAmount, fines.Count + 1);
+            Grid.SetRow(totalAmount, 1);
             Grid.SetColumn(totalAmount, 1);
-            tableGrid.Children.Add(totalAmount);
+            totalGrid.Children.Add(totalAmount);
 
-            scrollViewer.Content = tableGrid;
-            Grid.SetRow(scrollViewer, 1);
-            grid.Children.Add(scrollViewer);
+            Grid.SetRow(totalGrid, 2);
+            grid.Children.Add(totalGrid);
 
             var okBtnTemplate = new ControlTemplate(typeof(Button));
             var okBorder = new FrameworkElementFactory(typeof(Border));
@@ -1490,7 +1498,7 @@ namespace ETSOverlay
             btnOk.SetResourceReference(Button.ForegroundProperty, "MainTextBrush");
             btnOk.Click += (s, e) => win.Close();
             
-            Grid.SetRow(btnOk, 2);
+            Grid.SetRow(btnOk, 3);
             grid.Children.Add(btnOk);
 
             mainBorder.Child = grid;

@@ -37,7 +37,7 @@
   </ItemGroup>
   <ItemGroup>
     <Reference Include="SCSSdkClient">
-      <HintPath>..\..\..\..\Downloads\release_v_1_12_1\release_v_1_12_1\Demo\SCSSdkClient.dll</HintPath>
+      <HintPath>lib\SCSSdkClient.dll</HintPath>
     </Reference>
   </ItemGroup>
   <Target Name="BuildAndCopyUpdater" AfterTargets="Build;Publish">
