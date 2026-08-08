@@ -428,22 +428,22 @@ namespace ETSOverlay
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
 
+            // Validate license in the background
+            _ = ValidateLicenseOnStartupAsync();
+            LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
+            LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    WriteLog($"License plan: {LicenseManager.Instance.CurrentPlan}");
+                    WriteLog($"License features: {string.Join(", ", features)}");
+                    WriteLog($"Cloud Sync available: {hasCloudSync.ToString().ToLower()}");
+                });
+            };
+            UpdateSupporterVisuals();
+
             Loaded += async (s, e) =>
             {
-                // Validate license in the background
-                _ = ValidateLicenseOnStartupAsync();
-                LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
-                LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
-                {
-                    Dispatcher.Invoke(() =>
-                    {
-                        WriteLog($"License plan: {LicenseManager.Instance.CurrentPlan}");
-                        WriteLog($"License features: {string.Join(", ", features)}");
-                        WriteLog($"Cloud Sync available: {hasCloudSync.ToString().ToLower()}");
-                    });
-                };
-                UpdateSupporterVisuals();
-
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
@@ -2115,11 +2115,17 @@ namespace ETSOverlay
                 LastCloudSyncAttempt = null;
                 CloudSyncStatus = "";
                 
+                // Reset Premium Features
+                SpeedLimiterService.Instance.Disable();
+                SpeedWarningEts = 0;
+                SpeedWarningAts = 0;
+                
                 if (_uiMode == "custom")
                 {
                     OnUIModeChanged("full");
-                    _settingsWindow?.SetUIMode("full");
                 }
+                
+                _settingsWindow?.SyncGeneralValues();
             }
 
             bool isBetaOrDev = LicenseManager.Instance.Status == "active" && 
@@ -2127,10 +2133,12 @@ namespace ETSOverlay
             if (!isBetaOrDev && _uiMode == "hud")
             {
                 OnUIModeChanged("full");
-                _settingsWindow?.SetUIMode("full");
+                _settingsWindow?.SyncGeneralValues();
             }
 
             ApplyAppearance();
+            _settingsWindow?.SyncAppearanceValues();
+            SaveState();
         }
 
         private void SaveState()

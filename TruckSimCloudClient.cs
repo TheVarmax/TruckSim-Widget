@@ -150,7 +150,23 @@ namespace ETSOverlay
             }
             catch { }
 
-            return System.Text.Json.JsonSerializer.Deserialize<LicenseResponse>(rawJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            try
+            {
+                var result = System.Text.Json.JsonSerializer.Deserialize<LicenseResponse>(rawJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (result == null && !response.IsSuccessStatusCode)
+                {
+                    return new LicenseResponse { Success = false, Message = "HTTP Error " + response.StatusCode };
+                }
+                return result;
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                if (!response.IsSuccessStatusCode)
+                {
+                    return new LicenseResponse { Success = false, Message = "HTTP Error " + response.StatusCode };
+                }
+                throw;
+            }
         }
 
         public async Task<LicenseResponse?> DeactivateAsync(LicenseDeactivationRequest request)

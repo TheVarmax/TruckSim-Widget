@@ -394,7 +394,7 @@ namespace ETSOverlay
             _mainWindow.OnAutoHideEnabledChanged(false);
         }
 
-        private void SyncGeneralValues()
+        public void SyncGeneralValues()
         {
             if (_mainWindow == null || UIModeSelector == null) return;
             _suppressEvents = true;
@@ -484,7 +484,7 @@ namespace ETSOverlay
 
         // --- Appearance Logic ---
 
-        private void SyncAppearanceValues()
+        public void SyncAppearanceValues()
         {
             if (_mainWindow == null || ThemeSelector == null) return;
             _suppressEvents = true;
