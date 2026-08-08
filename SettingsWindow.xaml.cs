@@ -113,19 +113,7 @@ namespace ETSOverlay
             if (_suppressEvents || _mainWindow == null) return;
             if (UIModeSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag)
             {
-                if (item.Uid == "premium")
-                {
-                    var msg = _isUk 
-                        ? (tag == "hud" ? "HUD режим доступний тільки для Beta тестувальників." : "Кастомний режим доступний тільки для підписників Supporter або вище.") 
-                        : (tag == "hud" ? "HUD mode is available only for Beta testers." : "Custom mode is available only for Supporter tier or above.");
-                    MessageBox.Show(msg, _isUk ? "Premium Функція" : "Premium Feature", MessageBoxButton.OK, MessageBoxImage.Information);
-                    
-                    _suppressEvents = true;
-                    SyncGeneralValues();
-                    _suppressEvents = false;
-                    return;
-                }
-                
+
                 if (CustomModeConfigBtn != null) CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
                 if (HudModeConfigBtn != null) HudModeConfigBtn.Visibility = (tag == "hud") ? Visibility.Visible : Visibility.Collapsed;
                 if (CardStylePanel != null) CardStylePanel.Visibility = (tag == "hud") ? Visibility.Collapsed : Visibility.Visible;
@@ -433,7 +421,7 @@ namespace ETSOverlay
             if (!isBetaOrDev)
             {
                 var sp = new StackPanel { Orientation = Orientation.Horizontal };
-                sp.Children.Add(new TextBlock { Text = "⭐ ", FontSize = 18, Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5C542")), VerticalAlignment = VerticalAlignment.Center });
+                sp.Children.Add(new TextBlock { Text = "[BETA] ", FontSize = 12, FontWeight = FontWeights.Bold, Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5A623")), VerticalAlignment = VerticalAlignment.Center });
                 sp.Children.Add(new TextBlock { Text = hudText, VerticalAlignment = VerticalAlignment.Center });
                 hudItem.Content = sp;
                 hudItem.Uid = "premium";
@@ -596,7 +584,12 @@ namespace ETSOverlay
                     comboBox.SelectedIndex = 0;
                 }
                 _suppressEvents = false;
-                ShowToast(_isUk ? "Потрібна підписка Supporter" : "Requires Supporter subscription");
+                string toastMsg = _isUk ? "Потрібна підписка Supporter" : "Requires Supporter subscription";
+                if (item.Tag is string tag && tag == "hud")
+                {
+                    toastMsg = _isUk ? "Потрібна ліцензія Beta тестувальника" : "Requires Beta Tester license";
+                }
+                ShowToast(toastMsg);
                 return true;
             }
             return false;
