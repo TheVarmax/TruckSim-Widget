@@ -113,10 +113,23 @@ namespace ETSOverlay
             if (_suppressEvents || _mainWindow == null) return;
             if (UIModeSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag)
             {
-                if (CustomModeConfigBtn != null)
+                if (item.Uid == "premium")
                 {
-                    CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
+                    var msg = _isUk 
+                        ? (tag == "hud" ? "HUD режим доступний тільки для Beta тестувальників." : "Кастомний режим доступний тільки для підписників Supporter або вище.") 
+                        : (tag == "hud" ? "HUD mode is available only for Beta testers." : "Custom mode is available only for Supporter tier or above.");
+                    MessageBox.Show(msg, _isUk ? "Premium Функція" : "Premium Feature", MessageBoxButton.OK, MessageBoxImage.Information);
+                    
+                    _suppressEvents = true;
+                    SyncGeneralValues();
+                    _suppressEvents = false;
+                    return;
                 }
+                
+                if (CustomModeConfigBtn != null) CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
+                if (HudModeConfigBtn != null) HudModeConfigBtn.Visibility = (tag == "hud") ? Visibility.Visible : Visibility.Collapsed;
+                if (CardStylePanel != null) CardStylePanel.Visibility = (tag == "hud") ? Visibility.Collapsed : Visibility.Visible;
+
                 if (tag != "full" && AutoHideToggle.IsChecked == true)
                 {
                     AutoHideToggle.IsChecked = false;
@@ -196,6 +209,23 @@ namespace ETSOverlay
             var w = new VisibilitySettingsWindow(_mainWindow);
             w.Owner = this;
             w.ShowDialog();
+        }
+
+        private void HudModeConfigBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (HudModePopup != null) HudModePopup.IsOpen = true;
+        }
+
+        private void HudMoveToTopBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (HudModePopup != null) HudModePopup.IsOpen = false;
+            _mainWindow?.MoveHudToTop();
+        }
+
+        private void HudResetPositionBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (HudModePopup != null) HudModePopup.IsOpen = false;
+            _mainWindow?.ResetHudPosition();
         }
 
         private void SpeedWarningEtsBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -390,18 +420,37 @@ namespace ETSOverlay
                 activeMode = currentSelection;
             }
 
+            bool isBetaOrDev = isSupporter && (license.CurrentPlan == "tester" || license.CurrentPlan == "developer");
+
             PopulateCombo(UIModeSelector, new[] {
                 ("full", "Full Interface", "Повний інтерфейс", false),
                 ("minimal", "Minimalism", "Мінімалізм", false),
                 ("custom", "Custom", "Кастомний", true)
             }, activeMode, isSupporter);
 
+            var hudItem = new ComboBoxItem { Tag = "hud" };
+            string hudText = _isUk ? "HUD Режим" : "HUD Mode";
+            if (!isBetaOrDev)
+            {
+                var sp = new StackPanel { Orientation = Orientation.Horizontal };
+                sp.Children.Add(new TextBlock { Text = "⭐ ", FontSize = 18, Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5C542")), VerticalAlignment = VerticalAlignment.Center });
+                sp.Children.Add(new TextBlock { Text = hudText, VerticalAlignment = VerticalAlignment.Center });
+                hudItem.Content = sp;
+                hudItem.Uid = "premium";
+                hudItem.ToolTip = _isUk ? "Доступно тільки для Beta тестувальників" : "Available only for Beta testers";
+            }
+            else
+            {
+                hudItem.Content = hudText;
+                hudItem.Uid = "";
+            }
+            if (activeMode == "hud") hudItem.IsSelected = true;
+            UIModeSelector.Items.Add(hudItem);
+
             if (UIModeSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag)
             {
-                if (CustomModeConfigBtn != null)
-                {
-                    CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
-                }
+                if (CustomModeConfigBtn != null) CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
+                if (HudModeConfigBtn != null) HudModeConfigBtn.Visibility = (tag == "hud") ? Visibility.Visible : Visibility.Collapsed;
             }
 
             if (BetaUpdatesContainer != null)
@@ -612,14 +661,19 @@ namespace ETSOverlay
             var modeItem = AccentModeSelector.SelectedItem as ComboBoxItem;
             string mode = modeItem?.Tag as string ?? "standard";
 
-            if (mode == "custom")
+            if (mode == "uniform")
+            {
+                GlobalAccentPanel.Visibility = Visibility.Visible;
+                CustomAccentsPanel.Visibility = Visibility.Collapsed;
+            }
+            else if (mode == "custom")
             {
                 GlobalAccentPanel.Visibility = Visibility.Collapsed;
                 CustomAccentsPanel.Visibility = Visibility.Visible;
             }
             else
             {
-                GlobalAccentPanel.Visibility = Visibility.Visible;
+                GlobalAccentPanel.Visibility = Visibility.Collapsed;
                 CustomAccentsPanel.Visibility = Visibility.Collapsed;
             }
         }
@@ -786,10 +840,9 @@ namespace ETSOverlay
                 if (item.Tag is string tag && tag == mode)
                 {
                     UIModeSelector.SelectedItem = item;
-                    if (CustomModeConfigBtn != null)
-                    {
-                        CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
-                    }
+                    if (CustomModeConfigBtn != null) CustomModeConfigBtn.Visibility = (tag == "custom") ? Visibility.Visible : Visibility.Collapsed;
+                    if (HudModeConfigBtn != null) HudModeConfigBtn.Visibility = (tag == "hud") ? Visibility.Visible : Visibility.Collapsed;
+                    if (CardStylePanel != null) CardStylePanel.Visibility = (tag == "hud") ? Visibility.Collapsed : Visibility.Visible;
                     break;
                 }
             }

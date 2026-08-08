@@ -481,7 +481,54 @@
                                     </ControlTemplate>
                                 </Button.Template>
                             </Button>
+                            <Button x:Name="HudModeConfigBtn" Grid.Column="1" Content="Change" Foreground="White" FontSize="11" Margin="6,0,0,0" Padding="8,2" VerticalAlignment="Center" Visibility="Collapsed" Click="HudModeConfigBtn_Click" Cursor="Hand">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Border Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
                         </Grid>
+                        
+                        <Popup x:Name="HudModePopup" PlacementTarget="{Binding ElementName=HudModeConfigBtn}" Placement="Bottom" HorizontalOffset="-140" AllowsTransparency="True" StaysOpen="False">
+                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" Padding="12" Width="180">
+                                <Border.Effect>
+                                    <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
+                                </Border.Effect>
+                                <StackPanel>
+                                    <Button Content="Move to Top" Click="HudMoveToTopBtn_Click" Foreground="White" BorderThickness="0" Padding="8,6" Margin="0,0,0,6" Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="border" Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="4">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                    <Button Content="Reset Position" Click="HudResetPositionBtn_Click" Foreground="White" BorderThickness="0" Padding="8,6" Cursor="Hand">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border x:Name="border" Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="4">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
                     </StackPanel>
 
                     <!-- Auto-hide toggle -->
@@ -779,7 +826,7 @@
                     </StackPanel>
                     
                     <!-- Card Style -->
-                    <StackPanel Margin="0,0,0,16">
+                    <StackPanel x:Name="CardStylePanel" Margin="0,0,0,16">
                         <TextBlock x:Name="CardStyleLabel" Text="Card Style" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
                         <ComboBox x:Name="CardStyleSelector" SelectionChanged="AppearanceSetting_SelectionChanged" />
                     </StackPanel>

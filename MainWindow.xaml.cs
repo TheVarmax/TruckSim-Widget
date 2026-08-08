@@ -176,6 +176,9 @@ namespace ETSOverlay
         private SettingsWindow? _settingsWindow;
         private double _savedSettingsLeft = double.NaN;
         private double _savedSettingsTop = double.NaN;
+        private double _savedHudLeft = double.NaN;
+        private double _savedHudTop = double.NaN;
+        private double _savedHudCenterLeft = double.NaN;
 
         // UI Scale
         private const double BASE_SCALE = 1.15; // default "100%" is 15% larger than design
@@ -190,6 +193,7 @@ namespace ETSOverlay
         public bool SkipBetaUpdates { get; set; } = false;
         public string? LatestReleaseUrl { get; set; } = null;
 
+
         // Appearance Active State (What is actually rendered, downgraded if necessary)
         public string ActiveTheme { get; private set; } = "classic";
         public string ActiveAccent { get; private set; } = "teal";
@@ -200,8 +204,12 @@ namespace ETSOverlay
         private bool _headerOverlayVisible = false;
         private bool _overlayHover = false;
         private HeaderOverlayWindow? _headerOverlay;
+        private HudWindow? _hudWindow;
+        private System.Windows.Threading.DispatcherTimer? _hudSyncTimer;
         private DispatcherTimer? _overlayHideTimer;
         private DispatcherTimer? _licenseCheckTimer;
+        private bool _isHiddenByHud = false;
+        private bool _skipStartupAnimation = false;
 
         // Cloud Sync
         public bool CloudSyncEnabled { get; private set; } = false;
@@ -256,6 +264,9 @@ namespace ETSOverlay
         {
             public double Left { get; set; }
             public double Top { get; set; }
+            public double HudLeft { get; set; } = double.NaN;
+            public double HudTop { get; set; } = double.NaN;
+            public double HudCenterLeft { get; set; } = double.NaN;
             public bool ShowDistance { get; set; } = true;
             public bool ShowBottomInfo { get; set; } = true;
             public bool ShowRoute { get; set; } = true;
@@ -437,6 +448,22 @@ namespace ETSOverlay
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
                 HideHeaderOverlay();
+
+                if (_skipStartupAnimation)
+                {
+                    MainUI.Opacity = 1;
+                    IntroOverlay.Visibility = Visibility.Collapsed;
+                    MainBorder.BeginAnimation(OpacityProperty, null);
+                    MainBorder.Opacity = 1.0;
+                    ApplyDualLayerOpacity();
+                    _startupComplete = true;
+                    if (_autoHideEnabled && !_mainBorderHovered)
+                    {
+                        _autoHideQuietMs = 0;
+                        StartIdleTimer();
+                    }
+                    return;
+                }
 
                 // 1. Подготовка: скрыть MainUI, показать IntroOverlay
                 MainUI.Opacity = 0;
@@ -2095,6 +2122,14 @@ namespace ETSOverlay
                 }
             }
 
+            bool isBetaOrDev = LicenseManager.Instance.Status == "active" && 
+                              (LicenseManager.Instance.CurrentPlan == "tester" || LicenseManager.Instance.CurrentPlan == "developer");
+            if (!isBetaOrDev && _uiMode == "hud")
+            {
+                OnUIModeChanged("full");
+                _settingsWindow?.SetUIMode("full");
+            }
+
             ApplyAppearance();
         }
 
@@ -2106,6 +2141,9 @@ namespace ETSOverlay
                 {
                     Left = Left,
                     Top = Top,
+                    HudLeft = _hudWindow?.Left ?? _savedHudLeft,
+                    HudTop = _hudWindow?.Top ?? _savedHudTop,
+                    HudCenterLeft = _hudWindow != null ? _hudWindow.GetTrueCenterLeft() : _savedHudCenterLeft,
                     ShowDistance = _showDistance,
                     ShowBottomInfo = _showBottomInfo,
                     ShowRoute = _showRoute,
@@ -2181,6 +2219,17 @@ namespace ETSOverlay
                             if (windowOpacity <= 0 || windowOpacity > 1)
                             {
                                 windowOpacity = 0.85;
+                            }
+                            if (!double.IsNaN(state.Left) && !double.IsNaN(state.Top))
+                            {
+                                Left = state.Left;
+                                Top = state.Top;
+                            }
+                            if (!double.IsNaN(state.HudLeft) && !double.IsNaN(state.HudTop))
+                            {
+                                _savedHudLeft = state.HudLeft;
+                                _savedHudTop = state.HudTop;
+                                _savedHudCenterLeft = state.HudCenterLeft;
                             }
                             // Restore settings window position if available
                             if (!double.IsNaN(state.SettingsLeft) && !double.IsNaN(state.SettingsTop))
@@ -2354,7 +2403,9 @@ namespace ETSOverlay
             if (_settingsWindow == null)
             {
                 _settingsWindow = new SettingsWindow(this);
-                _settingsWindow.Owner = this;
+                if (this.IsVisible) _settingsWindow.Owner = this;
+                else if (_hudWindow != null && _hudWindow.IsVisible) _settingsWindow.Owner = _hudWindow;
+                
                 _settingsWindow.Topmost = this.Topmost;
                 _settingsWindow.SetUIMode(_uiMode);
                 _settingsWindow.SetOpacity(windowOpacity * 100, isSplitOpacityEnabled, backgroundOpacity * 100, textOpacity * 100);
@@ -2370,6 +2421,13 @@ namespace ETSOverlay
                     _settingsWindow.Left = _savedSettingsLeft;
                     _settingsWindow.Top = _savedSettingsTop;
                 }
+            }
+            else
+            {
+                // Update owner in case the UI mode changed between settings window uses
+                if (this.IsVisible) _settingsWindow.Owner = this;
+                else if (_hudWindow != null && _hudWindow.IsVisible) _settingsWindow.Owner = _hudWindow;
+                else _settingsWindow.Owner = null;
             }
 
             if (!_settingsWindow.IsVisible)
@@ -2498,6 +2556,77 @@ namespace ETSOverlay
 
         private void ApplyUIMode(bool animate = true)
         {
+            if (_uiMode == "hud")
+            {
+                _isHiddenByHud = true;
+                _skipStartupAnimation = true;
+                this.Hide();
+                _headerOverlay?.Hide();
+                if (_hudWindow == null)
+                {
+                    _hudWindow = new HudWindow(this);
+                    
+                    _hudSyncTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+                    _hudSyncTimer.Tick += (s, e) => 
+                    {
+                        if (_hudWindow != null && _hudWindow.IsVisible)
+                        {
+                            _hudWindow.UpdateData(
+                                StatusValue.Text, StatusValue.Foreground,
+                                DistanceInfo.Text,
+                                SpeedValue.Text,
+                                MaxSpeedValue.Text,
+                                DeliveryType.Text, DeliveryType.Foreground
+                            );
+                            if (_hudWindow.SpeedLabel != null && SpeedHeader != null) _hudWindow.SpeedLabel.Text = SpeedHeader.Text + ": ";
+                            if (_hudWindow.MaxSpeedLabel != null && MaxHeader != null) _hudWindow.MaxSpeedLabel.Text = MaxHeader.Text + ": ";
+                        }
+                    };
+                }
+                
+                _hudWindow.SetScale(BASE_SCALE * (_uiScale / 100.0));
+                _hudWindow.UpdatePinIcon(Topmost);
+                _hudWindow.Show();
+                _hudSyncTimer?.Start();
+                
+                ApplyDualLayerOpacity();
+                
+                // Position properly with levitation margin
+                _hudWindow.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                if (!double.IsNaN(_savedHudCenterLeft))
+                {
+                    _hudWindow.Left = _savedHudCenterLeft - _hudWindow.GetDesiredBaseWidth() / 2;
+                    _hudWindow.Top = _savedHudTop;
+                }
+                else if (!double.IsNaN(_savedHudLeft) && !double.IsNaN(_savedHudTop))
+                {
+                    _hudWindow.Left = _savedHudLeft;
+                    _hudWindow.Top = _savedHudTop;
+                }
+                else
+                {
+                    _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.DesiredSize.Width) / 2;
+                    _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.DesiredSize.Height - 20; 
+                }
+                
+                return;
+            }
+            else
+            {
+                if (_isHiddenByHud)
+                {
+                    this.Show();
+                    _headerOverlay?.Show();
+                    _isHiddenByHud = false;
+                }
+                MainBorder.Visibility = Visibility.Visible;
+                if (_hudWindow != null)
+                {
+                    _hudSyncTimer?.Stop();
+                    _hudWindow.Hide();
+                }
+            }
+
             bool isEffectivelyMinimal = _uiMode == "minimal" || (_uiMode == "custom" && !_showDistance && !_showRoute && !_showBottomInfo);
             if (isEffectivelyMinimal)
             {
@@ -2622,12 +2751,42 @@ namespace ETSOverlay
             }
         }
 
+        public void ResetHudPosition()
+        {
+            if (_hudWindow != null)
+            {
+                _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.ActualWidth) / 2;
+                _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.ActualHeight - 20;
+                _savedHudLeft = _hudWindow.Left;
+                _savedHudTop = _hudWindow.Top;
+            }
+            else
+            {
+                _savedHudLeft = double.NaN;
+                _savedHudTop = double.NaN;
+            }
+            SaveState();
+        }
+
+        public void MoveHudToTop()
+        {
+            if (_hudWindow != null)
+            {
+                _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.ActualWidth) / 2;
+                _hudWindow.Top = 20;
+                _savedHudLeft = _hudWindow.Left;
+                _savedHudTop = _hudWindow.Top;
+            }
+            SaveState();
+        }
+
         private void ApplyScale()
         {
             double effectiveScale = BASE_SCALE * (_uiScale / 100.0);
             UIScaleTransform.ScaleX = effectiveScale;
             UIScaleTransform.ScaleY = effectiveScale;
             _headerOverlay?.SetScale(effectiveScale);
+            _hudWindow?.SetScale(effectiveScale);
             UpdateHeaderOverlayPosition();
         }
 
@@ -2865,6 +3024,11 @@ namespace ETSOverlay
             // In Split Mode, MainUI must be 1.0 so text can reach 1.0 opacity.
             // In Normal Mode, MainUI is set to windowOpacity to smoothly fade everything together.
             if (MainUI != null) MainUI.Opacity = isSplitOpacityEnabled ? 1.0 : windowOpacity;
+
+            if (_hudWindow != null && _hudWindow.IsVisible)
+            {
+                _hudWindow.SetOpacity(targetBgOpacity, interfaceElementsOpacity, effectiveTextOpacity);
+            }
         }
 
         public void OnLanguageChanged(string lang)
@@ -3026,6 +3190,7 @@ namespace ETSOverlay
                 "Waiting for order upload..." or "Uploading..." or "Відправка..." or "Очікування відправки замовлення..." => LocalizeStatus("WAIT_TB_UPLOAD"),
                 "KM NOT REC (TB)" or "KM LOST (TB)" or "КМ ВТРАЧЕНО (TB)" or "КМ НЕ ЗАП (TB)" => LocalizeStatus("KM_NOT_REC"),
                 "DELIVERED" or "ДОСТАВЛЕНО" => LocalizeStatus("DELIVERED"),
+                "Delivering..." or "Здаємо вантаж..." => uiLanguage == "uk" ? "Здаємо вантаж..." : "Delivering...",
                 _ => status
             };
 
@@ -3078,6 +3243,20 @@ namespace ETSOverlay
             if (DistanceInfo.Text == "To pickup..." || DistanceInfo.Text == "За вантажем...")
             {
                 DistanceInfo.Text = uiLanguage == "uk" ? "За вантажем..." : "To pickup...";
+                return;
+            }
+
+            if (DistanceInfo.Text == "Delivering..." || DistanceInfo.Text == "Здаємо вантаж...")
+            {
+                DistanceInfo.Text = uiLanguage == "uk" ? "Здаємо вантаж..." : "Delivering...";
+                return;
+            }
+            
+            if (DistanceInfo.Text == "Suspended" || DistanceInfo.Text == "Призупинено" || DistanceInfo.Text == "Відчеплено")
+            {
+                // In English both map to Suspended. In Ukrainian they were different, but we'll use a generic Suspended equivalent.
+                // Wait, "Відчеплено" was used when trailer is detached. Let's just use "Призупинено" for both in UK if it's currently Suspended.
+                DistanceInfo.Text = uiLanguage == "uk" ? (DistanceInfo.Text == "Відчеплено" ? "Відчеплено" : "Призупинено") : "Suspended";
                 return;
             }
 
@@ -3551,11 +3730,16 @@ namespace ETSOverlay
             {
                 _settingsWindow.Topmost = Topmost;
             }
+            if (_hudWindow != null)
+            {
+                _hudWindow.Topmost = Topmost;
+            }
         }
 
         private void UpdatePinIcon()
         {
             _headerOverlay?.UpdatePinIcon(Topmost);
+            _hudWindow?.UpdatePinIcon(Topmost);
         }
         protected override void OnClosed(EventArgs e) { WriteLog("=== OVERLAY CLOSED ==="); SaveState(); SpeedLimiterService.Instance.ReleaseBrake(); telemetry?.Dispose(); base.OnClosed(e); }
 
