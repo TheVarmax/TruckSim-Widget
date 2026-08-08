@@ -2580,6 +2580,8 @@ namespace ETSOverlay
                             );
                             if (_hudWindow.SpeedLabel != null && SpeedHeader != null) _hudWindow.SpeedLabel.Text = SpeedHeader.Text + ": ";
                             if (_hudWindow.MaxSpeedLabel != null && MaxHeader != null) _hudWindow.MaxSpeedLabel.Text = MaxHeader.Text + ": ";
+                            if (_hudWindow.SpeedUnit != null && SpeedUnit != null) _hudWindow.SpeedUnit.Text = SpeedUnit.Text;
+                            if (_hudWindow.MaxUnit != null && MaxUnit != null) _hudWindow.MaxUnit.Text = MaxUnit.Text;
                         }
                     };
                 }
