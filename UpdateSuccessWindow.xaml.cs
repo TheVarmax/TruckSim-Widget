@@ -12,7 +12,7 @@ namespace ETSOverlay
         public UpdateSuccessWindow(string language, string? releaseUrl = null)
         {
             InitializeComponent();
-            _releaseUrl = releaseUrl ?? "https://github.com/TheVarmax/TruckSim-Widget/releases/latest";
+            _releaseUrl = string.IsNullOrWhiteSpace(releaseUrl) ? "https://github.com/TheVarmax/TruckSim-Widget/releases" : releaseUrl;
 
             
             // Set language specific text

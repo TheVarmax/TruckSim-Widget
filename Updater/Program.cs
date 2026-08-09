@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Drawing.Drawing2D;
-using System.IO.Compression;
 using System.Runtime.InteropServices;
 
 namespace TruckSimUpdater;
@@ -10,15 +9,6 @@ static class Program
     private const string SuccessUrl = "https://successful.maksym.uk";
     private const string SupportEmail = "info@maksym.uk";
 
-    // Файлы/папки, которые НЕ нужно перезаписывать при обновлении (пользовательские данные)
-    private static readonly HashSet<string> ProtectedFiles = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "settings.json",
-        "state.dat",
-        "updater.exe",
-        "app_log.txt",
-        "log.txt"
-    };
 
     // Цвета в стиле виджета
     private static readonly Color BgMain = Color.FromArgb(26, 28, 32);       // #1A1C20
@@ -277,77 +267,40 @@ static class Program
                 WriteLog(_logPath, "Main application closed.");
 
                 // Шаг 2: Скачиваем
-                SetStep(2, 4);
+                SetStep(2, 3);
                 SetStatus(_lang == "uk" ? "Завантаження оновлення" : "Downloading update", true);
-                WriteLog(_logPath, $"Downloading update from: {_downloadUrl}");
+                WriteLog(_logPath, $"Downloading installer from: {_downloadUrl}");
 
                 string tempDir = Path.Combine(Path.GetTempPath(), "TruckSimWidget_Update");
-                if (Directory.Exists(tempDir))
-                    Directory.Delete(tempDir, true);
-                Directory.CreateDirectory(tempDir);
+                if (!Directory.Exists(tempDir))
+                    Directory.CreateDirectory(tempDir);
 
-                string zipPath = Path.Combine(tempDir, _assetName);
-                await DownloadWithProgressAsync(_downloadUrl, zipPath);
-                WriteLog(_logPath, $"Download complete: {new FileInfo(zipPath).Length} bytes");
-
-                // Шаг 3: Распаковываем и заменяем файлы
-                SetStep(3, 4);
-                SetStatus(_lang == "uk" ? "Встановлення оновлення" : "Installing update", true);
-                SetProgress(0);
-
-                string extractDir = Path.Combine(tempDir, "extracted");
-                if (Directory.Exists(extractDir))
-                    Directory.Delete(extractDir, true);
-
-                WriteLog(_logPath, $"Extracting ZIP to: {extractDir}");
-                await Task.Run(() => ZipFile.ExtractToDirectory(zipPath, extractDir));
-                SetProgress(30);
-
-                string sourceDir = FindSourceDirectory(extractDir);
-                WriteLog(_logPath, $"Source directory: {sourceDir}");
-
-                WriteLog(_logPath, "Replacing application files...");
-                int copiedCount = await Task.Run(() => CopyFilesRecursive(sourceDir, _appDir, _logPath));
-                WriteLog(_logPath, $"Files replaced: {copiedCount}");
-                SetProgress(80);
-
-                // Очистка временных файлов
-                WriteLog(_logPath, "Cleaning up temp files...");
-                try
+                string installerPath = Path.Combine(tempDir, _assetName);
+                if (File.Exists(installerPath))
                 {
-                    if (Directory.Exists(tempDir))
-                        Directory.Delete(tempDir, true);
+                    try { File.Delete(installerPath); } catch { }
                 }
-                catch (Exception ex)
-                {
-                    WriteLog(_logPath, $"Cleanup warning: {ex.Message}");
-                }
+
+                await DownloadWithProgressAsync(_downloadUrl, installerPath);
+                WriteLog(_logPath, $"Download complete: {new FileInfo(installerPath).Length} bytes");
+
+                // Шаг 3: Запускаем установщик
+                SetStep(3, 3);
+                SetStatus(_lang == "uk" ? "Запуск інсталятора" : "Launching installer", true);
                 SetProgress(100);
 
-                WriteLog(_logPath, "=== UPDATE SUCCESSFUL ===");
+                WriteLog(_logPath, $"Launching installer: {installerPath} --update");
 
-                // Шаг 4: Готово
-                SetStep(4, 4);
-                _dotTimer.Stop();
-                _statusLabel.ForeColor = SuccessColor;
-                _statusLabel.Text = _lang == "uk" ? "✅ Оновлення встановлено!" : "✅ Update installed!";
-                _progressFill.BackColor = SuccessColor;
-
-                // Открытие donate страницы перенесено в само приложение после обновления
-
-                // Небольшая пауза перед перезапуском
-                await Task.Delay(1500);
-
-                // Перезапускаем приложение
-                WriteLog(_logPath, $"Restarting application: {_appExe} with --updated flag");
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = _appExe,
-                    Arguments = "--updated",
-                    WorkingDirectory = _appDir,
+                    FileName = installerPath,
+                    Arguments = "--update",
                     UseShellExecute = true
                 });
 
+                WriteLog(_logPath, "=== UPDATER FINISHED, HANDED OVER TO INSTALLER ===");
+
+                // Завершаем апдейтер
                 Close();
             }
             catch (Exception ex)
@@ -509,102 +462,6 @@ static class Program
         }
     }
 
-    /// <summary>
-    /// Находит папку с файлами внутри распакованного ZIP.
-    /// ZIP имеет структуру: корень / TruckSim Widget (x.x.x) / файлы
-    /// </summary>
-    private static string FindSourceDirectory(string extractDir)
-    {
-        // Проверяем, есть ли вложенная папка
-        var subdirs = Directory.GetDirectories(extractDir);
-        if (subdirs.Length == 1)
-        {
-            // Проверяем, что внутри есть exe или dll (признак папки с приложением)
-            string candidate = subdirs[0];
-            if (Directory.GetFiles(candidate, "*.exe").Length > 0 ||
-                Directory.GetFiles(candidate, "*.dll").Length > 0)
-            {
-                return candidate;
-            }
-        }
-
-        // Если вложенных папок нет или их несколько — файлы в корне
-        if (Directory.GetFiles(extractDir, "*.exe").Length > 0 ||
-            Directory.GetFiles(extractDir, "*.dll").Length > 0)
-        {
-            return extractDir;
-        }
-
-        // Рекурсивный поиск
-        foreach (var dir in subdirs)
-        {
-            string found = FindSourceDirectory(dir);
-            if (found != dir || Directory.GetFiles(dir, "*.exe").Length > 0)
-                return found;
-        }
-
-        return extractDir;
-    }
-
-    /// <summary>
-    /// Рекурсивно копирует файлы из source в destination, пропуская защищённые файлы
-    /// </summary>
-    private static int CopyFilesRecursive(string sourceDir, string destDir, string logPath)
-    {
-        int count = 0;
-
-        foreach (string sourceFile in Directory.GetFiles(sourceDir))
-        {
-            string fileName = Path.GetFileName(sourceFile);
-
-            // Пропускаем защищённые файлы
-            if (ProtectedFiles.Contains(fileName))
-            {
-                WriteLog(logPath, $"  Skipped (protected): {fileName}");
-                continue;
-            }
-
-            string destFile = Path.Combine(destDir, fileName);
-
-            // Пытаемся скопировать с повторными попытками
-            bool copied = false;
-            for (int attempt = 1; attempt <= 3; attempt++)
-            {
-                try
-                {
-                    File.Copy(sourceFile, destFile, overwrite: true);
-                    copied = true;
-                    count++;
-                    break;
-                }
-                catch (IOException) when (attempt < 3)
-                {
-                    WriteLog(logPath, $"  Retry {attempt}/3: {fileName}");
-                    Thread.Sleep(500 * attempt);
-                }
-            }
-
-            if (!copied)
-            {
-                WriteLog(logPath, $"  FAILED to copy: {fileName}");
-                throw new IOException($"Cannot overwrite file: {fileName}. The file may be locked by another process.");
-            }
-        }
-
-        // Рекурсивно обрабатываем подпапки
-        foreach (string sourceSubDir in Directory.GetDirectories(sourceDir))
-        {
-            string dirName = Path.GetFileName(sourceSubDir);
-            string destSubDir = Path.Combine(destDir, dirName);
-
-            if (!Directory.Exists(destSubDir))
-                Directory.CreateDirectory(destSubDir);
-
-            count += CopyFilesRecursive(sourceSubDir, destSubDir, logPath);
-        }
-
-        return count;
-    }
 
     /// <summary>
     /// Показывает диалог ошибки обновления с кнопками «Скопировать почту» и «Сохранить лог»

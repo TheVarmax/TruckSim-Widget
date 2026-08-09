@@ -1,7 +1,7 @@
 #define MyAppName "TruckSim Widget"
-#define MyAppVersion "1.5.9-beta.1"
+#define MyAppVersion "1.5.9-beta.2"
 #define MyAppExeName "TruckSim Widget.exe"
-#define PublishDir "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget (1.5.9-beta.1)"
+#define PublishDir "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget (1.5.9-beta.2)"
 
 [Setup]
 AppId={{8F4E6E2C-7F11-4F7D-BD7D-TRUCKSIMWIDGET}
@@ -56,6 +56,10 @@ english.CancelSetupMessage=TruckSim Widget has not been fully installed yet.%n%n
 english.CancelSetupYes=Cancel setup
 english.CancelSetupNo=Continue installation
 
+english.UpdateWelcome1=Welcome to the TruckSim Widget Update Setup
+english.UpdateWelcome2=This will update TruckSim Widget on your computer.%n%nIt is recommended that you close all other applications before continuing.
+english.UpdateTitle=TruckSim Widget Update
+
 ukrainian.DesktopIcon=Створити ярлик на робочому столі
 ukrainian.AdditionalShortcuts=Додаткові ярлики:
 ukrainian.LaunchApp=Запустити TruckSim Widget
@@ -83,6 +87,10 @@ ukrainian.CancelSetupMessage=TruckSim Widget ще не встановлено п
 ukrainian.CancelSetupYes=Скасувати встановлення
 ukrainian.CancelSetupNo=Продовжити встановлення
 
+ukrainian.UpdateWelcome1=Ласкаво просимо до оновлення TruckSim Widget
+ukrainian.UpdateWelcome2=Ця програма оновить TruckSim Widget на вашому комп'ютері.%n%nРекомендується закрити всі інші програми перед продовженням.
+ukrainian.UpdateTitle=Оновлення TruckSim Widget
+
 [Tasks]
 Name: "desktopicon"; Description: "{cm:DesktopIcon}"; GroupDescription: "{cm:AdditionalShortcuts}"; Flags: unchecked
 
@@ -95,14 +103,19 @@ Name: "{group}\{cm:OpenPluginFolder}"; Filename: "{app}\plugin"
 Name: "{autodesktop}\TruckSim Widget"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent
-
+Filename: "{app}\{#MyAppExeName}"; Parameters: "--updated"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent; Check: IsUpdateMode
+Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent; Check: not IsUpdateMode
 [Code]
 var
   TelemetryPage: TInputOptionWizardPage;
   GameDirPage: TInputDirWizardPage;
   SkipButton: TNewButton;
-  SkipTelemetry: Boolean;
+  SkipValidation: Boolean;
+
+function IsUpdateMode(): Boolean;
+begin
+  Result := Pos('--update', GetCmdTail) > 0;
+end;
 
 function CombinePath(BasePath: String; RelativePath: String): String;
 begin
@@ -156,17 +169,37 @@ end;
 
 procedure SkipButtonClick(Sender: TObject);
 begin
-  SkipTelemetry := True;
+  if WizardForm.CurPageID = TelemetryPage.ID then
+  begin
+    TelemetryPage.Values[0] := False;
+    TelemetryPage.Values[1] := False;
+    WizardForm.NextButton.OnClick(WizardForm.NextButton);
+  end
+  else if WizardForm.CurPageID = GameDirPage.ID then
+  begin
+    SkipValidation := True;
+    WizardForm.NextButton.OnClick(WizardForm.NextButton);
+    SkipValidation := False;
+  end;
+end;
 
-  TelemetryPage.Values[0] := False;
-  TelemetryPage.Values[1] := False;
-
-  WizardForm.NextButton.OnClick(WizardForm.NextButton);
+function IsValidGamePath(GamePath: String; ExpectedExe: String): Boolean;
+begin
+  Result := (GamePath <> '') and FileExists(CombinePath(GamePath, 'bin\win_x64\' + ExpectedExe));
 end;
 
 procedure InitializeWizard();
+var
+  RegPath: String;
 begin
-  SkipTelemetry := False;
+  SkipValidation := False;
+
+  if IsUpdateMode() then
+  begin
+    WizardForm.Caption := CustomMessage('UpdateTitle');
+    WizardForm.WelcomeLabel1.Caption := CustomMessage('UpdateWelcome1');
+    WizardForm.WelcomeLabel2.Caption := CustomMessage('UpdateWelcome2');
+  end;
 
   TelemetryPage := CreateInputOptionPage(
     wpSelectTasks,
@@ -193,7 +226,12 @@ begin
   GameDirPage.Add(CustomMessage('ATSDirPrompt'));
 
   GameDirPage.Values[0] := DetectGameDir('Euro Truck Simulator 2');
+  if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2Path', RegPath) and IsValidGamePath(RegPath, 'eurotrucks2.exe') then
+    GameDirPage.Values[0] := RegPath;
+
   GameDirPage.Values[1] := DetectGameDir('American Truck Simulator');
+  if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPath', RegPath) and IsValidGamePath(RegPath, 'amtrucks.exe') then
+    GameDirPage.Values[1] := RegPath;
 
   TelemetryPage.Values[0] := GameDirPage.Values[0] <> '';
   TelemetryPage.Values[1] := GameDirPage.Values[1] <> '';
@@ -237,12 +275,21 @@ function ShouldSkipPage(PageID: Integer): Boolean;
 begin
   Result := False;
 
+  if IsUpdateMode() then
+  begin
+    if (PageID = TelemetryPage.ID) or (PageID = GameDirPage.ID) then
+    begin
+      Result := True;
+      exit;
+    end;
+  end;
+
   if PageID = GameDirPage.ID then
     Result :=
-      SkipTelemetry or
       ((not TelemetryPage.Values[0]) and
        (not TelemetryPage.Values[1]));
 end;
+
 
 function ValidateGamePath(GamePath: String; ExpectedExe: String): Boolean;
 var
@@ -274,6 +321,18 @@ begin
 
   if CurPageID = GameDirPage.ID then
   begin
+    if SkipValidation then
+    begin
+      if TelemetryPage.Values[0] and not IsValidGamePath(GameDirPage.Values[0], 'eurotrucks2.exe') then
+        TelemetryPage.Values[0] := False;
+
+      if TelemetryPage.Values[1] and not IsValidGamePath(GameDirPage.Values[1], 'amtrucks.exe') then
+        TelemetryPage.Values[1] := False;
+
+      Result := True;
+      exit;
+    end;
+
     if TelemetryPage.Values[0] then
       Result := ValidateGamePath(GameDirPage.Values[0], 'eurotrucks2.exe');
 
@@ -319,13 +378,17 @@ procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
-    if not SkipTelemetry then
+    // Install telemetry plugins only if they are checked
+    if TelemetryPage.Values[0] then
     begin
-      if TelemetryPage.Values[0] then
-        InstallTelemetryPlugin('Euro Truck Simulator 2', GameDirPage.Values[0]);
+      InstallTelemetryPlugin('Euro Truck Simulator 2', GameDirPage.Values[0]);
+      RegWriteStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2Path', GameDirPage.Values[0]);
+    end;
 
-      if TelemetryPage.Values[1] then
-        InstallTelemetryPlugin('American Truck Simulator', GameDirPage.Values[1]);
+    if TelemetryPage.Values[1] then
+    begin
+      InstallTelemetryPlugin('American Truck Simulator', GameDirPage.Values[1]);
+      RegWriteStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPath', GameDirPage.Values[1]);
     end;
   end;
 end;

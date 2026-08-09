@@ -206,6 +206,7 @@ namespace ETSOverlay
         private HeaderOverlayWindow? _headerOverlay;
         private HudWindow? _hudWindow;
         private System.Windows.Threading.DispatcherTimer? _hudSyncTimer;
+        private bool _wasSettingsVisibleBeforeMinimize = false;
         private DispatcherTimer? _overlayHideTimer;
         private DispatcherTimer? _licenseCheckTimer;
         private bool _isHiddenByHud = false;
@@ -555,10 +556,16 @@ namespace ETSOverlay
                     var targetOp = 1.0;
                     MainBorder.BeginAnimation(OpacityProperty, new DoubleAnimation(targetOp, TimeSpan.FromSeconds(0.3)));
                     
-                    if (_settingsWindow != null && _settingsWindow.IsVisible)
+                    if (_wasSettingsVisibleBeforeMinimize && _settingsWindow != null)
                     {
+                        _settingsWindow.Show();
+                        if (_settingsWindow.WindowState == WindowState.Minimized)
+                        {
+                            _settingsWindow.WindowState = WindowState.Normal;
+                        }
                         _settingsWindow.Opacity = 0;
                         _settingsWindow.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromSeconds(0.3)));
+                        _wasSettingsVisibleBeforeMinimize = false;
                     }
                     
                     if (_headerOverlay != null && _headerOverlayVisible)
@@ -566,6 +573,13 @@ namespace ETSOverlay
                         _headerOverlay.SetOpacity(0);
                         var headerTargetOp = isSplitOpacityEnabled ? backgroundOpacity : windowOpacity;
                         _headerOverlay.AnimateOpacity(headerTargetOp, 0.3);
+                    }
+
+                    if (_hudWindow != null && _hudWindow.WindowState == WindowState.Minimized)
+                    {
+                        _hudWindow.WindowState = WindowState.Normal;
+                        _hudWindow.Opacity = 0;
+                        _hudWindow.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromSeconds(0.3)));
                     }
                 }
             };
@@ -2442,8 +2456,13 @@ namespace ETSOverlay
             {
                 _settingsWindow.Opacity = 0;
                 _settingsWindow.Show();
-                var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.2));
-                _settingsWindow.BeginAnimation(Window.OpacityProperty, fadeIn);
+            }
+            var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.2));
+            _settingsWindow.BeginAnimation(Window.OpacityProperty, fadeIn);
+            
+            if (_settingsWindow.WindowState == WindowState.Minimized)
+            {
+                _settingsWindow.WindowState = WindowState.Normal;
             }
             _settingsWindow.Activate();
         }
@@ -2573,6 +2592,26 @@ namespace ETSOverlay
                 if (_hudWindow == null)
                 {
                     _hudWindow = new HudWindow(this);
+                    _hudWindow.StateChanged += (s, e) =>
+                    {
+                        if (_hudWindow.WindowState == WindowState.Normal)
+                        {
+                            if (this.WindowState == WindowState.Minimized)
+                            {
+                                this.WindowState = WindowState.Normal;
+                            }
+                            
+                            if (_wasSettingsVisibleBeforeMinimize && _settingsWindow != null)
+                            {
+                                _settingsWindow.Show();
+                                if (_settingsWindow.WindowState == WindowState.Minimized)
+                                    _settingsWindow.WindowState = WindowState.Normal;
+                                _settingsWindow.Opacity = 0;
+                                _settingsWindow.BeginAnimation(OpacityProperty, new DoubleAnimation(1, TimeSpan.FromSeconds(0.3)));
+                                _wasSettingsVisibleBeforeMinimize = false;
+                            }
+                        }
+                    };
                     
                     _hudSyncTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
                     _hudSyncTimer.Tick += (s, e) => 
@@ -3706,22 +3745,39 @@ namespace ETSOverlay
             var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
             MainBorder.BeginAnimation(OpacityProperty, fadeOut);
             
-            if (_settingsWindow != null && _settingsWindow.IsVisible)
+            _wasSettingsVisibleBeforeMinimize = (_settingsWindow != null && _settingsWindow.IsVisible);
+            if (_wasSettingsVisibleBeforeMinimize)
             {
-                _settingsWindow.BeginAnimation(OpacityProperty, fadeOut);
+                _settingsWindow!.BeginAnimation(OpacityProperty, fadeOut);
             }
             
             if (_headerOverlay != null && _headerOverlayVisible)
             {
                 _headerOverlay.AnimateOpacity(0, 0.2);
             }
+
+            if (_hudWindow != null && _hudWindow.IsVisible)
+            {
+                _hudWindow.BeginAnimation(OpacityProperty, fadeOut);
+            }
             
             await Task.Delay(200);
             WindowState = WindowState.Minimized;
+
+            if (_hudWindow != null && _hudWindow.IsVisible)
+            {
+                _hudWindow.WindowState = WindowState.Minimized;
+            }
             
             // Восстанавливаем анимацию, чтобы при StateChanged виджет проявился нормально
             MainBorder.BeginAnimation(OpacityProperty, null);
             MainBorder.Opacity = 1.0;
+
+            if (_hudWindow != null && _hudWindow.IsVisible)
+            {
+                _hudWindow.BeginAnimation(OpacityProperty, null);
+                _hudWindow.Opacity = 1.0;
+            }
         }
 
         public void BtnClose_Click(object? sender, RoutedEventArgs e)
@@ -4007,7 +4063,8 @@ namespace ETSOverlay
                         foreach (var asset in assets.EnumerateArray())
                         {
                             string name = asset.GetProperty("name").GetString() ?? "";
-                            if (name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                            string expectedName = $"TruckSimWidgetSetup-{remoteVersion}.exe";
+                            if (name.Equals(expectedName, StringComparison.OrdinalIgnoreCase))
                             {
                                 downloadUrl = asset.GetProperty("browser_download_url").GetString();
                                 assetName = name;
@@ -4036,7 +4093,7 @@ namespace ETSOverlay
                     }
                     else
                     {
-                        WriteLog("Update found but no ZIP asset available");
+                        WriteLog("Update found but no installer EXE asset available");
                         if (!silent)
                         {
                             Dispatcher.Invoke(() =>
