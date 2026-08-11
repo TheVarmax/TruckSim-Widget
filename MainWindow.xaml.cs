@@ -145,9 +145,14 @@ namespace ETSOverlay
         private bool _isDesync = false;
 
         private string _uiMode = "full";
+        public string GetUiMode() => _uiMode;
         private bool _showDistance = true;
         private bool _showRoute = true;
         private bool _showBottomInfo = true;
+        
+        private bool _hudShowCurrentSpeed = true;
+        private bool _hudShowMaxSpeed = true;
+        private bool _hudShowDeliveryType = true;
         private bool _autoHideEnabled = false;
         private DispatcherTimer? _idleTimer;
         private bool _isIdle = false;
@@ -268,6 +273,9 @@ namespace ETSOverlay
             public double HudLeft { get; set; } = double.NaN;
             public double HudTop { get; set; } = double.NaN;
             public double HudCenterLeft { get; set; } = double.NaN;
+            public bool HudShowCurrentSpeed { get; set; } = true;
+            public bool HudShowMaxSpeed { get; set; } = true;
+            public bool HudShowDeliveryType { get; set; } = true;
             public bool ShowDistance { get; set; } = true;
             public bool ShowBottomInfo { get; set; } = true;
             public bool ShowRoute { get; set; } = true;
@@ -463,6 +471,13 @@ namespace ETSOverlay
                         _autoHideQuietMs = 0;
                         StartIdleTimer();
                     }
+
+                    if (_hudWindow != null && _hudWindow.IsVisible)
+                    {
+                        _hudWindow.Opacity = 0;
+                        _hudWindow.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromSeconds(0.4)));
+                    }
+
                     return;
                 }
 
@@ -2131,8 +2146,6 @@ namespace ETSOverlay
                 
                 // Reset Premium Features
                 SpeedLimiterService.Instance.Disable();
-                SpeedWarningEts = 0;
-                SpeedWarningAts = 0;
                 
                 if (_uiMode == "custom")
                 {
@@ -2142,9 +2155,8 @@ namespace ETSOverlay
                 _settingsWindow?.SyncGeneralValues();
             }
 
-            bool isBetaOrDev = LicenseManager.Instance.Status == "active" && 
-                              (LicenseManager.Instance.CurrentPlan == "tester" || LicenseManager.Instance.CurrentPlan == "developer");
-            if (!isBetaOrDev && _uiMode == "hud")
+            bool isSupporter = LicenseManager.Instance.Status == "active";
+            if (!isSupporter && _uiMode == "hud")
             {
                 OnUIModeChanged("full");
                 _settingsWindow?.SyncGeneralValues();
@@ -2166,6 +2178,9 @@ namespace ETSOverlay
                     HudLeft = _hudWindow?.Left ?? _savedHudLeft,
                     HudTop = _hudWindow?.Top ?? _savedHudTop,
                     HudCenterLeft = _hudWindow != null ? _hudWindow.GetTrueCenterLeft() : _savedHudCenterLeft,
+                    HudShowCurrentSpeed = _hudShowCurrentSpeed,
+                    HudShowMaxSpeed = _hudShowMaxSpeed,
+                    HudShowDeliveryType = _hudShowDeliveryType,
                     ShowDistance = _showDistance,
                     ShowBottomInfo = _showBottomInfo,
                     ShowRoute = _showRoute,
@@ -2229,6 +2244,9 @@ namespace ETSOverlay
                             Left = state.Left;
                             Top = state.Top;
                             _uiMode = state.UIMode ?? "full";
+                            _hudShowCurrentSpeed = state.HudShowCurrentSpeed;
+                            _hudShowMaxSpeed = state.HudShowMaxSpeed;
+                            _hudShowDeliveryType = state.HudShowDeliveryType;
                             _showDistance = state.ShowDistance;
                             _showRoute = state.ShowRoute;
                             _showBottomInfo = state.ShowBottomInfo;
@@ -2587,8 +2605,11 @@ namespace ETSOverlay
             {
                 _isHiddenByHud = true;
                 _skipStartupAnimation = true;
-                this.Hide();
-                _headerOverlay?.Hide();
+                if (!animate) 
+                {
+                    this.Hide();
+                    _headerOverlay?.Hide();
+                }
                 if (_hudWindow == null)
                 {
                     _hudWindow = new HudWindow(this);
@@ -2621,7 +2642,7 @@ namespace ETSOverlay
                             _hudWindow.UpdateData(
                                 StatusValue.Text, StatusValue.Foreground,
                                 DistanceInfo.Text,
-                                SpeedValue.Text,
+                                SpeedValue.Text, SpeedValue.Foreground,
                                 MaxSpeedValue.Text,
                                 DeliveryType.Text, DeliveryType.Foreground
                             );
@@ -2657,6 +2678,24 @@ namespace ETSOverlay
                     _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.DesiredSize.Width) / 2;
                     _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.DesiredSize.Height - 20; 
                 }
+                if (animate)
+                {
+                    _hudWindow.Opacity = 0;
+                    _hudWindow.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromSeconds(0.3)));
+                    
+                    var fadeOut = new DoubleAnimation(0.0, TimeSpan.FromSeconds(0.3));
+                    fadeOut.Completed += (s, ev) => 
+                    {
+                        this.Hide();
+                        this.BeginAnimation(Window.OpacityProperty, null);
+                        this.Opacity = 1.0;
+                    };
+                    this.BeginAnimation(Window.OpacityProperty, fadeOut);
+                }
+                else
+                {
+                    this.Hide();
+                }
                 
                 return;
             }
@@ -2664,15 +2703,37 @@ namespace ETSOverlay
             {
                 if (_isHiddenByHud)
                 {
+                    if (animate)
+                    {
+                        this.Opacity = 0;
+                        this.BeginAnimation(Window.OpacityProperty, null);
+                    }
                     this.Show();
-                    _headerOverlay?.Show();
+                    if (!animate) _headerOverlay?.Show();
                     _isHiddenByHud = false;
                 }
                 MainBorder.Visibility = Visibility.Visible;
                 if (_hudWindow != null)
                 {
                     _hudSyncTimer?.Stop();
-                    _hudWindow.Hide();
+                    if (animate && _hudWindow.IsVisible)
+                    {
+                        this.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromSeconds(0.3)));
+                        
+                        var fadeOut = new DoubleAnimation(0.0, TimeSpan.FromSeconds(0.3));
+                        fadeOut.Completed += (s, ev) => 
+                        {
+                            _hudWindow.Hide();
+                            _hudWindow.BeginAnimation(Window.OpacityProperty, null);
+                            _hudWindow.Opacity = 1.0;
+                            _headerOverlay?.Show();
+                        };
+                        _hudWindow.BeginAnimation(Window.OpacityProperty, fadeOut);
+                    }
+                    else
+                    {
+                        _hudWindow.Hide();
+                    }
                 }
             }
 
@@ -2891,6 +2952,10 @@ namespace ETSOverlay
         public bool GetShowRoute() => _showRoute;
         public bool GetShowBottomInfo() => _showBottomInfo;
 
+        public bool GetHudShowCurrentSpeed() => _hudShowCurrentSpeed;
+        public bool GetHudShowMaxSpeed() => _hudShowMaxSpeed;
+        public bool GetHudShowDeliveryType() => _hudShowDeliveryType;
+
         public void SetVisibilitySettings(bool gameCards, bool route, bool bottom)
         {
             _showDistance = gameCards;
@@ -2898,6 +2963,16 @@ namespace ETSOverlay
             _showBottomInfo = bottom;
             SaveState();
             ApplyUIMode(true);
+            ScheduleCloudSyncUpload();
+        }
+
+        public void SetHudVisibilitySettings(bool currentSpeed, bool maxSpeed, bool deliveryType)
+        {
+            _hudShowCurrentSpeed = currentSpeed;
+            _hudShowMaxSpeed = maxSpeed;
+            _hudShowDeliveryType = deliveryType;
+            SaveState();
+            _hudWindow?.ApplyVisibilitySettings(true);
             ScheduleCloudSyncUpload();
         }
 
@@ -3141,6 +3216,8 @@ namespace ETSOverlay
 
         private void ApplyLocalization()
         {
+            if (_hudWindow != null) _hudWindow.SuppressAnimations = true;
+            
             bool isUk = uiLanguage == "uk";
 
             // Main window labels
@@ -3782,7 +3859,7 @@ namespace ETSOverlay
 
         public void BtnClose_Click(object? sender, RoutedEventArgs e)
         {
-            try { SaveState(); telemetry?.Dispose(); } catch { }
+            try { SaveState(); SpeedLimiterService.Instance.ReleaseBrake(); telemetry?.Dispose(); } catch { }
             Environment.Exit(0);
         }
 
@@ -3807,7 +3884,15 @@ namespace ETSOverlay
             _headerOverlay?.UpdatePinIcon(Topmost);
             _hudWindow?.UpdatePinIcon(Topmost);
         }
-        protected override void OnClosed(EventArgs e) { WriteLog("=== OVERLAY CLOSED ==="); SaveState(); SpeedLimiterService.Instance.ReleaseBrake(); telemetry?.Dispose(); base.OnClosed(e); }
+        protected override void OnClosed(EventArgs e) 
+        { 
+            WriteLog("=== OVERLAY CLOSED ==="); 
+            SaveState(); 
+            SpeedLimiterService.Instance.ReleaseBrake(); 
+            telemetry?.Dispose(); 
+            base.OnClosed(e); 
+            Environment.Exit(0);
+        }
 
         // ==================== AUTO-UPDATE ====================
 
@@ -4260,6 +4345,7 @@ namespace ETSOverlay
 
                 // Сохраняем состояние и сразу закрываем приложение
                 SaveState();
+                SpeedLimiterService.Instance.ReleaseBrake();
                 telemetry?.Dispose();
                 Environment.Exit(0);
             }
@@ -4376,16 +4462,47 @@ namespace ETSOverlay
             }
         }
 
+        private System.Windows.Threading.DispatcherTimer? _speedWarningSoundTimer;
+        private System.Windows.Media.MediaPlayer? _speedWarningPlayer;
+
+        private void PlayWarningBeep()
+        {
+            if (_speedWarningPlayer == null)
+            {
+                _speedWarningPlayer = new System.Windows.Media.MediaPlayer();
+            }
+            
+            _speedWarningPlayer.Stop();
+            _speedWarningPlayer.Close();
+            _speedWarningPlayer.Open(new Uri(System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "warning.m4a")));
+            _speedWarningPlayer.Play();
+        }
+
         private void ApplySpeedWarningColor(int currentSpeed)
         {
+            if (_speedWarningSoundTimer == null)
+            {
+                _speedWarningSoundTimer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+                _speedWarningSoundTimer.Tick += (s, e) => PlayWarningBeep();
+            }
+
             int threshold = Math.Max(0, CurrentSpeedWarning);
             if (threshold > 0 && currentSpeed >= threshold)
             {
-                SpeedValue.Foreground = Brushes.Red;
+                SpeedValue.Foreground = System.Windows.Media.Brushes.Red;
+                if (!_speedWarningSoundTimer.IsEnabled)
+                {
+                    PlayWarningBeep();
+                    _speedWarningSoundTimer.Start();
+                }
             }
             else
             {
-                SpeedValue.Foreground = Brushes.White;
+                SpeedValue.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "AccentBrush_Speed");
+                if (_speedWarningSoundTimer.IsEnabled)
+                {
+                    _speedWarningSoundTimer.Stop();
+                }
             }
         }
 

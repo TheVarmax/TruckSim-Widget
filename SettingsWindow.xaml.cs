@@ -402,11 +402,7 @@ namespace ETSOverlay
             var license = LicenseManager.Instance;
             bool isSupporter = license.Status == "active";
 
-            string activeMode = "full";
-            if (UIModeSelector.SelectedItem is ComboBoxItem cbi && cbi.Tag is string currentSelection)
-            {
-                activeMode = currentSelection;
-            }
+            string activeMode = _mainWindow.GetUiMode();
 
             bool isBetaOrDev = isSupporter && (license.CurrentPlan == "tester" || license.CurrentPlan == "developer");
 
@@ -418,14 +414,14 @@ namespace ETSOverlay
 
             var hudItem = new ComboBoxItem { Tag = "hud" };
             string hudText = _isUk ? "HUD Режим" : "HUD Mode";
-            if (!isBetaOrDev)
+            if (!isSupporter)
             {
                 var sp = new StackPanel { Orientation = Orientation.Horizontal };
-                sp.Children.Add(new TextBlock { Text = "[BETA] ", FontSize = 12, FontWeight = FontWeights.Bold, Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5A623")), VerticalAlignment = VerticalAlignment.Center });
+                sp.Children.Add(new TextBlock { Text = "⭐ ", FontSize = 18, Foreground = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5C542")), VerticalAlignment = VerticalAlignment.Center });
                 sp.Children.Add(new TextBlock { Text = hudText, VerticalAlignment = VerticalAlignment.Center });
                 hudItem.Content = sp;
                 hudItem.Uid = "premium";
-                hudItem.ToolTip = _isUk ? "Доступно тільки для Beta тестувальників" : "Available only for Beta testers";
+                hudItem.ToolTip = _isUk ? "Доступно тільки з підпискою Supporter" : "Available only with Supporter subscription";
             }
             else
             {
@@ -465,7 +461,22 @@ namespace ETSOverlay
                 BtnSpeedLimiterKey.Content = SpeedLimiterService.Instance.BrakeKey.ToString();
             }
 
+            if (HudToggleSpeed != null) HudToggleSpeed.IsChecked = _mainWindow.GetHudShowCurrentSpeed();
+            if (HudToggleMaxSpeed != null) HudToggleMaxSpeed.IsChecked = _mainWindow.GetHudShowMaxSpeed();
+            if (HudToggleType != null) HudToggleType.IsChecked = _mainWindow.GetHudShowDeliveryType();
+
             _suppressEvents = false;
+        }
+
+        private void HudToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            
+            _mainWindow.SetHudVisibilitySettings(
+                HudToggleSpeed.IsChecked ?? true,
+                HudToggleMaxSpeed.IsChecked ?? true,
+                HudToggleType.IsChecked ?? true
+            );
         }
 
         private void BetaUpdatesToggle_Checked(object sender, RoutedEventArgs e)
@@ -585,10 +596,6 @@ namespace ETSOverlay
                 }
                 _suppressEvents = false;
                 string toastMsg = _isUk ? "Потрібна підписка Supporter" : "Requires Supporter subscription";
-                if (item.Tag is string tag && tag == "hud")
-                {
-                    toastMsg = _isUk ? "Потрібна ліцензія Beta тестувальника" : "Requires Beta Tester license";
-                }
                 ShowToast(toastMsg);
                 return true;
             }
@@ -767,12 +774,22 @@ namespace ETSOverlay
             if (CustomModeConfigBtn != null) CustomModeConfigBtn.Content = isUk ? "Змінити" : "Change";
             
             SpeedWarningLabel.Text = isUk ? "Поріг швидкості" : "Speed warning";
+            if (SpeedWarningToolTip != null) 
+            {
+                SpeedWarningToolTip.Content = isUk 
+                    ? "У разі ввімкнення попереджатиме вас звуком та кольором, якщо ваша швидкість вища за встановлений поріг." 
+                    : "When enabled, visually and audibly warns you if your speed is higher than the specified threshold.";
+            }
             ScaleLabel.Text = isUk ? "Масштаб" : "Scale";
             AutoHideLabel.Text = isUk ? "Автоскривання" : "Auto-hide";
             AutoHideHint.Text = isUk
                 ? "Використовує лише статус TruckBook. Тимчасово приховує вибраний режим інтерфейсу, коли статус спокійний."
                 : "Uses TruckBook status only. Temporarily hides the selected UI mode when status is calm.";
                 
+            if (HudToggleSpeedLabel != null) HudToggleSpeedLabel.Text = isUk ? "Поточна швидкість" : "Current Speed";
+            if (HudToggleMaxSpeedLabel != null) HudToggleMaxSpeedLabel.Text = isUk ? "Макс. швидкість" : "Max Speed";
+            if (HudToggleTypeLabel != null) HudToggleTypeLabel.Text = isUk ? "Тип вантажу" : "Delivery Type";
+
             if (BetaUpdatesLabel != null) BetaUpdatesLabel.Text = isUk ? "Отримувати бета-оновлення" : "Receive beta updates";
 
             if (!_mainWindow._isCheckingUpdate)
@@ -798,11 +815,17 @@ namespace ETSOverlay
             if (SpeedLimiterTitle != null)
             {
                 SpeedLimiterTitle.Text = isUk ? "Обмежувач швидкості" : "Speed Limiter";
-                SpeedLimiterEnableLabel.Text = isUk ? "Увімкнути обмежувач" : "Enable Limiter";
-                SpeedLimiterEtsLabel.Text = isUk ? "Ліміт ETS2 (км/год)" : "ETS2 Limit (km/h)";
-                SpeedLimiterAtsLabel.Text = isUk ? "Ліміт ATS (миль/год)" : "ATS Limit (mph)";
-                SpeedLimiterKeyLabel.Text = isUk ? "Кнопка гальма" : "Brake Key";
             }
+            if (SpeedLimiterToolTip != null)
+            {
+                SpeedLimiterToolTip.Content = isUk
+                    ? "У разі ввімкнення автоматично гальмує вантажівку, щоб не перевищувати ліміт швидкості. Кнопка гальмування ПОВИННА бути такою ж, як і в налаштуваннях гри."
+                    : "When enabled, automatically brakes the truck to keep it below the speed limit. The braking key MUST match the one configured in the game.";
+            }    
+            SpeedLimiterEnableLabel.Text = isUk ? "Увімкнути обмежувач" : "Enable Limiter";
+            SpeedLimiterEtsLabel.Text = isUk ? "Ліміт ETS2 (км/год)" : "ETS2 Limit (km/h)";
+            SpeedLimiterAtsLabel.Text = isUk ? "Ліміт ATS (миль/год)" : "ATS Limit (mph)";
+            SpeedLimiterKeyLabel.Text = isUk ? "Кнопка гальма" : "Brake Key";
 
             // Cloud Tab localization
             TabCloudBtn.Content = isUk ? "Хмара" : "Cloud";

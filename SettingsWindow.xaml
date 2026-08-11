@@ -498,6 +498,18 @@
                                     <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
                                 </Border.Effect>
                                 <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="4,0,0,8">
+                                        <ToggleButton x:Name="HudToggleSpeed" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="HudToggleSpeedLabel" Text="Current Speed" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="13"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="4,0,0,8">
+                                        <ToggleButton x:Name="HudToggleMaxSpeed" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="HudToggleMaxSpeedLabel" Text="Max Speed" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="13"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="4,0,0,12">
+                                        <ToggleButton x:Name="HudToggleType" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="HudToggleTypeLabel" Text="Delivery Type" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="13"/>
+                                    </StackPanel>
                                     <Button Content="Move to Top" Click="HudMoveToTopBtn_Click" Foreground="White" BorderThickness="0" Padding="8,6" Margin="0,0,0,6" Cursor="Hand">
                                         <Button.Template>
                                             <ControlTemplate TargetType="Button">
@@ -578,7 +590,15 @@
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="SpeedWarningLabel" Grid.Column="0" Text="Speed warning" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                            <TextBlock x:Name="SpeedWarningLabel" Text="Speed warning" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <Border Background="Transparent" Margin="6,0,0,0" VerticalAlignment="Center" ToolTipService.InitialShowDelay="200">
+                                <Border.ToolTip>
+                                    <ToolTip x:Name="SpeedWarningToolTip" Content="When enabled, warns you if your speed is higher than the specified threshold." />
+                                </Border.ToolTip>
+                                <Path Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" Fill="{DynamicResource MutedTextBrush}" Stretch="Uniform" Width="14" Height="14" />
+                            </Border>
+                        </StackPanel>
                         
                         <ToggleButton x:Name="BtnSpeedWarningConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
                             <ToggleButton.Template>
@@ -636,7 +656,15 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="SpeedLimiterTitle" Grid.Column="0" Text="Speed Limiter" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,10,0"/>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
+                                <TextBlock x:Name="SpeedLimiterTitle" Text="Speed Limiter" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                <Border Background="Transparent" Margin="6,0,0,0" VerticalAlignment="Center" ToolTipService.InitialShowDelay="200">
+                                    <Border.ToolTip>
+                                        <ToolTip x:Name="SpeedLimiterToolTip" Content="When enabled, automatically brakes the truck to keep it below the speed limit. The braking key MUST match the one configured in the game." />
+                                    </Border.ToolTip>
+                                    <Path Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" Fill="{DynamicResource MutedTextBrush}" Stretch="Uniform" Width="14" Height="14" />
+                                </Border>
+                            </StackPanel>
                             
                             <ToggleButton x:Name="BtnSpeedLimiterConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure" Click="BtnSpeedLimiterConfig_Click">
                                 <ToggleButton.Template>

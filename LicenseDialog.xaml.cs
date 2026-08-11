@@ -29,6 +29,7 @@ namespace ETSOverlay
                 LicenseKeyLabel.Text = "Ключ ліцензії";
                 BtnCloseInactive.Content = "Закрити";
                 BtnActivate.Content = "Активувати";
+                BtnGetLicense.Content = "Отримати ключ";
                 StatusLabel.Text = "Статус:";
                 PlanLabel.Text = "План:";
                 LastValidatedLabel.Text = "Остання перевірка:";
@@ -43,6 +44,7 @@ namespace ETSOverlay
                 LicenseKeyLabel.Text = "License Key";
                 BtnCloseInactive.Content = "Close";
                 BtnActivate.Content = "Activate";
+                BtnGetLicense.Content = "Get License";
                 StatusLabel.Text = "Status:";
                 PlanLabel.Text = "Plan:";
                 LastValidatedLabel.Text = "Last Validated:";
@@ -104,6 +106,19 @@ namespace ETSOverlay
             Close();
         }
 
+        private void BtnGetLicense_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "https://donate.maksym.uk",
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        }
+
         private void ShowMessage(string text, bool isError)
         {
             MessageBorder.Visibility = Visibility.Visible;
@@ -130,14 +145,21 @@ namespace ETSOverlay
             ClearMessage();
             if (string.IsNullOrWhiteSpace(LicenseKeyInput.Text))
             {
-                ShowMessage("Please enter a valid License Key.", true);
+                ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Будь ласка, введіть ключ ліцензії." : "Please enter a License Key.", true);
+                return;
+            }
+
+            string keyText = LicenseKeyInput.Text.Trim().ToUpper();
+            if (!System.Text.RegularExpressions.Regex.IsMatch(keyText, @"^TSW-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$"))
+            {
+                ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Невірний формат ключа. Має бути: TSW-XXXX-XXXX-XXXX" : "Invalid key format. Must be: TSW-XXXX-XXXX-XXXX", true);
                 return;
             }
 
             BtnActivate.IsEnabled = false;
             BtnActivate.Content = _mainWindow.GetUiLanguage() == "uk" ? "Активація..." : "Activating...";
 
-            var (success, message) = await LicenseManager.Instance.ActivateAsync(LicenseKeyInput.Text, MainWindow.GetCurrentVersion());
+            var (success, message) = await LicenseManager.Instance.ActivateAsync(keyText, MainWindow.GetCurrentVersion());
             
             if (!success)
             {

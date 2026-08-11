@@ -68,58 +68,62 @@
                 </Border>
                 
                 <Border MinHeight="38" Padding="12,0">
-                    <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="25"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="25"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="25"/>
-                        <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="25"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal">
 
                     <!-- TB STATUS -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Ellipse x:Name="TbStatusDot" Width="8" Height="8" Fill="{DynamicResource AccentBrush_Sim}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock x:Name="TbStatus" Text="TB • ONLINE" Foreground="{DynamicResource AccentBrush_Sim}" FontSize="12" FontWeight="Bold" VerticalAlignment="Center"/>
                     </StackPanel>
                     
-                    <Border Grid.Column="1" Width="1" Background="{DynamicResource CardBorderBrush}" Margin="0,4" HorizontalAlignment="Center"/>
+                    <Border Width="1" Background="{DynamicResource CardBorderBrush}" Margin="12,4" HorizontalAlignment="Center"/>
 
                     <!-- DISTANCE -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                         <Path Data="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z" Fill="{DynamicResource AccentBrush_Distance}" Stretch="Uniform" Width="12" Height="12" Margin="0,0,6,0" VerticalAlignment="Center"/>
                         <TextBlock x:Name="DistanceInfo" Text="0 / 0 km" Foreground="{DynamicResource AccentBrush_Distance}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
                     </StackPanel>
 
-                    <Border Grid.Column="3" Width="1" Background="{DynamicResource CardBorderBrush}" Margin="0,4" HorizontalAlignment="Center"/>
+                    <Grid x:Name="SpeedSeparator" Tag="25">
+                        <Border Width="1" Background="{DynamicResource CardBorderBrush}" Margin="0,4" HorizontalAlignment="Center"/>
+                    </Grid>
 
                     <!-- SPEED -->
-                    <StackPanel Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel x:Name="SpeedContainer" Orientation="Horizontal" VerticalAlignment="Center" ClipToBounds="True" RenderTransformOrigin="0.5,0.5">
+                        <StackPanel.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1"/>
+                        </StackPanel.RenderTransform>
                         <TextBlock x:Name="SpeedLabel" Text="SPEED: " Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,2,2,0"/>
                         <TextBlock x:Name="SpeedValue" Text="0" Foreground="{DynamicResource AccentBrush_Speed}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
                         <TextBlock x:Name="SpeedUnit" Text="km/h" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" VerticalAlignment="Bottom" Margin="2,0,0,1"/>
                     </StackPanel>
 
-                    <Border Grid.Column="5" Width="1" Background="{DynamicResource CardBorderBrush}" Margin="0,4" HorizontalAlignment="Center"/>
+                    <Grid x:Name="MaxSpeedSeparator" Tag="25">
+                        <Border Width="1" Background="{DynamicResource CardBorderBrush}" Margin="0,4" HorizontalAlignment="Center"/>
+                    </Grid>
 
                     <!-- MAX SPEED -->
-                    <StackPanel Grid.Column="6" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel x:Name="MaxSpeedContainer" Orientation="Horizontal" VerticalAlignment="Center" ClipToBounds="True" RenderTransformOrigin="0.5,0.5">
+                        <StackPanel.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1"/>
+                        </StackPanel.RenderTransform>
                         <TextBlock x:Name="MaxSpeedLabel" Text="MAX: " Foreground="{DynamicResource MainTextBrush}" FontSize="10" FontWeight="Bold" VerticalAlignment="Center" Margin="0,2,2,0"/>
                         <TextBlock x:Name="MaxSpeedValue" Text="0" Foreground="{DynamicResource AccentBrush_Max}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
                         <TextBlock x:Name="MaxUnit" Text="km/h" Foreground="{DynamicResource MutedTextBrush}" FontSize="10" VerticalAlignment="Bottom" Margin="2,0,0,1"/>
                     </StackPanel>
 
-                    <Border Grid.Column="7" Width="1" Background="{DynamicResource CardBorderBrush}" Margin="0,4" HorizontalAlignment="Center"/>
+                    <Grid x:Name="TypeSeparator" Tag="25">
+                        <Border Width="1" Background="{DynamicResource CardBorderBrush}" Margin="0,4" HorizontalAlignment="Center"/>
+                    </Grid>
 
                     <!-- TYPE -->
-                    <StackPanel Grid.Column="8" Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel x:Name="TypeContainer" Orientation="Horizontal" VerticalAlignment="Center" ClipToBounds="True" RenderTransformOrigin="0.5,0.5">
+                        <StackPanel.RenderTransform>
+                            <ScaleTransform ScaleX="1" ScaleY="1"/>
+                        </StackPanel.RenderTransform>
                         <TextBlock x:Name="DeliveryType" Text="N/A" Foreground="{DynamicResource AccentBrush_Type}" FontSize="14" FontWeight="Heavy" VerticalAlignment="Center"/>
                     </StackPanel>
-                    </Grid>
+                    </StackPanel>
                 </Border>
             </Grid>
 
