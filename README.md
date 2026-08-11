@@ -75,6 +75,14 @@ Keep your cargo state, route, driven distance, and current delivery progress vis
 
 See the information that matters during a delivery without filling the screen with another dashboard.
 
+### 🖥️ HUD Mode *(Supporters Exclusive)*
+
+A sleek, focused overlay mode designed to show only the most essential telemetry data without cluttering the screen.
+
+- Displays core driving metrics in a streamlined horizontal format.
+- Features smooth text transition animations.
+- Dynamic color synchronization with the main widget (e.g. speed warnings turn red).
+
 ### 🎨 Interface customization *(Supporters Exclusive)*
 
 Personalize the widget to match your setup and preferences.
@@ -109,6 +117,7 @@ Automatically saves completed deliveries and lets you review your driving histor
 Support TruckSim Widget development and unlock additional functionality.
 
 - ☁️ Cloud Sync
+- 🖥️ HUD Mode
 - 🎨 Custom UI Mode
 - 📖 Unlimited Trip Logbook
 - 📊 Advanced trip statistics
@@ -167,6 +176,7 @@ Supporter subscriptions unlock additional convenience features while keeping all
 | Trip Logbook | Last 5 trips | Unlimited |
 | Essential trip information | ✅ | ✅ |
 | Extended trip statistics | ❌ | ✅ |
+| HUD Mode | ❌ | ✅ |
 | Custom UI Mode | ❌ | ✅ |
 | Cloud Sync | ❌ | ✅ |
 | Smart Braking Assistant | ❌ | ✅ |
