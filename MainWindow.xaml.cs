@@ -854,27 +854,31 @@ namespace ETSOverlay
                         _lastValidNavDist = data.NavigationValues.NavigationDistance;
                     }
 
-                    if (hasJobInfo && _navZeroTicks > 5)
+                    bool isWotJob = (int)data.JobValues.Market == 2 || (int)data.JobValues.Market == 4;
+                    if (hasJobInfo && _navZeroTicks > 5 && isWotJob)
                     {
                         // SCSSdkClient bug workaround: WoT job was cancelled/suspended, but telemetry is stuck.
                         // Navigation distance is 0 for several ticks.
-                        if (!_cargoWasLoaded && _cargoLoadedTicks < 3)
+                        if (!_tbHasActiveJob)
                         {
-                            // Phase 1 (driving to pickup). We always drop to Free Roam if NavDist becomes 0.
-                            // If they just arrived at pickup, it's fine, it will recover when they load.
-                            hasJobInfo = false;
-                        }
-                        else if (_lastValidNavDist > 1000f)
-                        {
-                            // Phase 3 (already loaded). Only drop to Free Roam if the route abruptly vanished
-                            // while they were far (>1000m) from the destination (i.e. cancelled/suspended).
-                            hasJobInfo = false;
-                        }
+                            if (!_cargoWasLoaded && _cargoLoadedTicks < 3)
+                            {
+                                // Phase 1 (driving to pickup). We always drop to Free Roam if NavDist becomes 0.
+                                // If they just arrived at pickup, it's fine, it will recover when they load.
+                                hasJobInfo = false;
+                            }
+                            else if (_lastValidNavDist > 1000f)
+                            {
+                                // Phase 3 (already loaded). Only drop to Free Roam if the route abruptly vanished
+                                // while they were far (>1000m) from the destination (i.e. cancelled/suspended).
+                                hasJobInfo = false;
+                            }
 
-                        if (!hasJobInfo)
-                        {
-                            // Сохраняем ID отменённого заказа, чтобы он не воскрес при перезапуске виджета
-                            _cancelledJobs.Add(resolvedJobId);
+                            if (!hasJobInfo)
+                            {
+                                // Сохраняем ID отменённого заказа, чтобы он не воскрес при перезапуске виджета
+                                _cancelledJobs.Add(resolvedJobId);
+                            }
                         }
                     }
 
@@ -3756,7 +3760,6 @@ namespace ETSOverlay
 
                 var json = JsonSerializer.Serialize(jobState, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(filePath, json);
-                WriteLog($"Job state saved to file: {safeJobId}");
             }
             catch (Exception ex)
             {
