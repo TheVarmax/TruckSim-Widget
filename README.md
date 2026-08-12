@@ -319,6 +319,10 @@ If something behaves unexpectedly, use the project website or the Telegram link 
 
 ## Notes
 
+### Custom truck and trailer mods
+
+When using custom truck or trailer mods, you might occasionally see false telemetry errors in the widget. This happens because some custom mods send incorrect or incomplete data to the telemetry plugin. If you encounter unexpected widget warnings while driving a modded vehicle, it is likely caused by the mod itself. If you experience these problems, please contact support at support@maksym.uk and attach your TrucksBook logs and the widget's log file located at `%LocalAppData%\TruckSimWidget\app_log.txt`.
+
 ### Compatibility
 
 TruckSim Widget is an independent project. It is not affiliated with, endorsed by, or associated with SCS Software, Euro Truck Simulator 2, American Truck Simulator, or TrucksBook.
