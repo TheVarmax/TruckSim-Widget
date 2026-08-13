@@ -161,6 +161,10 @@ The interface supports English and Ukrainian. City names can also be translated 
 
 Stay up to date without manually checking for every new release. After a successful update, the widget shows an in-app confirmation window with useful links instead of forcing a browser page open.
 
+> [!WARNING]
+> **Update Notice for Older Versions:**  
+> Starting with version 1.5.9, TruckSim Widget transitioned to a brand new `updater.exe` based system. If you are currently running a version *older* than 1.5.9, the automatic update may throw an error due to the outdated update logic. If this happens, please manually download and run the latest installer from the Releases page. Furthermore, version 1.5.9 marks the end of Portable (`.zip`) releases to fully support this new seamless update architecture.
+
 ---
 
 ## Free vs Supporter
@@ -240,7 +244,7 @@ Open the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/
 | Format | Best for | What to do |
 | --- | --- | --- |
 | **Installer (recommended)** `TruckSimWidgetSetup-<version>.exe` | Most users | Run the setup, choose an installation folder, and optionally configure the telemetry plugin for ETS2 and/or ATS during setup. The installer creates Windows shortcuts and an uninstall entry. |
-| **Portable ZIP** `TruckSimWidget-<version>.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. |
+| **Portable ZIP** `TruckSimWidget-<version>.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. *(Note: 1.5.9 is the final release to support the Portable format).* |
 
 > **Important:** Do not run the portable version from inside the ZIP archive. Extract it first.
 
