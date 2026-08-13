@@ -143,7 +143,7 @@ Choose between **Full** and **Minimal** layouts, adjust opacity and scale, and p
 
 ### ⚠️ Speed warnings
 
-Set a speed warning threshold and receive a clear visual indication when you exceed it.
+Set a speed warning threshold and receive a clear visual indication and a custom looping audio alarm when you reach it.
 
 ### 🛡️ Smart Braking Assistant *(Supporters Exclusive)*
 
