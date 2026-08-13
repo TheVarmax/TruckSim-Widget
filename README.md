@@ -163,7 +163,7 @@ Stay up to date without manually checking for every new release. After a success
 
 > [!WARNING]
 > **Update Notice for Older Versions:**  
-> Starting with version 1.5.9, TruckSim Widget transitioned to a brand new `updater.exe` based system. If you are currently running a version *older* than 1.5.9, the automatic update may throw an error due to the outdated update logic. If this happens, please manually download and run the latest installer from the Releases page. Furthermore, version 1.5.9 marks the end of Portable (`.zip`) releases to fully support this new seamless update architecture.
+> Starting with version 1.5.9, TruckSim Widget transitioned to a brand new `updater.exe` based system. If you are currently running a version *older* than 1.5.9, **the widget will not notify you about new updates** because the old update logic relied on `.zip` files which are no longer published. To receive the latest updates, please manually download and run the latest installer from the Releases page. Furthermore, version 1.5.9 marks the end of Portable (`.zip`) releases to fully support this new seamless update architecture.
 
 ---
 
