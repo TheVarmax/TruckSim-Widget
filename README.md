@@ -71,6 +71,11 @@ Know at a glance whether TrucksBook is online and your delivery is being tracked
 
 Keep your cargo state, route, driven distance, and current delivery progress visible in one compact overlay.
 
+> **What do "REAL" and "RACE" mean?**  
+> The widget frequently displays the current delivery type (often without a "TYPE:" label in HUD Mode to save space). This indicates the TrucksBook category your delivery falls into, which is based on **TrucksBook's official rules**. Your category is determined entirely by your maximum speed during the job:
+> - **REAL**: Maximum speed has not exceeded 100 km/h (ETS2) or 80 mph (ATS). This is the standard realism category.
+> - **RACE**: Maximum speed reached between 100-180 km/h (ETS2) or 80-112 mph (ATS).
+
 ### 🚛 Live telemetry
 
 See the information that matters during a delivery without filling the screen with another dashboard.
@@ -79,7 +84,7 @@ See the information that matters during a delivery without filling the screen wi
 
 A sleek, focused overlay mode designed to show only the most essential telemetry data without cluttering the screen.
 
-- Displays core driving metrics in a streamlined horizontal format.
+- Displays the exact same core driving metrics as the Full Interface, but omits text labels (like "Distance", "Type", or "Speed") to maximize screen real estate.
 - Features smooth text transition animations.
 - Dynamic color synchronization with the main widget (e.g. speed warnings turn red).
 
