@@ -329,8 +329,8 @@ If something behaves unexpectedly, use the project website or the Telegram link 
 ## Notes
 
 > [!IMPORTANT]
-> **Domain Migration & Version Requirements**  
-> New license activations, subscription operations, and cloud sync now use our new infrastructure and require TruckSim Widget version **1.6.1 or newer**. Older widget versions must remain untouched and may continue using the legacy API/domain without interruption.
+> **Minimum Version Requirement: 1.6.1**  
+> All online services (license validation, subscription operations, and cloud sync) now strictly require TruckSim Widget version **1.6.1 or newer**. Older versions are no longer supported and will lose the ability to validate locally saved licenses. If you are using version 1.6.0 or below, you must update to 1.6.1+ to continue using the widget.
 
 ### Custom truck and trailer mods
 
