@@ -328,6 +328,10 @@ If something behaves unexpectedly, use the project website or the Telegram link 
 
 ## Notes
 
+> [!IMPORTANT]
+> **Domain Migration & Version Requirements**  
+> New license activations, subscription operations, and cloud sync now use our new infrastructure and require TruckSim Widget version **1.6.1 or newer**. Older widget versions must remain untouched and may continue using the legacy API/domain without interruption.
+
 ### Custom truck and trailer mods
 
 When using custom truck or trailer mods, you might occasionally see false telemetry errors in the widget. This happens because some custom mods send incorrect or incomplete data to the telemetry plugin. If you encounter unexpected widget warnings while driving a modded vehicle, it is likely caused by the mod itself. If you experience these problems, please contact support at support@trucksim.uk and attach your TrucksBook logs and the widget's log file located at `%LocalAppData%\TruckSimWidget\app_log.txt`.
