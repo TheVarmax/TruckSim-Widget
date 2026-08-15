@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <a href="https://trucksim.maksym.uk"><img src="https://img.shields.io/badge/Website-trucksim.maksym.uk-2ea44f?style=flat-square"></a>
+  <a href="https://trucksim.uk"><img src="https://img.shields.io/badge/Website-trucksim.uk-2ea44f?style=flat-square"></a>
   <a href="https://t.me/thevarmax"><img src="https://img.shields.io/badge/Telegram-@thevarmax-26A5E4?style=flat-square&logo=telegram&logoColor=white"></a>
   <a href="https://github.com/TheVarmax/TruckSim-Widget/releases"><img src="https://img.shields.io/badge/Download-Latest_Release-5865F2?style=flat-square&logo=github&logoColor=white"></a>
   <a href="https://send.monobank.ua/8Q2FKkJr3B"><img src="https://img.shields.io/badge/Donate-Monobank-ff5f5f?style=flat-square"></a>
@@ -330,7 +330,7 @@ scs-telemetry.dll
 
 ### Кастомні моди на вантажівки та причепи
 
-Під час використання кастомних модів на вантажівки або причепи віджет може іноді показувати хибні помилки телеметрії. Це стається тому, що деякі моди надсилають некоректні або неповні дані в плагін телеметрії. Якщо ви отримуєте несподівані попередження від віджета під час використання модованого транспорту, найімовірніше, це викликано самим модом. У разі виникнення таких проблем, будь ласка, зверніться до служби підтримки за адресою support@maksym.uk та надішліть логи TrucksBook і логи роботи віджета, які знаходяться за шляхом `%LocalAppData%\TruckSimWidget\app_log.txt`.
+Під час використання кастомних модів на вантажівки або причепи віджет може іноді показувати хибні помилки телеметрії. Це стається тому, що деякі моди надсилають некоректні або неповні дані в плагін телеметрії. Якщо ви отримуєте несподівані попередження від віджета під час використання модованого транспорту, найімовірніше, це викликано самим модом. У разі виникнення таких проблем, будь ласка, зверніться до служби підтримки за адресою support@trucksim.uk та надішліть логи TrucksBook і логи роботи віджета, які знаходяться за шляхом `%LocalAppData%\TruckSimWidget\app_log.txt`.
 
 ### Сумісність
 
@@ -387,5 +387,5 @@ TruckSim Widget поширюється за умовами ліцензії Mozi
 </p>
 
 <p align="center">
-  <a href="https://trucksim.maksym.uk">trucksim.maksym.uk</a>
+  <a href="https://trucksim.uk">trucksim.uk</a>
 </p>

@@ -112,7 +112,7 @@ namespace ETSOverlay
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = "https://donate.maksym.uk",
+                    FileName = "https://trucksim.uk/donate",
                     UseShellExecute = true
                 });
             }

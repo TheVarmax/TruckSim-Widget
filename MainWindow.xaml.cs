@@ -33,8 +33,8 @@ namespace ETSOverlay
         // Auto-update constants
         // GitHub URL (using /releases to include pre-releases/betas)
         private const string GitHubApiUrl = "https://api.github.com/repos/TheVarmax/TruckSim-Widget/releases";
-        private const string DonateUrl = "https://donate.maksym.uk";
-        private const string SupportEmail = "info@maksym.uk";
+        private const string DonateUrl = "https://trucksim.uk/donate";
+        private const string SupportEmail = "support@trucksim.uk";
         public bool _isCheckingUpdate = false;
 
         private bool locked = false;

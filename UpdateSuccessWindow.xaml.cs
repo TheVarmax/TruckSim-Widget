@@ -40,7 +40,7 @@ namespace ETSOverlay
 
         private void BtnWebsite_Click(object sender, RoutedEventArgs e)
         {
-            OpenUrl("https://trucksim.maksym.uk");
+            OpenUrl("https://trucksim.uk");
             Close();
         }
 

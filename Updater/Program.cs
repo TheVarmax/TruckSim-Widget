@@ -6,8 +6,8 @@ namespace TruckSimUpdater;
 
 static class Program
 {
-    private const string SuccessUrl = "https://successful.maksym.uk";
-    private const string SupportEmail = "info@maksym.uk";
+    private const string SuccessUrl = "https://trucksim.uk/successful";
+    private const string SupportEmail = "support@trucksim.uk";
 
 
     // Цвета в стиле виджета

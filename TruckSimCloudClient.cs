@@ -105,7 +105,7 @@ namespace ETSOverlay
 
     public class TruckSimCloudClient
     {
-        private const string BASE_URL = "https://trucksim-cloud-api.sd4nxwfsrb.workers.dev";
+        private const string BASE_URL = "https://api.trucksim.uk";
         private static readonly HttpClient _httpClient = new HttpClient();
 
         public async Task<LicenseResponse?> ActivateAsync(LicenseActivationRequest request)

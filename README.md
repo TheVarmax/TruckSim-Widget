@@ -24,7 +24,7 @@
 </p>
 
 <p align="center">
-  <a href="https://trucksim.maksym.uk"><img src="https://img.shields.io/badge/Website-trucksim.maksym.uk-2ea44f?style=flat-square"></a>
+  <a href="https://trucksim.uk"><img src="https://img.shields.io/badge/Website-trucksim.uk-2ea44f?style=flat-square"></a>
   <a href="https://t.me/thevarmax"><img src="https://img.shields.io/badge/Telegram-@thevarmax-26A5E4?style=flat-square&logo=telegram&logoColor=white"></a>
   <a href="https://github.com/TheVarmax/TruckSim-Widget/releases"><img src="https://img.shields.io/badge/Download-Latest_Release-5865F2?style=flat-square&logo=github&logoColor=white"></a>
   <a href="https://send.monobank.ua/8Q2FKkJr3B"><img src="https://img.shields.io/badge/Donate-Monobank-ff5f5f?style=flat-square"></a>
@@ -330,7 +330,7 @@ If something behaves unexpectedly, use the project website or the Telegram link 
 
 ### Custom truck and trailer mods
 
-When using custom truck or trailer mods, you might occasionally see false telemetry errors in the widget. This happens because some custom mods send incorrect or incomplete data to the telemetry plugin. If you encounter unexpected widget warnings while driving a modded vehicle, it is likely caused by the mod itself. If you experience these problems, please contact support at support@maksym.uk and attach your TrucksBook logs and the widget's log file located at `%LocalAppData%\TruckSimWidget\app_log.txt`.
+When using custom truck or trailer mods, you might occasionally see false telemetry errors in the widget. This happens because some custom mods send incorrect or incomplete data to the telemetry plugin. If you encounter unexpected widget warnings while driving a modded vehicle, it is likely caused by the mod itself. If you experience these problems, please contact support at support@trucksim.uk and attach your TrucksBook logs and the widget's log file located at `%LocalAppData%\TruckSimWidget\app_log.txt`.
 
 ### Compatibility
 
@@ -387,5 +387,5 @@ For full license details, see [LICENSE](LICENSE).
 </p>
 
 <p align="center">
-  <a href="https://trucksim.maksym.uk">trucksim.maksym.uk</a>
+  <a href="https://trucksim.uk">trucksim.uk</a>
 </p>
