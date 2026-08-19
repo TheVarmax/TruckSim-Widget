@@ -473,8 +473,8 @@ static class Program
         var form = new Form
         {
             Text = "TruckSim Widget — " + (isUk ? "Помилка оновлення" : "Update Error"),
-            Width = 500,
-            Height = 340,
+            Width = 520,
+            Height = 370,
             StartPosition = FormStartPosition.CenterScreen,
             FormBorderStyle = FormBorderStyle.FixedDialog,
             MaximizeBox = false,
@@ -489,34 +489,37 @@ static class Program
             Text = isUk ? "❌ Помилка оновлення" : "❌ Update Failed",
             Font = new Font("Segoe UI", 16, FontStyle.Bold),
             ForeColor = ErrorColor,
-            Location = new Point(20, 15),
-            AutoSize = true
+            Location = new Point(0, 20),
+            Size = new Size(form.Width - 16, 35),
+            TextAlign = ContentAlignment.MiddleCenter
         };
 
         var lblMessage = new Label
         {
             Text = (isUk ? "Під час оновлення виникла помилка:\n" : "An error occurred during the update:\n") +
                    (errorMessage.Length > 200 ? errorMessage[..200] + "..." : errorMessage),
-            Location = new Point(20, 55),
-            Size = new Size(440, 80),
-            ForeColor = TextSecondary
+            Location = new Point(30, 65),
+            Size = new Size(445, 80),
+            ForeColor = TextSecondary,
+            TextAlign = ContentAlignment.TopCenter
         };
 
         var lblContact = new Label
         {
             Text = isUk
-                ? $"Будь ласка, надішліть лог на {SupportEmail} для підтримки."
-                : $"Please send the log file to {SupportEmail} for support.",
-            Location = new Point(20, 140),
-            AutoSize = true,
-            ForeColor = Color.FromArgb(180, 180, 180)
+                ? $"Будь ласка, надішліть лог на {SupportEmail} для підтримки\nабо створіть репорт на сайті trucksim.uk"
+                : $"Please send the log file to {SupportEmail} for support\nor submit a report on trucksim.uk",
+            Location = new Point(0, 155),
+            Size = new Size(form.Width - 16, 45),
+            ForeColor = Color.FromArgb(180, 180, 180),
+            TextAlign = ContentAlignment.MiddleCenter
         };
 
         var btnCopyEmail = new Button
         {
-            Text = $"📋 {(isUk ? "Копіювати email" : "Copy email")}: {SupportEmail}",
-            Location = new Point(20, 180),
-            Size = new Size(220, 40),
+            Text = $"📋 {(isUk ? "Копіювати email" : "Copy email")}",
+            Location = new Point(30, 215),
+            Size = new Size(215, 40),
             FlatStyle = FlatStyle.Flat,
             BackColor = BgCard,
             ForeColor = TextPrimary,
@@ -536,8 +539,8 @@ static class Program
         var btnSaveLog = new Button
         {
             Text = isUk ? "💾 Зберегти лог..." : "💾 Save log file...",
-            Location = new Point(250, 180),
-            Size = new Size(220, 40),
+            Location = new Point(260, 215),
+            Size = new Size(215, 40),
             FlatStyle = FlatStyle.Flat,
             BackColor = BgCard,
             ForeColor = TextPrimary,
@@ -581,11 +584,35 @@ static class Program
             }
         };
 
+        var btnOpenSite = new Button
+        {
+            Text = isUk ? "🌐 Відкрити сайт" : "🌐 Open website",
+            Location = new Point(30, 265),
+            Size = new Size(215, 38),
+            FlatStyle = FlatStyle.Flat,
+            BackColor = BgCard,
+            ForeColor = TextPrimary,
+            Cursor = Cursors.Hand
+        };
+        btnOpenSite.FlatAppearance.BorderColor = BgBorder;
+        btnOpenSite.Click += (s, e) =>
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "https://trucksim.uk/",
+                    UseShellExecute = true
+                });
+            }
+            catch { }
+        };
+
         var btnClose = new Button
         {
             Text = isUk ? "Закрити" : "Close",
-            Location = new Point(170, 240),
-            Size = new Size(150, 38),
+            Location = new Point(260, 265),
+            Size = new Size(215, 38),
             FlatStyle = FlatStyle.Flat,
             BackColor = Color.FromArgb(70, 70, 80),
             ForeColor = TextPrimary,
@@ -594,7 +621,7 @@ static class Program
         };
         btnClose.FlatAppearance.BorderColor = Color.FromArgb(100, 100, 110);
 
-        form.Controls.AddRange(new Control[] { lblTitle, lblMessage, lblContact, btnCopyEmail, btnSaveLog, btnClose });
+        form.Controls.AddRange(new Control[] { lblTitle, lblMessage, lblContact, btnCopyEmail, btnSaveLog, btnOpenSite, btnClose });
         form.AcceptButton = btnClose;
         form.ShowDialog();
     }
