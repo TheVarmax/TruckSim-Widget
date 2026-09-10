@@ -1,52 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace ETSOverlay
 {
-    public class CloudSyncSettings
-    {
-        [JsonPropertyName("uiMode")]
-        public string UiMode { get; set; } = "full";
-        [JsonPropertyName("windowOpacity")]
-        public double WindowOpacity { get; set; } = 0.85;
-        [JsonPropertyName("isSplitOpacityEnabled")]
-        public bool IsSplitOpacityEnabled { get; set; } = false;
-        [JsonPropertyName("backgroundOpacity")]
-        public double BackgroundOpacity { get; set; } = 0.85;
-        [JsonPropertyName("textOpacity")]
-        public double TextOpacity { get; set; } = 1.0;
-        [JsonPropertyName("uiLanguage")]
-        public string UiLanguage { get; set; } = "en";
-        [JsonPropertyName("autoHideEnabled")]
-        public bool AutoHideEnabled { get; set; } = false;
-        [JsonPropertyName("uiScale")]
-        public int UiScale { get; set; } = 100;
-        [JsonPropertyName("speedWarningEts")]
-        public int SpeedWarningEts { get; set; }
-        [JsonPropertyName("speedWarningAts")]
-        public int SpeedWarningAts { get; set; }
-        [JsonPropertyName("savedTheme")]
-        public string SavedTheme { get; set; } = "classic";
-        [JsonPropertyName("savedAccent")]
-        public string SavedAccent { get; set; } = "teal";
-        [JsonPropertyName("savedCardStyle")]
-        public string SavedCardStyle { get; set; } = "standard";
-        [JsonPropertyName("accentMode")]
-        public string AccentMode { get; set; } = "standard";
-        [JsonPropertyName("customCardAccents")]
-        public Dictionary<string, string> CustomCardAccents { get; set; } = new();
-        [JsonPropertyName("skipBetaUpdates")]
-        public bool SkipBetaUpdates { get; set; } = false;
-        
-        [JsonPropertyName("showDistance")]
-        public bool ShowDistance { get; set; } = true;
-        [JsonPropertyName("showBottomInfo")]
-        public bool ShowBottomInfo { get; set; } = true;
-        [JsonPropertyName("showRoute")]
-        public bool ShowRoute { get; set; } = true;
-    }
-
     public class CloudSyncStatusRequest
     {
         [JsonPropertyName("deviceToken")]
@@ -64,7 +22,7 @@ namespace ETSOverlay
         [JsonPropertyName("revision")]
         public int? Revision { get; set; }
         [JsonPropertyName("settings")]
-        public CloudSyncSettings? Settings { get; set; }
+        public Dictionary<string, object>? Settings { get; set; }
     }
 
     public class CloudSyncInfo
@@ -94,7 +52,7 @@ namespace ETSOverlay
         [JsonPropertyName("sync")]
         public CloudSyncInfo? Sync { get; set; }
         [JsonPropertyName("settings")]
-        public CloudSyncSettings? Settings { get; set; }
+        public Dictionary<string, JsonElement>? Settings { get; set; }
         [JsonPropertyName("deleted")]
         public bool? Deleted { get; set; }
     }

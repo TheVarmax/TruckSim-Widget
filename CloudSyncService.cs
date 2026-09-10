@@ -34,7 +34,7 @@ namespace ETSOverlay
             return await _apiClient.GetSyncSettingsAsync(req);
         }
 
-        public async Task<CloudSyncResponse?> SaveSettingsAsync(string version, int? revision, CloudSyncSettings settings)
+        public async Task<CloudSyncResponse?> SaveSettingsAsync(string version, int? revision, Dictionary<string, object> settings)
         {
             var req = new CloudSyncSettingsRequest
             {

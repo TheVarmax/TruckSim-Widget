@@ -21,6 +21,9 @@ using SCSSdkClient.Object;
 
 namespace ETSOverlay
 {
+    [AttributeUsage(AttributeTargets.Property)]
+    public class CloudSyncIgnoreAttribute : Attribute { }
+
     public partial class MainWindow : Window
     {
         private enum GameType
@@ -266,13 +269,13 @@ namespace ETSOverlay
             public TripState TripData { get; set; } = new();
         }
 
-        private class AppState
+        internal class AppState
         {
-            public double Left { get; set; }
-            public double Top { get; set; }
-            public double HudLeft { get; set; } = double.NaN;
-            public double HudTop { get; set; } = double.NaN;
-            public double HudCenterLeft { get; set; } = double.NaN;
+            [CloudSyncIgnore] public double Left { get; set; }
+            [CloudSyncIgnore] public double Top { get; set; }
+            [CloudSyncIgnore] public double HudLeft { get; set; } = double.NaN;
+            [CloudSyncIgnore] public double HudTop { get; set; } = double.NaN;
+            [CloudSyncIgnore] public double HudCenterLeft { get; set; } = double.NaN;
             public bool HudShowCurrentSpeed { get; set; } = true;
             public bool HudShowMaxSpeed { get; set; } = true;
             public bool HudShowDeliveryType { get; set; } = true;
@@ -286,35 +289,37 @@ namespace ETSOverlay
             public double TextOpacity { get; set; }
             public string UiLanguage { get; set; } = "en";
             public bool AutoHideEnabled { get; set; } = false;
-            public double SettingsLeft { get; set; } = double.NaN;
-            public double SettingsTop { get; set; } = double.NaN;
+            [CloudSyncIgnore] public double SettingsLeft { get; set; } = double.NaN;
+            [CloudSyncIgnore] public double SettingsTop { get; set; } = double.NaN;
             public int UiScale { get; set; } = 100;
-            public List<string> CancelledJobs { get; set; } = new();
-            public string HardwareHash { get; set; } = string.Empty;
-            public List<string> CachedFeatures { get; set; } = new();
-            public DateTime LastLicenseValidation { get; set; }
-            public string LicensePlan { get; set; } = string.Empty;
-            public string LicenseSource { get; set; } = string.Empty;
-            public string LicenseStatus { get; set; } = "inactive";
-            public DateTime? LicenseExpiry { get; set; }
+            [CloudSyncIgnore] public List<string> CancelledJobs { get; set; } = new();
+            [CloudSyncIgnore] public string HardwareHash { get; set; } = string.Empty;
+            [CloudSyncIgnore] public List<string> CachedFeatures { get; set; } = new();
+            [CloudSyncIgnore] public DateTime LastLicenseValidation { get; set; }
+            [CloudSyncIgnore] public string LicensePlan { get; set; } = string.Empty;
+            [CloudSyncIgnore] public string LicenseSource { get; set; } = string.Empty;
+            [CloudSyncIgnore] public string LicenseStatus { get; set; } = "inactive";
+            [CloudSyncIgnore] public DateTime? LicenseExpiry { get; set; }
             public string SavedTheme { get; set; } = "classic";
             public string SavedAccent { get; set; } = "teal";
             public string SavedCardStyle { get; set; } = "standard";
             public string AccentMode { get; set; } = "standard";
             public Dictionary<string, string> CustomCardAccents { get; set; } = new();
             public bool SkipBetaUpdates { get; set; } = false;
-            public string? LatestReleaseUrl { get; set; } = null;
+            [CloudSyncIgnore] public string? LatestReleaseUrl { get; set; } = null;
             
-            public bool CloudSyncEnabled { get; set; } = false;
-            public int? CloudSyncRevision { get; set; } = null;
-            public DateTime? CloudSyncUpdatedAt { get; set; } = null;
-            public DateTime? LastCloudSyncAttempt { get; set; } = null;
-            public string CloudSyncStatus { get; set; } = "";
-            public string LastCityExtraction { get; set; } = "Unknown";
+            [CloudSyncIgnore] public bool CloudSyncEnabled { get; set; } = false;
+            [CloudSyncIgnore] public int? CloudSyncRevision { get; set; } = null;
+            [CloudSyncIgnore] public DateTime? CloudSyncUpdatedAt { get; set; } = null;
+            [CloudSyncIgnore] public DateTime? LastCloudSyncAttempt { get; set; } = null;
+            [CloudSyncIgnore] public string CloudSyncStatus { get; set; } = "";
+            [CloudSyncIgnore] public string LastCityExtraction { get; set; } = "Unknown";
             public bool SpeedLimiterEnabled { get; set; } = false;
             public int SpeedLimiterThresholdKmh { get; set; } = 99;
             public int SpeedLimiterThresholdMph { get; set; } = 79;
             public string SpeedLimiterBrakeKey { get; set; } = "S";
+            public int SpeedWarningEts { get; set; } = 0;
+            public int SpeedWarningAts { get; set; } = 0;
         }
 
         private class GameState
@@ -2177,58 +2182,139 @@ namespace ETSOverlay
             SaveState();
         }
 
+        internal AppState GetCurrentAppState()
+        {
+            return new AppState
+            {
+                Left = Left,
+                Top = Top,
+                HudLeft = _hudWindow?.Left ?? _savedHudLeft,
+                HudTop = _hudWindow?.Top ?? _savedHudTop,
+                HudCenterLeft = _hudWindow != null ? _hudWindow.GetTrueCenterLeft() : _savedHudCenterLeft,
+                HudShowCurrentSpeed = _hudShowCurrentSpeed,
+                HudShowMaxSpeed = _hudShowMaxSpeed,
+                HudShowDeliveryType = _hudShowDeliveryType,
+                ShowDistance = _showDistance,
+                ShowBottomInfo = _showBottomInfo,
+                ShowRoute = _showRoute,
+                UIMode = _uiMode,
+                WindowOpacity = windowOpacity,
+                IsSplitOpacityEnabled = isSplitOpacityEnabled,
+                BackgroundOpacity = backgroundOpacity,
+                TextOpacity = textOpacity,
+                UiLanguage = uiLanguage,
+                AutoHideEnabled = _autoHideEnabled,
+                SettingsLeft = _settingsWindow?.Left ?? _savedSettingsLeft,
+                SettingsTop = _settingsWindow?.Top ?? _savedSettingsTop,
+                UiScale = _uiScale,
+                CancelledJobs = _cancelledJobs.ToList(),
+                HardwareHash = LicenseManager.Instance.HardwareHash,
+                CachedFeatures = LicenseManager.Instance.GetFeaturesList(),
+                LastLicenseValidation = LicenseManager.Instance.LastValidationTime,
+                LicensePlan = LicenseManager.Instance.CurrentPlan,
+                LicenseSource = LicenseManager.Instance.Source,
+                LicenseStatus = LicenseManager.Instance.Status,
+                LicenseExpiry = LicenseManager.Instance.ExpiresAt,
+                SavedTheme = SavedTheme,
+                SavedAccent = SavedAccent,
+                SavedCardStyle = SavedCardStyle,
+                AccentMode = SavedAccentMode,
+                CustomCardAccents = SavedCustomAccents,
+                SkipBetaUpdates = SkipBetaUpdates,
+                LatestReleaseUrl = LatestReleaseUrl,
+                CloudSyncEnabled = CloudSyncEnabled,
+                CloudSyncRevision = CloudSyncRevision,
+                CloudSyncUpdatedAt = CloudSyncUpdatedAt,
+                LastCloudSyncAttempt = LastCloudSyncAttempt,
+                CloudSyncStatus = CloudSyncStatus,
+                SpeedLimiterEnabled = SpeedLimiterService.Instance.IsEnabled,
+                SpeedLimiterThresholdKmh = SpeedLimiterService.Instance.SpeedThresholdKmh,
+                SpeedLimiterThresholdMph = SpeedLimiterService.Instance.SpeedThresholdMph,
+                SpeedLimiterBrakeKey = SpeedLimiterService.Instance.BrakeKey.ToString(),
+                SpeedWarningEts = _speedWarningEts,
+                SpeedWarningAts = _speedWarningAts
+            };
+        }
+
+        private void ApplyAppState(AppState state)
+        {
+            Left = state.Left;
+            Top = state.Top;
+            _uiMode = state.UIMode ?? "full";
+            _hudShowCurrentSpeed = state.HudShowCurrentSpeed;
+            _hudShowMaxSpeed = state.HudShowMaxSpeed;
+            _hudShowDeliveryType = state.HudShowDeliveryType;
+            _showDistance = state.ShowDistance;
+            _showRoute = state.ShowRoute;
+            _showBottomInfo = state.ShowBottomInfo;
+            windowOpacity = state.WindowOpacity;
+            isSplitOpacityEnabled = state.IsSplitOpacityEnabled;
+            backgroundOpacity = state.BackgroundOpacity > 0 ? state.BackgroundOpacity : 0.85;
+            textOpacity = state.TextOpacity > 0 ? state.TextOpacity : 1.0;
+            _autoHideEnabled = state.AutoHideEnabled;
+            uiLanguage = string.IsNullOrWhiteSpace(state.UiLanguage) ? "en" : state.UiLanguage;
+            if (windowOpacity <= 0 || windowOpacity > 1)
+            {
+                windowOpacity = 0.85;
+            }
+            if (!double.IsNaN(state.Left) && !double.IsNaN(state.Top))
+            {
+                Left = state.Left;
+                Top = state.Top;
+            }
+            if (!double.IsNaN(state.HudLeft) && !double.IsNaN(state.HudTop))
+            {
+                _savedHudLeft = state.HudLeft;
+                _savedHudTop = state.HudTop;
+                _savedHudCenterLeft = state.HudCenterLeft;
+            }
+            // Restore settings window position if available
+            if (!double.IsNaN(state.SettingsLeft) && !double.IsNaN(state.SettingsTop))
+            {
+                _savedSettingsLeft = state.SettingsLeft;
+                _savedSettingsTop = state.SettingsTop;
+            }
+            _uiScale = state.UiScale == 0 ? 100 : state.UiScale;
+            SavedTheme = state.SavedTheme ?? "classic";
+            SavedAccent = state.SavedAccent ?? "teal";
+            SavedCardStyle = state.SavedCardStyle ?? "standard";
+            SavedAccentMode = state.AccentMode ?? "standard";
+            if (state.CustomCardAccents != null)
+            {
+                SavedCustomAccents = state.CustomCardAccents;
+            }
+            
+            SkipBetaUpdates = state.SkipBetaUpdates;
+            LatestReleaseUrl = state.LatestReleaseUrl;
+            
+            if (state.CancelledJobs != null)
+            {
+                _cancelledJobs = new HashSet<string>(state.CancelledJobs);
+            }
+            
+            CloudSyncEnabled = state.CloudSyncEnabled;
+            CloudSyncRevision = state.CloudSyncRevision;
+            CloudSyncUpdatedAt = state.CloudSyncUpdatedAt;
+            LastCloudSyncAttempt = state.LastCloudSyncAttempt;
+            CloudSyncStatus = state.CloudSyncStatus ?? "";
+
+            SpeedLimiterService.Instance.IsEnabled = state.SpeedLimiterEnabled;
+            SpeedLimiterService.Instance.SpeedThresholdKmh = state.SpeedLimiterThresholdKmh;
+            SpeedLimiterService.Instance.SpeedThresholdMph = state.SpeedLimiterThresholdMph;
+            if (Enum.TryParse<System.Windows.Input.Key>(state.SpeedLimiterBrakeKey, out var brakeKey))
+                SpeedLimiterService.Instance.BrakeKey = brakeKey;
+
+            _speedWarningEts = state.SpeedWarningEts;
+            _speedWarningAts = state.SpeedWarningAts;
+
+            LicenseManager.Instance.Initialize(state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseSource, state.LicenseStatus, state.LicenseExpiry);
+        }
+
         private void SaveState()
         {
             try
             {
-                var state = new AppState
-                {
-                    Left = Left,
-                    Top = Top,
-                    HudLeft = _hudWindow?.Left ?? _savedHudLeft,
-                    HudTop = _hudWindow?.Top ?? _savedHudTop,
-                    HudCenterLeft = _hudWindow != null ? _hudWindow.GetTrueCenterLeft() : _savedHudCenterLeft,
-                    HudShowCurrentSpeed = _hudShowCurrentSpeed,
-                    HudShowMaxSpeed = _hudShowMaxSpeed,
-                    HudShowDeliveryType = _hudShowDeliveryType,
-                    ShowDistance = _showDistance,
-                    ShowBottomInfo = _showBottomInfo,
-                    ShowRoute = _showRoute,
-                    UIMode = _uiMode,
-                    WindowOpacity = windowOpacity,
-                    IsSplitOpacityEnabled = isSplitOpacityEnabled,
-                    BackgroundOpacity = backgroundOpacity,
-                    TextOpacity = textOpacity,
-                    UiLanguage = uiLanguage,
-                    AutoHideEnabled = _autoHideEnabled,
-                    SettingsLeft = _settingsWindow?.Left ?? _savedSettingsLeft,
-                    SettingsTop = _settingsWindow?.Top ?? _savedSettingsTop,
-                    UiScale = _uiScale,
-                    CancelledJobs = _cancelledJobs.ToList(),
-                    HardwareHash = LicenseManager.Instance.HardwareHash,
-                    CachedFeatures = LicenseManager.Instance.GetFeaturesList(),
-                    LastLicenseValidation = LicenseManager.Instance.LastValidationTime,
-                    LicensePlan = LicenseManager.Instance.CurrentPlan,
-                    LicenseSource = LicenseManager.Instance.Source,
-                    LicenseStatus = LicenseManager.Instance.Status,
-                    LicenseExpiry = LicenseManager.Instance.ExpiresAt,
-                    SavedTheme = SavedTheme,
-                    SavedAccent = SavedAccent,
-                    SavedCardStyle = SavedCardStyle,
-                    AccentMode = SavedAccentMode,
-                    CustomCardAccents = SavedCustomAccents,
-                    SkipBetaUpdates = SkipBetaUpdates,
-                    LatestReleaseUrl = LatestReleaseUrl,
-                    CloudSyncEnabled = CloudSyncEnabled,
-                    CloudSyncRevision = CloudSyncRevision,
-                    CloudSyncUpdatedAt = CloudSyncUpdatedAt,
-                    LastCloudSyncAttempt = LastCloudSyncAttempt,
-                    CloudSyncStatus = CloudSyncStatus,
-                    SpeedLimiterEnabled = SpeedLimiterService.Instance.IsEnabled,
-                    SpeedLimiterThresholdKmh = SpeedLimiterService.Instance.SpeedThresholdKmh,
-                    SpeedLimiterThresholdMph = SpeedLimiterService.Instance.SpeedThresholdMph,
-                    SpeedLimiterBrakeKey = SpeedLimiterService.Instance.BrakeKey.ToString()
-                };
+                var state = GetCurrentAppState();
 
                 var json = JsonSerializer.Serialize(state, StateJsonOptions);
                 File.WriteAllText(stateFilePath, json);
@@ -2254,73 +2340,7 @@ namespace ETSOverlay
                         var state = JsonSerializer.Deserialize<AppState>(content, StateJsonOptions);
                         if (state != null)
                         {
-                            Left = state.Left;
-                            Top = state.Top;
-                            _uiMode = state.UIMode ?? "full";
-                            _hudShowCurrentSpeed = state.HudShowCurrentSpeed;
-                            _hudShowMaxSpeed = state.HudShowMaxSpeed;
-                            _hudShowDeliveryType = state.HudShowDeliveryType;
-                            _showDistance = state.ShowDistance;
-                            _showRoute = state.ShowRoute;
-                            _showBottomInfo = state.ShowBottomInfo;
-                            windowOpacity = state.WindowOpacity;
-                            isSplitOpacityEnabled = state.IsSplitOpacityEnabled;
-                            backgroundOpacity = state.BackgroundOpacity > 0 ? state.BackgroundOpacity : 0.85;
-                            textOpacity = state.TextOpacity > 0 ? state.TextOpacity : 1.0;
-                            _autoHideEnabled = state.AutoHideEnabled;
-                            uiLanguage = string.IsNullOrWhiteSpace(state.UiLanguage) ? "en" : state.UiLanguage;
-                            if (windowOpacity <= 0 || windowOpacity > 1)
-                            {
-                                windowOpacity = 0.85;
-                            }
-                            if (!double.IsNaN(state.Left) && !double.IsNaN(state.Top))
-                            {
-                                Left = state.Left;
-                                Top = state.Top;
-                            }
-                            if (!double.IsNaN(state.HudLeft) && !double.IsNaN(state.HudTop))
-                            {
-                                _savedHudLeft = state.HudLeft;
-                                _savedHudTop = state.HudTop;
-                                _savedHudCenterLeft = state.HudCenterLeft;
-                            }
-                            // Restore settings window position if available
-                            if (!double.IsNaN(state.SettingsLeft) && !double.IsNaN(state.SettingsTop))
-                            {
-                                _savedSettingsLeft = state.SettingsLeft;
-                                _savedSettingsTop = state.SettingsTop;
-                            }
-                            _uiScale = state.UiScale == 0 ? 100 : state.UiScale;
-                            SavedTheme = state.SavedTheme ?? "classic";
-                            SavedAccent = state.SavedAccent ?? "teal";
-                            SavedCardStyle = state.SavedCardStyle ?? "standard";
-                            SavedAccentMode = state.AccentMode ?? "standard";
-                            if (state.CustomCardAccents != null)
-                            {
-                                SavedCustomAccents = state.CustomCardAccents;
-                            }
-                            
-                            SkipBetaUpdates = state.SkipBetaUpdates;
-                            LatestReleaseUrl = state.LatestReleaseUrl;
-                            
-                            if (state.CancelledJobs != null)
-                            {
-                                _cancelledJobs = new HashSet<string>(state.CancelledJobs);
-                            }
-                            
-                            CloudSyncEnabled = state.CloudSyncEnabled;
-                            CloudSyncRevision = state.CloudSyncRevision;
-                            CloudSyncUpdatedAt = state.CloudSyncUpdatedAt;
-                            LastCloudSyncAttempt = state.LastCloudSyncAttempt;
-                            CloudSyncStatus = state.CloudSyncStatus ?? "";
-
-                            SpeedLimiterService.Instance.IsEnabled = state.SpeedLimiterEnabled;
-                            SpeedLimiterService.Instance.SpeedThresholdKmh = state.SpeedLimiterThresholdKmh;
-                            SpeedLimiterService.Instance.SpeedThresholdMph = state.SpeedLimiterThresholdMph;
-                            if (Enum.TryParse<System.Windows.Input.Key>(state.SpeedLimiterBrakeKey, out var brakeKey))
-                                SpeedLimiterService.Instance.BrakeKey = brakeKey;
-
-                            LicenseManager.Instance.Initialize(state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseSource, state.LicenseStatus, state.LicenseExpiry);
+                            ApplyAppState(state);
                             // При старте не загружаем сохранённые заказы, только настройки интерфейса.
                         }
                     }
@@ -4949,53 +4969,30 @@ namespace ETSOverlay
             }
         }
 
-        public CloudSyncSettings ExportCloudSyncSettings()
+        private void ApplyCloudSyncSettings(Dictionary<string, JsonElement> cloudSettings)
         {
-            return new CloudSyncSettings
+            var currentState = GetCurrentAppState();
+            foreach (var prop in typeof(AppState).GetProperties())
             {
-                UiMode = _uiMode,
-                WindowOpacity = windowOpacity,
-                IsSplitOpacityEnabled = isSplitOpacityEnabled,
-                BackgroundOpacity = backgroundOpacity,
-                TextOpacity = textOpacity,
-                UiLanguage = uiLanguage,
-                AutoHideEnabled = _autoHideEnabled,
-                UiScale = _uiScale,
-                SpeedWarningEts = _speedWarningEts,
-                SpeedWarningAts = _speedWarningAts,
-                SavedTheme = SavedTheme,
-                SavedAccent = SavedAccent,
-                SavedCardStyle = SavedCardStyle,
-                AccentMode = SavedAccentMode,
-                CustomCardAccents = new Dictionary<string, string>(SavedCustomAccents),
-                SkipBetaUpdates = SkipBetaUpdates,
-                ShowDistance = _showDistance,
-                ShowBottomInfo = _showBottomInfo,
-                ShowRoute = _showRoute
-            };
-        }
+                if (Attribute.IsDefined(prop, typeof(CloudSyncIgnoreAttribute))) continue;
 
-        public void ApplyCloudSyncSettings(CloudSyncSettings settings)
-        {
-            _uiMode = settings.UiMode;
-            windowOpacity = settings.WindowOpacity;
-            isSplitOpacityEnabled = settings.IsSplitOpacityEnabled;
-            backgroundOpacity = settings.BackgroundOpacity;
-            textOpacity = settings.TextOpacity;
-            uiLanguage = settings.UiLanguage;
-            _autoHideEnabled = settings.AutoHideEnabled;
-            _uiScale = settings.UiScale;
-            _speedWarningEts = settings.SpeedWarningEts;
-            _speedWarningAts = settings.SpeedWarningAts;
-            SavedTheme = settings.SavedTheme;
-            SavedAccent = settings.SavedAccent;
-            SavedCardStyle = settings.SavedCardStyle;
-            SavedAccentMode = settings.AccentMode;
-            SavedCustomAccents = new Dictionary<string, string>(settings.CustomCardAccents);
-            SkipBetaUpdates = settings.SkipBetaUpdates;
-            _showDistance = settings.ShowDistance;
-            _showBottomInfo = settings.ShowBottomInfo;
-            _showRoute = settings.ShowRoute;
+                var key = cloudSettings.Keys.FirstOrDefault(k => k.Equals(prop.Name, StringComparison.OrdinalIgnoreCase));
+                if (key != null)
+                {
+                    try
+                    {
+                        var jsonElement = cloudSettings[key];
+                        var value = JsonSerializer.Deserialize(jsonElement.GetRawText(), prop.PropertyType, StateJsonOptions);
+                        prop.SetValue(currentState, value);
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteLog($"[ERROR] Failed to deserialize cloud property {prop.Name}: {ex.Message}");
+                    }
+                }
+            }
+
+            ApplyAppState(currentState);
 
             ApplyLocalization();
             ApplyLanguageSelection();
@@ -5028,8 +5025,17 @@ namespace ETSOverlay
             try
             {
                 LastCloudSyncAttempt = DateTime.Now;
-                var settings = ExportCloudSyncSettings();
-                var resp = await SyncService.SaveSettingsAsync(GetCurrentVersion(), force ? null : CloudSyncRevision, settings);
+                var state = GetCurrentAppState();
+                var settingsDict = new Dictionary<string, object>();
+                
+                foreach (var prop in typeof(AppState).GetProperties())
+                {
+                    if (Attribute.IsDefined(prop, typeof(CloudSyncIgnoreAttribute))) continue;
+                    var val = prop.GetValue(state);
+                    if (val != null) settingsDict[prop.Name] = val;
+                }
+
+                var resp = await SyncService.SaveSettingsAsync(GetCurrentVersion(), force ? null : CloudSyncRevision, settingsDict);
                 
                 if (resp != null && resp.Success)
                 {

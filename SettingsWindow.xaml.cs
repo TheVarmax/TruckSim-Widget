@@ -1070,16 +1070,18 @@ namespace ETSOverlay
         public void SyncFromCloud()
         {
             _suppressEvents = true;
-            SetUIMode(_mainWindow.ExportCloudSyncSettings().UiMode);
-            OpacitySlider.Value = _mainWindow.ExportCloudSyncSettings().WindowOpacity * 100;
+            var currentState = _mainWindow.GetCurrentAppState();
+            
+            SetUIMode(currentState.UIMode);
+            OpacitySlider.Value = currentState.WindowOpacity * 100;
             OpacityValue.Text = $"{(int)Math.Round(OpacitySlider.Value)}%";
             
-            SplitOpacityToggle.IsChecked = _mainWindow.ExportCloudSyncSettings().IsSplitOpacityEnabled;
+            SplitOpacityToggle.IsChecked = currentState.IsSplitOpacityEnabled;
             
-            BackgroundOpacitySlider.Value = _mainWindow.ExportCloudSyncSettings().BackgroundOpacity * 100;
+            BackgroundOpacitySlider.Value = currentState.BackgroundOpacity * 100;
             BackgroundOpacityValue.Text = $"{(int)Math.Round(BackgroundOpacitySlider.Value)}%";
             
-            TextOpacitySlider.Value = _mainWindow.ExportCloudSyncSettings().TextOpacity * 100;
+            TextOpacitySlider.Value = currentState.TextOpacity * 100;
             TextOpacityValue.Text = $"{(int)Math.Round(TextOpacitySlider.Value)}%";
             
             bool isSplit = SplitOpacityToggle.IsChecked == true;
@@ -1091,9 +1093,10 @@ namespace ETSOverlay
             
             TextOpacityPanel.IsEnabled = isSplit;
             TextOpacityPanel.Opacity = isSplit ? 1.0 : 0.5;
-            SetLanguage(_mainWindow.ExportCloudSyncSettings().UiLanguage);
-            SetAutoHideEnabled(_mainWindow.ExportCloudSyncSettings().AutoHideEnabled);
-            SetScale(_mainWindow.ExportCloudSyncSettings().UiScale);
+            
+            SetLanguage(currentState.UiLanguage);
+            SetAutoHideEnabled(currentState.AutoHideEnabled);
+            SetScale(currentState.UiScale);
             // Ignore speed warnings to avoid complex logic if gametype differs
             SyncAppearanceValues();
             _suppressEvents = false;
