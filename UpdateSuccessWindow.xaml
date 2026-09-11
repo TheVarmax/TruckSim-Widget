@@ -31,6 +31,7 @@
 
             <!-- Markdown viewer handles its own scrolling. VerticalScrollBarVisibility="Auto" -->
             <md:MarkdownScrollViewer Grid.Row="2" x:Name="MarkdownViewer" 
+                                     MarkdownStyleName="Dark"
                                      Foreground="White"
                                      Background="Transparent" 
                                      VerticalScrollBarVisibility="Auto"
