@@ -29,13 +29,83 @@
             <!-- Fallback text block -->
             <TextBlock Grid.Row="2" x:Name="FallbackBlock" Foreground="#A0A0A0" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,5,0,20" />
 
-            <!-- Markdown viewer handles its own scrolling. VerticalScrollBarVisibility="Auto" -->
             <md:MarkdownScrollViewer Grid.Row="2" x:Name="MarkdownViewer" 
-                                     MarkdownStyleName="Dark"
                                      Foreground="White"
                                      Background="Transparent" 
                                      VerticalScrollBarVisibility="Auto"
-                                     Margin="0,0,0,15"/>
+                                     Margin="0,0,0,15">
+                <md:MarkdownScrollViewer.Resources>
+                    <Style TargetType="List">
+                        <Setter Property="MarkerStyle" Value="Disc" />
+                    </Style>
+                    <Style TargetType="ListItem">
+                        <Setter Property="Margin" Value="0,2" />
+                    </Style>
+                </md:MarkdownScrollViewer.Resources>
+                <md:MarkdownScrollViewer.Engine>
+                    <md:Markdown>
+                        <md:Markdown.Heading1Style>
+                            <Style TargetType="Paragraph">
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="FontSize" Value="24" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                                <Setter Property="Margin" Value="0,15,0,10" />
+                            </Style>
+                        </md:Markdown.Heading1Style>
+                        <md:Markdown.Heading2Style>
+                            <Style TargetType="Paragraph">
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="FontSize" Value="20" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                                <Setter Property="Margin" Value="0,15,0,10" />
+                            </Style>
+                        </md:Markdown.Heading2Style>
+                        <md:Markdown.Heading3Style>
+                            <Style TargetType="Paragraph">
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="FontSize" Value="16" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                                <Setter Property="Margin" Value="0,15,0,10" />
+                            </Style>
+                        </md:Markdown.Heading3Style>
+                        <md:Markdown.Heading4Style>
+                            <Style TargetType="Paragraph">
+                                <Setter Property="Foreground" Value="White" />
+                                <Setter Property="FontSize" Value="14" />
+                                <Setter Property="FontWeight" Value="Bold" />
+                                <Setter Property="Margin" Value="0,10,0,5" />
+                            </Style>
+                        </md:Markdown.Heading4Style>
+                        <md:Markdown.CodeBlockStyle>
+                            <Style TargetType="Paragraph">
+                                <Setter Property="Background" Value="#2b3137" />
+                                <Setter Property="Foreground" Value="#E6EDF3" />
+                                <Setter Property="FontFamily" Value="Consolas" />
+                                <Setter Property="Padding" Value="10" />
+                                <Setter Property="Margin" Value="0,5,0,15" />
+                            </Style>
+                        </md:Markdown.CodeBlockStyle>
+                        <md:Markdown.CodeStyle>
+                            <Style TargetType="Run">
+                                <Setter Property="Background" Value="#2b3137" />
+                                <Setter Property="Foreground" Value="#E6EDF3" />
+                                <Setter Property="FontFamily" Value="Consolas" />
+                            </Style>
+                        </md:Markdown.CodeStyle>
+                        <md:Markdown.LinkStyle>
+                            <Style TargetType="Hyperlink">
+                                <Setter Property="Foreground" Value="#4493F8" />
+                                <Setter Property="TextDecorations" Value="None" />
+                                <Style.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter Property="TextDecorations" Value="Underline" />
+                                    </Trigger>
+                                </Style.Triggers>
+                            </Style>
+                        </md:Markdown.LinkStyle>
+                    </md:Markdown>
+                </md:MarkdownScrollViewer.Engine>
+            </md:MarkdownScrollViewer>
 
             <Grid Grid.Row="3" Margin="0,5,0,0">
                 <Grid.ColumnDefinitions>
