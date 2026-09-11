@@ -65,7 +65,6 @@ namespace ETSOverlay
             if (language == "uk")
             {
                 TitleBlock.Text = "ОНОВЛЕННЯ ВСТАНОВЛЕНО";
-                MessageBlock.Text = "Оновлення успішно встановлено!";
                 BtnWebsite.Content = "Сайт проєкту";
                 BtnClose.Content = "Закрити";
                 SupportBlock.Text = "Потрібна допомога? Напишіть на support@trucksim.uk";
@@ -73,7 +72,6 @@ namespace ETSOverlay
             else
             {
                 TitleBlock.Text = "UPDATE SUCCESSFUL";
-                MessageBlock.Text = "Update successfully installed!";
                 BtnWebsite.Content = "Project Website";
                 BtnClose.Content = "Close";
                 SupportBlock.Text = "Need help? Contact support@trucksim.uk";

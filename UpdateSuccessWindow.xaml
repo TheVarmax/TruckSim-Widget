@@ -22,7 +22,6 @@
             <TextBlock x:Name="TitleBlock" Text="UPDATE SUCCESSFUL" Foreground="#43A047" FontSize="15" FontWeight="Bold" Margin="0,0,0,15"/>
 
             <StackPanel Grid.Row="1" Margin="0,5,0,10">
-                <TextBlock x:Name="MessageBlock" Text="Оновлення успішно встановлено!" Foreground="White" FontSize="14" FontWeight="SemiBold" TextWrapping="Wrap" Margin="0,0,0,5"/>
                 <TextBlock x:Name="ReleaseNameBlock" Foreground="White" FontSize="16" FontWeight="Bold" Margin="0,5,0,0" />
             </StackPanel>
 
