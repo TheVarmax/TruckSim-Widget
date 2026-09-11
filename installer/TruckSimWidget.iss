@@ -105,6 +105,11 @@ Name: "{autodesktop}\TruckSim Widget"; Filename: "{app}\{#MyAppExeName}"; Tasks:
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--updated"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent; Check: IsUpdateMode
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent; Check: not IsUpdateMode
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{app}\Resources"
+Type: filesandordirs; Name: "{app}"
+
 [Code]
 var
   TelemetryPage: TInputOptionWizardPage;
