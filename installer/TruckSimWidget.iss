@@ -375,12 +375,30 @@ begin
       AlreadyOwned := True;
   end;
 
+  if ExistedBefore then
+  begin
+    if not AlreadyOwned then
+    begin
+      Log(Format('Skipping unowned plugin for %s: %s', [GameName, TargetFile]));
+      exit;
+    end
+    else
+    begin
+      if not DeleteFile(TargetFile) then
+      begin
+        MsgBox(
+          Format(CustomMessage('PluginInstallFailed'), [GameName, ExpandConstant('{app}\plugin')]),
+          mbError,
+          MB_OK
+        );
+        exit;
+      end;
+    end;
+  end;
+
   if FileCopy(SourceFile, TargetFile, False) then
   begin
-    if (not ExistedBefore) or AlreadyOwned then
-    begin
-      RegWriteStringValue(HKCU, 'Software\TruckSim Widget', GamePrefix + 'PluginOwnedPath', TargetFile);
-    end;
+    RegWriteStringValue(HKCU, 'Software\TruckSim Widget', GamePrefix + 'PluginOwnedPath', TargetFile);
     Log(Format(CustomMessage('PluginInstalled'), [GameName]));
   end
   else
