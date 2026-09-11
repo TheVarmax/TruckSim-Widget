@@ -131,7 +131,12 @@ begin
   if RegQueryStringValue(HKCU, 'Software\Valve\Steam', 'SteamPath', Result) then exit;
 end;
 
-function TryGameDir(BasePath: String; GameFolderName: String; var FoundPath: String): Boolean;
+function IsValidGamePath(GamePath: String; ExpectedExe: String): Boolean;
+begin
+  Result := (GamePath <> '') and FileExists(CombinePath(GamePath, 'bin\win_x64\' + ExpectedExe));
+end;
+
+function TryGameDir(BasePath: String; GameFolderName: String; ExpectedExe: String; var FoundPath: String): Boolean;
 var
   Candidate: String;
 begin
@@ -142,14 +147,14 @@ begin
 
   Candidate := CombinePath(BasePath, 'steamapps\common\' + GameFolderName);
 
-  if DirExists(Candidate) then
+  if IsValidGamePath(Candidate, ExpectedExe) then
   begin
     FoundPath := Candidate;
     Result := True;
   end;
 end;
 
-function DetectGameDir(GameFolderName: String): String;
+function DetectGameDir(GameFolderName: String; ExpectedExe: String): String;
 var
   SteamPath: String;
 begin
@@ -157,14 +162,14 @@ begin
 
   SteamPath := GetSteamInstallPath();
 
-  if TryGameDir(SteamPath, GameFolderName, Result) then exit;
-  if TryGameDir(ExpandConstant('{pf}\Steam'), GameFolderName, Result) then exit;
-  if TryGameDir(ExpandConstant('{pf32}\Steam'), GameFolderName, Result) then exit;
+  if TryGameDir(SteamPath, GameFolderName, ExpectedExe, Result) then exit;
+  if TryGameDir(ExpandConstant('{pf}\Steam'), GameFolderName, ExpectedExe, Result) then exit;
+  if TryGameDir(ExpandConstant('{pf32}\Steam'), GameFolderName, ExpectedExe, Result) then exit;
 
-  if TryGameDir('D:\SteamLibrary', GameFolderName, Result) then exit;
-  if TryGameDir('E:\SteamLibrary', GameFolderName, Result) then exit;
-  if TryGameDir('F:\SteamLibrary', GameFolderName, Result) then exit;
-  if TryGameDir('G:\SteamLibrary', GameFolderName, Result) then exit;
+  if TryGameDir('D:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
+  if TryGameDir('E:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
+  if TryGameDir('F:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
+  if TryGameDir('G:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
 end;
 
 procedure SkipButtonClick(Sender: TObject);
@@ -183,10 +188,7 @@ begin
   end;
 end;
 
-function IsValidGamePath(GamePath: String; ExpectedExe: String): Boolean;
-begin
-  Result := (GamePath <> '') and FileExists(CombinePath(GamePath, 'bin\win_x64\' + ExpectedExe));
-end;
+
 
 procedure InitializeWizard();
 var
@@ -225,11 +227,11 @@ begin
   GameDirPage.Add(CustomMessage('ETS2DirPrompt'));
   GameDirPage.Add(CustomMessage('ATSDirPrompt'));
 
-  GameDirPage.Values[0] := DetectGameDir('Euro Truck Simulator 2');
+  GameDirPage.Values[0] := DetectGameDir('Euro Truck Simulator 2', 'eurotrucks2.exe');
   if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2Path', RegPath) and IsValidGamePath(RegPath, 'eurotrucks2.exe') then
     GameDirPage.Values[0] := RegPath;
 
-  GameDirPage.Values[1] := DetectGameDir('American Truck Simulator');
+  GameDirPage.Values[1] := DetectGameDir('American Truck Simulator', 'amtrucks.exe');
   if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPath', RegPath) and IsValidGamePath(RegPath, 'amtrucks.exe') then
     GameDirPage.Values[1] := RegPath;
 
@@ -341,11 +343,14 @@ begin
   end;
 end;
 
-procedure InstallTelemetryPlugin(GameName: String; GamePath: String);
+procedure InstallTelemetryPlugin(GamePrefix: String; GameName: String; GamePath: String);
 var
   SourceFile: String;
   TargetDir: String;
   TargetFile: String;
+  ExistedBefore: Boolean;
+  AlreadyOwned: Boolean;
+  OwnedPath: String;
 begin
   SourceFile := ExpandConstant('{app}\plugin\scs-telemetry.dll');
   TargetDir := CombinePath(GamePath, 'bin\win_x64\plugins');
@@ -361,17 +366,31 @@ begin
     exit;
   end;
 
-  if not FileCopy(SourceFile, TargetFile, False) then
+  ExistedBefore := FileExists(TargetFile);
+  AlreadyOwned := False;
+  
+  if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', GamePrefix + 'PluginOwnedPath', OwnedPath) then
+  begin
+    if CompareText(OwnedPath, TargetFile) = 0 then
+      AlreadyOwned := True;
+  end;
+
+  if FileCopy(SourceFile, TargetFile, False) then
+  begin
+    if (not ExistedBefore) or AlreadyOwned then
+    begin
+      RegWriteStringValue(HKCU, 'Software\TruckSim Widget', GamePrefix + 'PluginOwnedPath', TargetFile);
+    end;
+    Log(Format(CustomMessage('PluginInstalled'), [GameName]));
+  end
+  else
   begin
     MsgBox(
       Format(CustomMessage('PluginInstallFailed'), [GameName, ExpandConstant('{app}\plugin')]),
       mbError,
       MB_OK
     );
-    exit;
   end;
-
-  Log(Format(CustomMessage('PluginInstalled'), [GameName]));
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -381,14 +400,47 @@ begin
     // Install telemetry plugins only if they are checked
     if TelemetryPage.Values[0] then
     begin
-      InstallTelemetryPlugin('Euro Truck Simulator 2', GameDirPage.Values[0]);
+      InstallTelemetryPlugin('ETS2', 'Euro Truck Simulator 2', GameDirPage.Values[0]);
       RegWriteStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2Path', GameDirPage.Values[0]);
     end;
 
     if TelemetryPage.Values[1] then
     begin
-      InstallTelemetryPlugin('American Truck Simulator', GameDirPage.Values[1]);
+      InstallTelemetryPlugin('ATS', 'American Truck Simulator', GameDirPage.Values[1]);
       RegWriteStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPath', GameDirPage.Values[1]);
     end;
+  end;
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  OwnedPath: String;
+  WidgetLocalAppData: String;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    // Remove ETS2 plugin if owned
+    if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2PluginOwnedPath', OwnedPath) then
+    begin
+      if FileExists(OwnedPath) then
+        DeleteFile(OwnedPath);
+    end;
+
+    // Remove ATS plugin if owned
+    if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPluginOwnedPath', OwnedPath) then
+    begin
+      if FileExists(OwnedPath) then
+        DeleteFile(OwnedPath);
+    end;
+  end
+  else if CurUninstallStep = usPostUninstall then
+  begin
+    // Clean up Registry
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\TruckSim Widget');
+
+    // Clean up LocalAppData
+    WidgetLocalAppData := ExpandConstant('{localappdata}\TruckSimWidget');
+    if DirExists(WidgetLocalAppData) then
+      DelTree(WidgetLocalAppData, True, True, True);
   end;
 end;
