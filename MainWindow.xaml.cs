@@ -555,6 +555,13 @@ namespace ETSOverlay
                 var args = Environment.GetCommandLineArgs();
                 if (Array.Exists(args, arg => arg == "--updated"))
                 {
+                    // Fallback: если release body не был сохранён предыдущей версией,
+                    // подтягиваем его из GitHub API
+                    if (string.IsNullOrWhiteSpace(LatestReleaseBody))
+                    {
+                        await FetchLatestReleaseNotesAsync();
+                    }
+
                     var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
                     successWindow.Owner = this;
                     successWindow.ShowDialog();
@@ -4324,6 +4331,52 @@ namespace ETSOverlay
                         }
                     });
                 }
+            }
+        }
+
+        /// <summary>
+        /// Загружает release notes текущей версии из GitHub API.
+        /// Используется как fallback, если предыдущая версия не сохранила body в state.
+        /// </summary>
+        private async Task FetchLatestReleaseNotesAsync()
+        {
+            try
+            {
+                string currentVersion = GetCurrentVersion();
+                WriteLog($"Fetching release notes for current version {currentVersion}...");
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget/" + currentVersion);
+                client.Timeout = TimeSpan.FromSeconds(10);
+
+                var response = await client.GetStringAsync(GitHubApiUrl);
+                using var doc = JsonDocument.Parse(response);
+
+                if (doc.RootElement.ValueKind != JsonValueKind.Array) return;
+
+                foreach (var release in doc.RootElement.EnumerateArray())
+                {
+                    string tagName = release.GetProperty("tag_name").GetString() ?? "";
+                    string releaseVersion = ExtractVersionFromTag(tagName);
+
+                    if (releaseVersion == currentVersion)
+                    {
+                        LatestReleaseName = release.GetProperty("name").GetString() ?? tagName;
+                        LatestReleaseBody = release.TryGetProperty("body", out var bodyProp)
+                            ? bodyProp.GetString() ?? ""
+                            : "";
+                        LatestReleaseUrl = release.TryGetProperty("html_url", out var urlProp)
+                            ? urlProp.GetString() ?? ""
+                            : "";
+
+                        WriteLog($"Fetched release notes for {releaseVersion}: {LatestReleaseName}");
+                        break;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                WriteLog($"[WARN] Failed to fetch release notes: {ex.Message}");
             }
         }
 
