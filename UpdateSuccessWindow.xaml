@@ -26,17 +26,15 @@
                 <TextBlock x:Name="ReleaseNameBlock" Foreground="White" FontSize="16" FontWeight="Bold" Margin="0,5,0,0" />
             </StackPanel>
 
-            <ScrollViewer Grid.Row="2" Margin="0,0,0,15" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                <StackPanel>
-                    <TextBlock x:Name="FallbackBlock" Foreground="#A0A0A0" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,5,0,5" />
-                    <!-- For MdXaml, setting Document properties can style the document -->
-                    <md:MarkdownScrollViewer x:Name="MarkdownViewer" 
-                                           Foreground="White"
-                                           Background="Transparent" 
-                                           ScrollViewer.VerticalScrollBarVisibility="Disabled"
-                                           Margin="0,0,10,0"/>
-                </StackPanel>
-            </ScrollViewer>
+            <!-- Fallback text block -->
+            <TextBlock Grid.Row="2" x:Name="FallbackBlock" Foreground="#A0A0A0" FontSize="13" TextWrapping="Wrap" Visibility="Collapsed" Margin="0,5,0,20" />
+
+            <!-- Markdown viewer handles its own scrolling. VerticalScrollBarVisibility="Auto" -->
+            <md:MarkdownScrollViewer Grid.Row="2" x:Name="MarkdownViewer" 
+                                     Foreground="White"
+                                     Background="Transparent" 
+                                     VerticalScrollBarVisibility="Auto"
+                                     Margin="0,0,0,15"/>
 
             <Grid Grid.Row="3" Margin="0,5,0,0">
                 <Grid.ColumnDefinitions>
