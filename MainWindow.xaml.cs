@@ -200,6 +200,8 @@ namespace ETSOverlay
         public Dictionary<string, string> SavedCustomAccents { get; set; } = new();
         public bool SkipBetaUpdates { get; set; } = false;
         public string? LatestReleaseUrl { get; set; } = null;
+        public string? LatestReleaseName { get; set; } = null;
+        public string? LatestReleaseBody { get; set; } = null;
 
 
         // Appearance Active State (What is actually rendered, downgraded if necessary)
@@ -307,6 +309,8 @@ namespace ETSOverlay
             public Dictionary<string, string> CustomCardAccents { get; set; } = new();
             public bool SkipBetaUpdates { get; set; } = false;
             [CloudSyncIgnore] public string? LatestReleaseUrl { get; set; } = null;
+            [CloudSyncIgnore] public string? LatestReleaseName { get; set; } = null;
+            [CloudSyncIgnore] public string? LatestReleaseBody { get; set; } = null;
             
             [CloudSyncIgnore] public bool CloudSyncEnabled { get; set; } = false;
             [CloudSyncIgnore] public int? CloudSyncRevision { get; set; } = null;
@@ -551,12 +555,14 @@ namespace ETSOverlay
                 var args = Environment.GetCommandLineArgs();
                 if (Array.Exists(args, arg => arg == "--updated"))
                 {
-                    var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl);
+                    var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
                     successWindow.Owner = this;
                     successWindow.ShowDialog();
                     
                     // Clear the URL after showing it
                     LatestReleaseUrl = null;
+                    LatestReleaseName = null;
+                    LatestReleaseBody = null;
                     SaveState();
                 }
 
@@ -2222,6 +2228,8 @@ namespace ETSOverlay
                 CustomCardAccents = SavedCustomAccents,
                 SkipBetaUpdates = SkipBetaUpdates,
                 LatestReleaseUrl = LatestReleaseUrl,
+                LatestReleaseName = LatestReleaseName,
+                LatestReleaseBody = LatestReleaseBody,
                 CloudSyncEnabled = CloudSyncEnabled,
                 CloudSyncRevision = CloudSyncRevision,
                 CloudSyncUpdatedAt = CloudSyncUpdatedAt,
@@ -2286,6 +2294,8 @@ namespace ETSOverlay
             
             SkipBetaUpdates = state.SkipBetaUpdates;
             LatestReleaseUrl = state.LatestReleaseUrl;
+            LatestReleaseName = state.LatestReleaseName;
+            LatestReleaseBody = state.LatestReleaseBody;
             
             if (state.CancelledJobs != null)
             {
@@ -4180,6 +4190,7 @@ namespace ETSOverlay
 
                 var latestRelease = targetRelease.Value;
                 string htmlUrl = latestRelease.TryGetProperty("html_url", out var urlProp) ? urlProp.GetString() ?? "" : "";
+                string body = latestRelease.TryGetProperty("body", out var bodyProp) ? bodyProp.GetString() ?? "" : "";
                 string currentVersion = GetCurrentVersion();
 
                 WriteLog($"Current version: {currentVersion}, Selected: {remoteVersion} ({tagName}) - Beta: {isBeta}");
@@ -4221,7 +4232,7 @@ namespace ETSOverlay
                         });
 
                         // Показываем диалог подтверждения
-                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName, htmlUrl, isBeta);
+                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName, htmlUrl, body, isBeta);
                     }
                     else
                     {
@@ -4319,7 +4330,7 @@ namespace ETSOverlay
         /// <summary>
         /// Показывает диалог подтверждения обновления
         /// </summary>
-        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName, string htmlUrl, bool isBeta = false)
+        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName, string htmlUrl, string body, bool isBeta = false)
         {
             Dispatcher.Invoke(() =>
             {
@@ -4336,6 +4347,8 @@ namespace ETSOverlay
                 if (result == MessageBoxResult.Yes)
                 {
                     LatestReleaseUrl = htmlUrl;
+                    LatestReleaseName = releaseName;
+                    LatestReleaseBody = body;
                     SaveState();
                     LaunchUpdaterAndShutdown(downloadUrl, assetName);
                 }
