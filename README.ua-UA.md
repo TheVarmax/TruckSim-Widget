@@ -374,11 +374,11 @@ TruckSim Widget є абсолютно безкоштовним для викор
 
 ---
 
-## Third-Party Assets
+## Сторонні матеріали
 
-**Truck icon** by Magnific from Flaticon.
-Used under the Flaticon license with attribution.
-Source: [https://www.flaticon.com/free-icon/truck_2554978](https://www.flaticon.com/free-icon/truck_2554978)
+**Іконка вантажівки** від Magnific з Flaticon.
+Використовується за ліцензією Flaticon із зазначенням авторства.
+Джерело: [https://www.flaticon.com/free-icon/truck_2554978](https://www.flaticon.com/free-icon/truck_2554978)
 
 ---
 
