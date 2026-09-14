@@ -376,8 +376,7 @@ TruckSim Widget is free to use. If it helps you keep your deliveries tracked and
 
 ## Third-Party Assets
 
-**Truck icon**
-Truck icon by Magnific from Flaticon.
+**Truck icon** by Magnific from Flaticon.
 Used under the Flaticon license with attribution.
 Source: [https://www.flaticon.com/free-icon/truck_2554978](https://www.flaticon.com/free-icon/truck_2554978)
 
