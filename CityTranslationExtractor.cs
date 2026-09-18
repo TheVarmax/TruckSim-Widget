@@ -42,10 +42,10 @@ namespace ETSOverlay
         };
 
         /// <summary>Known ETS2 Steam App ID.</summary>
-        private const int Ets2AppId = 227300;
+        public const int Ets2AppId = 227300;
 
         /// <summary>Known ATS Steam App ID.</summary>
-        private const int AtsAppId = 270880;
+        public const int AtsAppId = 270880;
 
         // Regex patterns for parsing .sii/.sui city definition files
         private static readonly Regex CityNameRegex = new(@"city_name:\s*""([^""]+)""", RegexOptions.Compiled);

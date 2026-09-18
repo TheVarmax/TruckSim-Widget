@@ -93,6 +93,10 @@ namespace ETSOverlay
         private float _lastValidNavDist = 0; // Для отслеживания внезапного обрыва маршрута
         private float _lastNavDistWithTrailer = -1f; // Расстояние до финиша пока прицеп прицеплен
         private bool _forceProfileUnloaded = false; // Жестко глушим телеметрию, если вышли из профиля
+        private readonly DeliveryActiveTimer _deliveryTimer = new();
+        private static readonly object _logLock = new();
+        private string? _currentGameVersion = null;
+        private bool _wasGameRunning = false;
         private int _lastDeliveredLogIndex = -1; // Для предотвращения спама DELIVERED из логов
         private HashSet<string> _cancelledJobs = new(); // Хранит отменённые заказы, чтобы багнутый кэш SDK не воскрешал их после рестарта виджета
         private string _lastJobIdEts = ""; // Железобетонный идентификатор заказа (ETS)
@@ -255,6 +259,7 @@ namespace ETSOverlay
             public float CargoDamage { get; set; }
             public float MaxSpeedKmh { get; set; }
             public string PlayMode { get; set; } = "";
+            public long ActiveDurationTicks { get; set; }
         }
 
         private class JobState
@@ -455,6 +460,7 @@ namespace ETSOverlay
             // Validate license in the background
             _ = ValidateLicenseOnStartupAsync();
             LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
+            LicenseManager.Instance.OnLicenseChanged += () => ClientPresenceService.Instance.Start();
             LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
             {
                 Dispatcher.Invoke(() =>
@@ -468,6 +474,7 @@ namespace ETSOverlay
 
             Loaded += async (s, e) =>
             {
+                ClientPresenceService.Instance.Start();
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
@@ -635,6 +642,7 @@ namespace ETSOverlay
         {
             WriteLog("[EVENT] Job Cancelled fired by telemetry.");
             _jobCancelledOrDeliveredFlag = true;
+            _deliveryTimer.Reset();
         }
 
         private void Telemetry_JobDelivered(object? sender, EventArgs e)
@@ -654,6 +662,13 @@ namespace ETSOverlay
             {
                 try
                 {
+                    _deliveryTimer.Flush();
+                    TimeSpan activeDuration = _deliveryTimer.Elapsed;
+                    if (activeDuration <= TimeSpan.Zero)
+                    {
+                        activeDuration = DateTime.UtcNow - _tripStartTimeUtc;
+                    }
+
                     var trip = new TripRecord
                     {
                         StartTimeUtc = _tripStartTimeUtc,
@@ -662,7 +677,8 @@ namespace ETSOverlay
                         Destination = GetLocalizedCity(_tripDestination),
                         CargoName = _tripCargoName,
                         DistanceKm = jobDrivenDistance / (UseMiles ? KmToMiles : 1f), // convert back to km
-                        Duration = DateTime.UtcNow - _tripStartTimeUtc,
+                        ActiveDurationTicks = activeDuration.Ticks,
+                        Duration = activeDuration,
                         AverageSpeedKmh = _tripSpeedSamples > 0 ? (float)(_tripSpeedSumKmh / _tripSpeedSamples) : 0,
                         MaxSpeedKmh = (int)Math.Round(_tripMaxSpeedKmh),
                         PlayMode = _tripPlayMode,
@@ -687,12 +703,20 @@ namespace ETSOverlay
 
                     TripLogbookService.Instance.SaveTrip(trip);
                     WriteLog($"[LOGBOOK] Trip saved: {trip.Origin} -> {trip.Destination}, {trip.DistanceKm:F1} km, {trip.Duration}");
+
+                    ClientPresenceService.Instance.RecordEvent("trip_delivered", $"Trip delivered: {trip.Origin} -> {trip.Destination}", new()
+                    {
+                        ["distanceKm"] = Math.Round(trip.DistanceKm, 1),
+                        ["activeDurationSeconds"] = (int)trip.Duration.TotalSeconds,
+                        ["game"] = trip.GameType?.ToLowerInvariant() ?? "ets2"
+                    });
                 }
                 catch (Exception ex)
                 {
                     WriteLog($"[LOGBOOK] Error saving trip: {ex.Message}");
                 }
             }
+            _deliveryTimer.Reset();
             _tripTrackingActive = false;
 
             Dispatcher.Invoke(() => {
@@ -712,12 +736,15 @@ namespace ETSOverlay
         {
             try
             {
-                if (File.Exists(appLogFilePath) && new FileInfo(appLogFilePath).Length > 5 * 1024 * 1024)
+                lock (_logLock)
                 {
-                    File.WriteAllText(appLogFilePath, "");
-                }
+                    if (File.Exists(appLogFilePath) && new FileInfo(appLogFilePath).Length > 5 * 1024 * 1024)
+                    {
+                        File.WriteAllText(appLogFilePath, "");
+                    }
 
-                File.AppendAllText(appLogFilePath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+                    File.AppendAllText(appLogFilePath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
+                }
             }
             catch { }
         }
@@ -782,9 +809,15 @@ namespace ETSOverlay
                 {
                     WriteLog("Game telemetry CONNECTED");
                     _needsLocationCheck = true;
+                    ClientPresenceService.Instance.RecordEvent("telemetry_connected", "Game telemetry connected");
                 }
                 isGameOnline = data.SdkActive;
                 isPaused = data.Paused;
+
+                if (data.GameVersion != null && (data.GameVersion.Major > 0 || data.GameVersion.Minor > 0))
+                {
+                    _currentGameVersion = $"{data.GameVersion.Major}.{data.GameVersion.Minor}";
+                }
 
                 if (isGameOnline && data.TruckValues.CurrentValues.DashboardValues.Odometer > 0)
                 {
@@ -1298,6 +1331,13 @@ namespace ETSOverlay
                         GameStatus.Text = LocalizeStatus("GAME_ACTIVE");
                         GameStatus.Foreground = new SolidColorBrush(Color.FromRgb(122, 197, 205));
                     }
+
+                    bool isActivelyDriving = _tripTrackingActive && _cargoWasLoaded && isCargoLoaded && !isPaused && isProfileLoaded;
+                    _deliveryTimer.Update(isActivelyDriving);
+                }
+                else
+                {
+                    _deliveryTimer.Update(false);
                 }
             });
         }
@@ -1321,6 +1361,23 @@ namespace ETSOverlay
                 _currentGame = GameType.Unknown;
             }
 
+            if (isGameRunning != _wasGameRunning)
+            {
+                if (isGameRunning)
+                {
+                    ClientPresenceService.Instance.RecordEvent("game_started", $"Game started: {_currentGame}", new()
+                    {
+                        ["game"] = isAtsRunning ? "ats" : "ets2"
+                    });
+                }
+                else
+                {
+                    ClientPresenceService.Instance.RecordEvent("game_stopped", "Game stopped");
+                    ClientPresenceService.Instance.RecordEvent("telemetry_disconnected", "Game closed");
+                }
+                _wasGameRunning = isGameRunning;
+            }
+
             if (isGameRunning && (DateTime.Now - lastTelemetryUpdate).TotalSeconds > 5)
             {
                 try { telemetry?.Dispose(); telemetry = new SCSSdkTelemetry(); telemetry.Data += Telemetry_Data; lastTelemetryUpdate = DateTime.Now; WriteLog("Reinitialized telemetry connection"); } catch { }
@@ -1333,10 +1390,31 @@ namespace ETSOverlay
             if (_isTbRunning != wasTbRunning)
             {
                 WriteLog($"TrucksBook running status changed to: {_isTbRunning}");
+                if (_isTbRunning)
+                {
+                    ClientPresenceService.Instance.RecordEvent("trucksbook_connected", "TrucksBook client connected");
+                }
+                else
+                {
+                    ClientPresenceService.Instance.RecordEvent("trucksbook_disconnected", "TrucksBook client disconnected");
+                }
             }
+
+            ClientPresenceService.Instance.UpdateLiveState(s =>
+            {
+                s.GameRunning = isGameRunning;
+                s.Game = isAtsRunning ? "ats" : (isEtsRunning ? "ets2" : null);
+                s.GameVersion = _currentGameVersion;
+                s.TelemetryConnected = isGameOnline;
+                s.TrucksBookConnected = _isTbRunning;
+                s.TrackingActive = _tripTrackingActive;
+                s.RecordingActive = _isTbRunning && !_isRecordingBroken;
+                s.SyncActive = LicenseManager.Instance.HasFeature("cloud_sync") || CloudSyncStatus == "Available";
+            });
 
             if (!isGameRunning)
             {
+                _deliveryTimer.Update(false);
                 if (isGameOnline || (GameStatus.Text != "OFFLINE" && GameStatus.Text != LocalizeStatus("GAME_OFFLINE")))
                 {
                     WriteLog("Game closed or went offline");
@@ -1904,6 +1982,7 @@ namespace ETSOverlay
             MaxSpeedValue.Text = "0";
             UpdateDeliveryTypeUI(0);
             ClearJobUI();
+            _deliveryTimer.Reset();
             SaveState();
         }
 
@@ -1917,6 +1996,7 @@ namespace ETSOverlay
             MaxSpeedValue.Text = "0";
             UpdateDeliveryTypeUI(0);
             ClearJobUI();
+            _deliveryTimer.Reset();
         }
 
         private void LoadOrInitJobState(string jobId, bool isNewJob = false)
@@ -1959,6 +2039,7 @@ namespace ETSOverlay
                 _trailerWasAttachedBeforeLoading = false;
                 _lastTickOdometer = -1;
                 MaxSpeedValue.Text = "0";
+                _deliveryTimer.Reset();
                 SaveJobState();
                 return;
             }
@@ -1995,6 +2076,8 @@ namespace ETSOverlay
             _tripPlayMode = state.TripData.PlayMode;
             _tripFinesTotal = state.TripData.FinesTotal;
             _tripFines = new List<TripFine>(state.TripData.Fines);
+
+            _deliveryTimer.Restore(state.TripData.ActiveDurationTicks);
 
             // Не вызываем SaveJobState() здесь: не хотим перезаписать CargoWasLoaded=true в файле
             // до того, как телеметрия подтвердит сцепку.
@@ -2037,6 +2120,8 @@ namespace ETSOverlay
                 return;
             }
 
+            _deliveryTimer.Flush();
+
             string stateKey = GetJobStateKey(CurrentLastJobId);
             var jobState = new JobState
             {
@@ -2076,6 +2161,7 @@ namespace ETSOverlay
             jobState.TripData.PlayMode = _tripPlayMode;
             jobState.TripData.FinesTotal = _tripFinesTotal;
             jobState.TripData.Fines = new List<TripFine>(_tripFines);
+            jobState.TripData.ActiveDurationTicks = _deliveryTimer.GetTicks();
 
             _jobStates[stateKey] = jobState;
 
@@ -2437,9 +2523,11 @@ namespace ETSOverlay
             _ghostDestination = "";
             _triggerGhostSnapshot = false;
             UpdateDeliveryTypeUI(0);
+            _deliveryTimer.Update(false);
 
             if (clearJobState)
             {
+                _deliveryTimer.Reset();
                 _cargoWasLoaded = false;
                 _lastJobIdEts = ""; 
                 _lastJobIdAts = ""; 
@@ -3923,7 +4011,20 @@ namespace ETSOverlay
 
         public void BtnClose_Click(object? sender, RoutedEventArgs e)
         {
-            try { SaveState(); SpeedLimiterService.Instance.ReleaseBrake(); telemetry?.Dispose(); } catch { }
+            try
+            {
+                _deliveryTimer.Update(false);
+                SaveJobState();
+                SaveState();
+                SpeedLimiterService.Instance.ReleaseBrake();
+                telemetry?.Dispose();
+                try
+                {
+                    Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("user_exit")).Wait(2500);
+                }
+                catch { }
+            }
+            catch { }
             Environment.Exit(0);
         }
 
@@ -3948,14 +4049,44 @@ namespace ETSOverlay
             _headerOverlay?.UpdatePinIcon(Topmost);
             _hudWindow?.UpdatePinIcon(Topmost);
         }
+
         protected override void OnClosed(EventArgs e) 
         { 
             WriteLog("=== OVERLAY CLOSED ==="); 
-            SaveState(); 
-            SpeedLimiterService.Instance.ReleaseBrake(); 
-            telemetry?.Dispose(); 
+            try
+            {
+                _deliveryTimer.Update(false);
+                SaveJobState();
+                SaveState(); 
+                SpeedLimiterService.Instance.ReleaseBrake(); 
+                telemetry?.Dispose(); 
+                try
+                {
+                    Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("user_exit")).Wait(2500);
+                }
+                catch { }
+            }
+            catch { }
             base.OnClosed(e); 
             Environment.Exit(0);
+        }
+
+        public void HandleSessionEnding()
+        {
+            try
+            {
+                _deliveryTimer.Update(false);
+                SaveJobState();
+                SaveState();
+                SpeedLimiterService.Instance.ReleaseBrake();
+                telemetry?.Dispose();
+                try
+                {
+                    Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("system_shutdown")).Wait(2500);
+                }
+                catch { }
+            }
+            catch { }
         }
 
         // ==================== AUTO-UPDATE ====================
@@ -4457,9 +4588,16 @@ namespace ETSOverlay
                 WriteLog("Updater launched, shutting down for update...");
 
                 // Сохраняем состояние и сразу закрываем приложение
+                _deliveryTimer.Update(false);
+                SaveJobState();
                 SaveState();
                 SpeedLimiterService.Instance.ReleaseBrake();
                 telemetry?.Dispose();
+                try
+                {
+                    Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("update")).Wait(2500);
+                }
+                catch { }
                 Environment.Exit(0);
             }
             catch (Exception ex)
