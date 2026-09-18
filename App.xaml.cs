@@ -26,7 +26,37 @@ namespace TruckSim_Widget
                 return;
             }
 
+            SessionEnding += App_SessionEnding;
             base.OnStartup(e);
+        }
+
+        private void App_SessionEnding(object sender, SessionEndingCancelEventArgs e)
+        {
+            try
+            {
+                if (MainWindow is ETSOverlay.MainWindow mw)
+                {
+                    mw.HandleSessionEnding();
+                }
+            }
+            catch { }
+        }
+
+        protected override void OnExit(ExitEventArgs e)
+        {
+            try
+            {
+                _mutex?.ReleaseMutex();
+            }
+            catch { }
+            try
+            {
+                _mutex?.Dispose();
+            }
+            catch { }
+            _mutex = null;
+
+            base.OnExit(e);
         }
     }
 }

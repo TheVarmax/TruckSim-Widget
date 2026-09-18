@@ -334,10 +334,16 @@ namespace ETSOverlay
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => _mainWindow.BtnMinimize_Click(sender, e);
         private void BtnClose_Click(object sender, RoutedEventArgs e) => _mainWindow.BtnClose_Click(sender, e);
 
+        private bool _isClosingFromMainWindow = false;
+        internal void MarkClosingFromMainWindow() => _isClosingFromMainWindow = true;
+
         protected override void OnClosed(EventArgs e)
         {
             base.OnClosed(e);
-            Environment.Exit(0);
+            if (!_isClosingFromMainWindow)
+            {
+                _mainWindow.BtnClose_Click(null, null!);
+            }
         }
     }
 }
