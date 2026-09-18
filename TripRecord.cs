@@ -23,12 +23,32 @@ namespace ETSOverlay
         public string CargoName { get; set; } = "";
         public float DistanceKm { get; set; }
         public long DurationTicks { get; set; }  // TimeSpan stored as ticks for JSON compat
+        public long? ActiveDurationTicks { get; set; }  // Accumulated active delivery duration ticks
 
         [JsonIgnore]
         public TimeSpan Duration
         {
-            get => TimeSpan.FromTicks(DurationTicks);
-            set => DurationTicks = value.Ticks;
+            get
+            {
+                if (ActiveDurationTicks.HasValue && ActiveDurationTicks.Value > 0)
+                {
+                    return TimeSpan.FromTicks(ActiveDurationTicks.Value);
+                }
+                if (DurationTicks > 0)
+                {
+                    return TimeSpan.FromTicks(DurationTicks);
+                }
+                if (EndTimeUtc > StartTimeUtc)
+                {
+                    return EndTimeUtc - StartTimeUtc;
+                }
+                return TimeSpan.Zero;
+            }
+            set
+            {
+                ActiveDurationTicks = value.Ticks;
+                DurationTicks = value.Ticks;
+            }
         }
 
         // Extended fields (Supporter tier)

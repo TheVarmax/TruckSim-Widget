@@ -52,7 +52,7 @@ namespace ETSOverlay
                     t.Origin == trip.Origin && 
                     t.Destination == trip.Destination &&
                     Math.Abs(t.DistanceKm - trip.DistanceKm) < 1f &&
-                    (trip.EndTimeUtc - t.EndTimeUtc).TotalMinutes < 2))
+                    Math.Abs((trip.EndTimeUtc - t.EndTimeUtc).TotalMinutes) < 2))
                 {
                     Debug.WriteLine("[TripLogbook] Duplicate trip detected, skipping save.");
                     return;
@@ -135,7 +135,7 @@ namespace ETSOverlay
                         CsvEscape(t.Destination),
                         CsvEscape(t.CargoName),
                         t.DistanceKm.ToString("F1"),
-                        t.Duration.ToString(@"hh\:mm\:ss"),
+                        $"{Math.Floor(t.Duration.TotalHours):00}:{t.Duration.Minutes:00}:{t.Duration.Seconds:00}",
                         t.StartTimeUtc.ToString("o"),
                         t.EndTimeUtc.ToString("o"),
                         t.AverageSpeedKmh.ToString("F1"),
