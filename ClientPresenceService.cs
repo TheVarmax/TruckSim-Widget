@@ -281,21 +281,29 @@ namespace ETSOverlay
             };
         }
 
-        private ClientSoftwareInfo GetSoftwareInfo()
+        private ClientSoftwareInfo? _cachedSoftwareInfo;
+
+        public ClientSoftwareInfo GetSoftwareInfo()
         {
+            if (_cachedSoftwareInfo != null) return _cachedSoftwareInfo;
+
             string? ets2Ver = GetGameExeVersion(CityTranslationExtractor.Ets2AppId, "Euro Truck Simulator 2", "eurotrucks2.exe");
             string? atsVer = GetGameExeVersion(CityTranslationExtractor.AtsAppId, "American Truck Simulator", "amtrucks.exe");
             string? tmpVer = GetTruckersMpVersion();
             string runtimeVer = RuntimeInformation.FrameworkDescription;
 
-            return new ClientSoftwareInfo
+            _cachedSoftwareInfo = new ClientSoftwareInfo
             {
                 Ets2Version = ets2Ver,
                 AtsVersion = atsVer,
                 TruckersMpVersion = tmpVer,
                 RuntimeVersion = runtimeVer
             };
+            return _cachedSoftwareInfo;
         }
+
+        public string? Ets2Version => GetSoftwareInfo().Ets2Version;
+        public string? AtsVersion => GetSoftwareInfo().AtsVersion;
 
         private string? GetGameExeVersion(int appId, string folderName, string exeName)
         {

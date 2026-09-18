@@ -815,7 +815,15 @@ namespace ETSOverlay
                 isGameOnline = data.SdkActive;
                 isPaused = data.Paused;
 
-                if (data.GameVersion != null && (data.GameVersion.Major > 0 || data.GameVersion.Minor > 0))
+                if (isEtsRunning)
+                {
+                    _currentGameVersion = ClientPresenceService.Instance.Ets2Version;
+                }
+                else if (isAtsRunning)
+                {
+                    _currentGameVersion = ClientPresenceService.Instance.AtsVersion;
+                }
+                else if (data.GameVersion != null && (data.GameVersion.Major > 0 || data.GameVersion.Minor > 0) && !(data.GameVersion.Major == 1 && data.GameVersion.Minor == 20))
                 {
                     _currentGameVersion = $"{data.GameVersion.Major}.{data.GameVersion.Minor}";
                 }
@@ -1408,11 +1416,21 @@ namespace ETSOverlay
                 }
             }
 
+            string? runningGameVersion = null;
+            if (isEtsRunning)
+            {
+                runningGameVersion = ClientPresenceService.Instance.Ets2Version ?? _currentGameVersion;
+            }
+            else if (isAtsRunning)
+            {
+                runningGameVersion = ClientPresenceService.Instance.AtsVersion ?? _currentGameVersion;
+            }
+
             ClientPresenceService.Instance.UpdateLiveState(s =>
             {
                 s.GameRunning = isGameRunning;
                 s.Game = isAtsRunning ? "ats" : (isEtsRunning ? "ets2" : null);
-                s.GameVersion = _currentGameVersion;
+                s.GameVersion = runningGameVersion;
                 s.TelemetryConnected = isGameOnline;
                 s.TrucksBookConnected = _isTbRunning;
                 s.TrackingActive = _tripTrackingActive;
