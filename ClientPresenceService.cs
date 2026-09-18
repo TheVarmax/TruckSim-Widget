@@ -22,8 +22,20 @@ namespace ETSOverlay
 
         private readonly ITruckSimCloudClient _client;
         private readonly SemaphoreSlim _syncLock = new(1, 1);
-        private readonly ConcurrentQueue<ClientDiagnosticEvent> _eventQueue = new();
+        private readonly List<ClientDiagnosticEvent> _events = new();
+        private readonly object _eventLock = new();
         private readonly object _stateLock = new();
+
+        public int EventQueueCount
+        {
+            get
+            {
+                lock (_eventLock)
+                {
+                    return _events.Count;
+                }
+            }
+        }
 
         private CancellationTokenSource? _heartbeatCts;
         private Task? _heartbeatLoopTask;
@@ -452,16 +464,19 @@ namespace ETSOverlay
             }
             catch { }
 
-            using var timeoutCts = new CancellationTokenSource(timeoutMs);
-            try
+            // 1. Acquire lock with a short timeout to prevent blocking shutdown indefinitely
+            using (var lockCts = new CancellationTokenSource(Math.Min(1000, timeoutMs)))
             {
-                await _syncLock.WaitAsync(timeoutCts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                _isShutDown = true;
-                _isRegistered = false;
-                return;
+                try
+                {
+                    await _syncLock.WaitAsync(lockCts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    _isShutDown = true;
+                    _isRegistered = false;
+                    return;
+                }
             }
 
             try
@@ -474,19 +489,33 @@ namespace ETSOverlay
                 string token = DeviceTokenStorage.LoadToken();
                 if (string.IsNullOrWhiteSpace(token)) return;
 
-                try
+                // 2. Best-effort short timeout budget strictly for diagnostic flush (max 800ms)
+                // Prevents slow/hanging event requests from starving the shutdown request.
+                int flushTimeoutMs = Math.Min(800, Math.Max(200, timeoutMs / 3));
+                using (var flushCts = new CancellationTokenSource(flushTimeoutMs))
                 {
-                    await FlushEventsInternalAsync(token, timeoutCts.Token);
+                    try
+                    {
+                        await FlushEventsInternalAsync(token, flushCts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        Debug.WriteLine($"[ClientPresence] Shutdown flush diagnostics non-critical: {ex.Message}");
+                    }
                 }
-                catch { }
 
-                var shutdownReq = new ClientShutdownRequest
+                // 3. Guaranteed separate timeout budget strictly for /client/shutdown
+                int shutdownTimeoutMs = Math.Max(1500, timeoutMs);
+                using (var shutdownCts = new CancellationTokenSource(shutdownTimeoutMs))
                 {
-                    Reason = reason,
-                    AppVersion = GetAppVersion()
-                };
+                    var shutdownReq = new ClientShutdownRequest
+                    {
+                        Reason = reason,
+                        AppVersion = GetAppVersion()
+                    };
 
-                await _client.SendShutdownAsync(token, shutdownReq, timeoutCts.Token);
+                    await _client.SendShutdownAsync(token, shutdownReq, shutdownCts.Token);
+                }
             }
             catch (Exception ex)
             {
@@ -543,26 +572,48 @@ namespace ETSOverlay
                 Metadata = safeMeta
             };
 
-            while (_eventQueue.Count > 100)
+            lock (_eventLock)
             {
-                _eventQueue.TryDequeue(out _);
+                while (_events.Count >= 100)
+                {
+                    _events.RemoveAt(0);
+                }
+                _events.Add(evt);
             }
-            _eventQueue.Enqueue(evt);
+        }
+
+        internal Task FlushEventsAsync(string token, CancellationToken ct = default)
+        {
+            return FlushEventsInternalAsync(token, ct);
         }
 
         private async Task FlushEventsInternalAsync(string token, CancellationToken ct)
         {
-            if (_eventQueue.IsEmpty) return;
-
-            var batch = new List<ClientDiagnosticEvent>();
-            while (batch.Count < 50 && _eventQueue.TryDequeue(out var evt))
+            List<ClientDiagnosticEvent> batch;
+            lock (_eventLock)
             {
-                batch.Add(evt);
+                if (_events.Count == 0) return;
+                batch = _events.Take(50).ToList();
             }
 
-            if (batch.Count > 0)
+            if (batch.Count == 0) return;
+
+            try
             {
-                await _client.SendEventsAsync(token, new ClientEventsRequest { Events = batch }, ct);
+                var res = await _client.SendEventsAsync(token, new ClientEventsRequest { Events = batch }, ct);
+                if (res != null && res.Success)
+                {
+                    lock (_eventLock)
+                    {
+                        int countToRemove = Math.Min(batch.Count, _events.Count);
+                        _events.RemoveRange(0, countToRemove);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[ClientPresence] Failed to send events: {ex.Message}");
+                // Network failure: events are preserved in _events in original order
             }
         }
 

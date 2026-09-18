@@ -30,10 +30,12 @@ namespace ETSOverlay
         {
             get
             {
-                if (ActiveDurationTicks.HasValue && ActiveDurationTicks.Value > 0)
+                // New records always have ActiveDurationTicks set (even if 0). Never fallback to calendar time for them.
+                if (ActiveDurationTicks.HasValue)
                 {
-                    return TimeSpan.FromTicks(ActiveDurationTicks.Value);
+                    return ActiveDurationTicks.Value > 0 ? TimeSpan.FromTicks(ActiveDurationTicks.Value) : TimeSpan.Zero;
                 }
+                // Legacy records fallback (only when ActiveDurationTicks is null)
                 if (DurationTicks > 0)
                 {
                     return TimeSpan.FromTicks(DurationTicks);

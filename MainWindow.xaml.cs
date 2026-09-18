@@ -94,6 +94,7 @@ namespace ETSOverlay
         private float _lastNavDistWithTrailer = -1f; // Расстояние до финиша пока прицеп прицеплен
         private bool _forceProfileUnloaded = false; // Жестко глушим телеметрию, если вышли из профиля
         private readonly DeliveryActiveTimer _deliveryTimer = new();
+        private DateTime _lastJobStateAutoSaveUtc = DateTime.MinValue;
         private static readonly object _logLock = new();
         private string? _currentGameVersion = null;
         private bool _wasGameRunning = false;
@@ -664,9 +665,9 @@ namespace ETSOverlay
                 {
                     _deliveryTimer.Flush();
                     TimeSpan activeDuration = _deliveryTimer.Elapsed;
-                    if (activeDuration <= TimeSpan.Zero)
+                    if (activeDuration < TimeSpan.Zero)
                     {
-                        activeDuration = DateTime.UtcNow - _tripStartTimeUtc;
+                        activeDuration = TimeSpan.Zero;
                     }
 
                     var trip = new TripRecord
@@ -1281,6 +1282,13 @@ namespace ETSOverlay
                                     _tripIncome = data.JobValues?.Income ?? 0;
                                 }
 
+                                // Periodic auto-save every 30 seconds while active delivery is tracking (e.g. while standing still with engine idling)
+                                if (_tripTrackingActive && _cargoWasLoaded && (DateTime.UtcNow - _lastJobStateAutoSaveUtc).TotalSeconds >= 30)
+                                {
+                                    _lastJobStateAutoSaveUtc = DateTime.UtcNow;
+                                    SaveJobState();
+                                }
+
                                 // Отрисовка прогресса
                                 // Используем данные от навигатора (advisor) в реальном времени, чтобы итоговый километраж
                                 // обновлялся при перестроении маршрута. Берём пройденное + оставшееся по навигатору.
@@ -1418,6 +1426,10 @@ namespace ETSOverlay
                 if (isGameOnline || (GameStatus.Text != "OFFLINE" && GameStatus.Text != LocalizeStatus("GAME_OFFLINE")))
                 {
                     WriteLog("Game closed or went offline");
+                    if (_cargoWasLoaded || !string.IsNullOrWhiteSpace(CurrentLastJobId) || jobDrivenDistance > 0)
+                    {
+                        SaveJobState();
+                    }
                     WriteLog($"Resetting display and game state");
                     isGameOnline = false;
                     ResetDisplay(true); // Полная очистка интерфейса и состояния
@@ -2527,6 +2539,11 @@ namespace ETSOverlay
 
             if (clearJobState)
             {
+                if (_cargoWasLoaded || !string.IsNullOrWhiteSpace(CurrentLastJobId) || jobDrivenDistance > 0)
+                {
+                    SaveJobState();
+                }
+
                 _deliveryTimer.Reset();
                 _cargoWasLoaded = false;
                 _lastJobIdEts = ""; 
