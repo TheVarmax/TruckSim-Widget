@@ -1,7 +1,7 @@
 #define MyAppName "TruckSim Widget"
-#define MyAppVersion "1.6.3"
+#define MyAppVersion "1.6.4-beta.1"
 #define MyAppExeName "TruckSim Widget.exe"
-#define PublishDir "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget (1.6.3)"
+#define PublishDir "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget (1.6.4-beta.1)"
 
 [Setup]
 AppId={{8F4E6E2C-7F11-4F7D-BD7D-TRUCKSIMWIDGET}
