@@ -55,6 +55,8 @@ namespace ETSOverlay
         private bool isGameOnline = false;
         private bool isPaused = false;
         private bool isProfileLoaded = false;
+        private bool isEtsRunning = false;
+        private bool isAtsRunning = false;
         private int maxSpeedKmh = 0;
 
         private float lastPlannedDistance = 0;
@@ -815,11 +817,11 @@ namespace ETSOverlay
                 isGameOnline = data.SdkActive;
                 isPaused = data.Paused;
 
-                if (isEtsRunning)
+                if (isEtsRunning || _currentGame == GameType.Ets)
                 {
                     _currentGameVersion = ClientPresenceService.Instance.Ets2Version;
                 }
-                else if (isAtsRunning)
+                else if (isAtsRunning || _currentGame == GameType.Ats)
                 {
                     _currentGameVersion = ClientPresenceService.Instance.AtsVersion;
                 }
@@ -1360,8 +1362,8 @@ namespace ETSOverlay
 
         private void CheckStatusAndProcesses()
         {
-            bool isEtsRunning = Process.GetProcessesByName("eurotrucks2").Any();
-            bool isAtsRunning = Process.GetProcessesByName("amtrucks").Any();
+            isEtsRunning = Process.GetProcessesByName("eurotrucks2").Any();
+            isAtsRunning = Process.GetProcessesByName("amtrucks").Any();
             bool isGameRunning = isEtsRunning || isAtsRunning;
 
             if (isAtsRunning)
