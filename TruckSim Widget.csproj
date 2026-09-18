@@ -18,6 +18,11 @@
     <None Remove="Updater\**" />
     <Content Remove="Updater\**" />
     <EmbeddedResource Remove="Updater\**" />
+    <Compile Remove="*Tests\**;*.Tests\**" />
+    <None Remove="*Tests\**;*.Tests\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="TruckSimWidget.Tests" />
   </ItemGroup>
   <ItemGroup>
     <Using Remove="System.Windows.Forms" />

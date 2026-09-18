@@ -361,4 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-/-remote --tags origin
+
+# Tests (strictly local, never committed to repository)
+*Tests/
+*.Tests/
+[Tt]ests/
+[Tt]est/
+TestResults/
+*.TestRun*
