@@ -159,6 +159,10 @@ function SaveJsonStateFile(const AppVersionStr, AppInstallDir: String; const ETS
 var
   StateFile: String;
   StateDir: String;
+  StagingDir: String;
+  BackupFile: String;
+  OriginalHash: String;
+  StepIdx: Integer;
   Json: String;
   NowIso: String;
 begin
@@ -168,6 +172,32 @@ begin
 
   if not SafeDirExists(StateDir) then
     ForceDirectories(StateDir);
+
+  BackupFile := '';
+  OriginalHash := '';
+
+  // If install-state.json already exists, stage a rollback backup before modifying it
+  if SafeFileExists(StateFile) then
+  begin
+    OriginalHash := GetFileSha256Safe(StateFile);
+    StagingDir := GetTransactionStagingDir();
+    if not SafeDirExists(StagingDir) then
+      ForceDirectories(StagingDir);
+
+    BackupFile := CombinePath(StagingDir, 'state_rollback_' + GetDateTimeString('yyyymmdd_hhnnss', '', '') + '.json');
+    LogInfo('Staging rollback backup of existing install state: ' + StateFile + ' -> ' + BackupFile);
+    if not CopyFile(StateFile, BackupFile, False) then
+    begin
+      if not CopyFileElevated(StateFile, BackupFile) then
+      begin
+        LogErr('CRITICAL: Failed to stage rollback backup of existing install-state.json!');
+        exit;
+      end;
+    end;
+  end;
+
+  // Record transaction journal step: Operation = 'SaveStateFile'
+  StepIdx := BeginTransactionStep('SaveStateFile', '', StateFile, BackupFile, OriginalHash);
 
   NowIso := GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':');
 
@@ -200,9 +230,14 @@ begin
 
   Result := AtomicSaveStringToFile(StateFile, Json);
   if Result then
-    LogInfo('Saved canonical v3 install state to: ' + StateFile)
+  begin
+    LogInfo('Saved canonical v3 install state to: ' + StateFile);
+    CompleteTransactionStep(StepIdx);
+  end
   else
+  begin
     LogErr('Failed to atomically write install state to: ' + StateFile);
+  end;
 end;
 
 procedure EvaluatePluginOwnership(var Game: TGameConfig; const BundledHash: String);

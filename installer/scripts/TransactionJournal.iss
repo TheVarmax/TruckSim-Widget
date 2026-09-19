@@ -213,6 +213,57 @@ begin
           LogWarn('Could not remove created directory during rollback: ' + Step.TargetPath);
       end;
     end;
+  end
+  else if Step.Operation = 'SaveStateFile' then
+  begin
+    LogInfo('Rolling back install state file: ' + Step.TargetPath);
+    if (Step.BackupPath <> '') and SafeFileExists(Step.BackupPath) then
+    begin
+      // Existing state was modified: restore from staging backup
+      LogInfo('Restoring previous install state from staging backup: ' + Step.BackupPath + ' -> ' + Step.TargetPath);
+      Copied := CopyFile(Step.BackupPath, Step.TargetPath, False);
+      if not Copied then
+        Copied := CopyFileElevated(Step.BackupPath, Step.TargetPath);
+
+      if not Copied or not SafeFileExists(Step.TargetPath) then
+      begin
+        LogErr('CRITICAL: Failed to restore install state from backup: ' + Step.BackupPath);
+        Result := False;
+        exit;
+      end;
+
+      // Verify restored state file SHA-256 against recorded OriginalHash
+      if Step.OriginalHash <> '' then
+      begin
+        RestoredHash := GetFileSha256Safe(Step.TargetPath);
+        if CompareText(RestoredHash, Step.OriginalHash) <> 0 then
+        begin
+          LogErr('CRITICAL: Restored install state SHA-256 mismatch! Expected: ' + Step.OriginalHash + ', Actual: ' + RestoredHash);
+          Result := False;
+          exit;
+        end;
+        LogInfo('Restored install state SHA-256 verified successfully: ' + RestoredHash);
+      end;
+    end
+    else
+    begin
+      // No previous state existed prior to this transaction: delete the newly created install-state.json
+      LogInfo('No previous install state existed prior to transaction; removing created file: ' + Step.TargetPath);
+      if SafeFileExists(Step.TargetPath) then
+      begin
+        Deleted := DeleteFile(Step.TargetPath);
+        if not Deleted then
+          Deleted := DeleteFileElevated(Step.TargetPath);
+
+        if SafeFileExists(Step.TargetPath) then
+        begin
+          LogErr('CRITICAL: Failed to delete newly created install state file during rollback: ' + Step.TargetPath);
+          Result := False;
+          exit;
+        end;
+        LogInfo('Successfully removed newly created install state file during rollback.');
+      end;
+    end;
   end;
 end;
 
@@ -339,8 +390,18 @@ begin
   Result := False;
   JournalPath := GetTransactionJournalFilePath();
 
+  // If no journal exists, clean up any orphaned staging files from past completed sessions
   if not SafeFileExists(JournalPath) then
+  begin
+    if SafeDirExists(GetTransactionStagingDir()) then
+    begin
+      try
+        DelTree(GetTransactionStagingDir(), True, True, True);
+      except
+      end;
+    end;
     exit;
+  end;
 
   LogInfo('Found existing transaction journal at: ' + JournalPath);
   if not LoadStringFromFile(JournalPath, RawContent) then
@@ -407,7 +468,14 @@ begin
   end
   else if (StatusVal = TRANSACTION_STATUS_COMMITTED) or (StatusVal = TRANSACTION_STATUS_ROLLED_BACK) then
   begin
-    // Stale completed journal
+    // Stale completed or rolled back journal: safely clean staging and journal
+    if SafeDirExists(GetTransactionStagingDir()) then
+    begin
+      try
+        DelTree(GetTransactionStagingDir(), True, True, True);
+      except
+      end;
+    end;
     DeleteFile(JournalPath);
   end;
 end;

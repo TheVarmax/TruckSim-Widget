@@ -16,7 +16,7 @@ internal static class Program
     private const int EXIT_ACCESS_DENIED = 5;
 
     private static readonly Regex GameBackupRegex = new(@"^scs-telemetry\.dll\.backup_\d{8}_\d{6}\.bak$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex StagingRollbackRegex = new(@"^(ETS2|ATS)_rollback_\d{8}_\d{6}\.dll$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex StagingRollbackRegex = new(@"^((ETS2|ATS)_rollback_\d{8}_\d{6}\.dll|state_rollback_\d{8}_\d{6}\.json)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     public static int Main(string[] args)
     {
