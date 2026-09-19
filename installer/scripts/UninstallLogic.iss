@@ -27,9 +27,10 @@ begin
   begin
     LogInfo('[' + GameId + '] Restoring original third-party plugin from: ' + BackupPath);
     try
-      if CopyFile(BackupPath, TargetPluginFile, False) then
+      if CopyFile(BackupPath, TargetPluginFile, False) or CopyFileElevated(BackupPath, TargetPluginFile) then
       begin
-        DeleteFile(BackupPath);
+        if not DeleteFile(BackupPath) then
+          DeleteFileElevated(BackupPath);
         LogInfo('[' + GameId + '] Successfully restored original plugin.');
       end
       else
@@ -45,7 +46,7 @@ begin
   begin
     LogInfo('[' + GameId + '] Removing Widget-owned plugin: ' + TargetPluginFile);
     try
-      if DeleteFile(TargetPluginFile) then
+      if DeleteFile(TargetPluginFile) or DeleteFileElevated(TargetPluginFile) then
         LogInfo('[' + GameId + '] Plugin successfully removed.')
       else
         LogWarn('[' + GameId + '] Could not delete plugin file (may be locked).');

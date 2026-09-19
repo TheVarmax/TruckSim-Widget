@@ -83,43 +83,20 @@ begin
   end;
 end;
 
-function EscapeJson(const S: String): String;
+function ExtractNestedJsonValue(const Content, SectionName, KeyName: String): String;
 var
-  Res: String;
-begin
-  Res := S;
-  StringChange(Res, '\', '\\');
-  StringChange(Res, '"', '\"');
-  Result := Res;
-end;
-
-function ExtractJsonValue(const Content, Key: String): String;
-var
-  KeyPat: String;
-  PosKey, StartPos: Integer;
+  SecPos, EndSecPos: Integer;
+  SecBlock: String;
 begin
   Result := '';
-  KeyPat := '"' + Key + '"';
-  PosKey := Pos(KeyPat, Content);
-  if PosKey > 0 then
+  SecPos := Pos('"' + SectionName + '"', Content);
+  if SecPos > 0 then
   begin
-    PosKey := PosKey + Length(KeyPat);
-    while (PosKey <= Length(Content)) and (Content[PosKey] in [' ', ':', #9, #13, #10]) do
-      PosKey := PosKey + 1;
-    if (PosKey <= Length(Content)) and (Content[PosKey] = '"') then
-    begin
-      PosKey := PosKey + 1;
-      StartPos := PosKey;
-      while (PosKey <= Length(Content)) and (Content[PosKey] <> '"') do
-        PosKey := PosKey + 1;
-      Result := Copy(Content, StartPos, PosKey - StartPos);
-      StringChange(Result, '\\', '\');
-    end
-    else if (PosKey <= Length(Content)) and ((Content[PosKey] = 't') or (Content[PosKey] = 'f')) then
-    begin
-      if Copy(Content, PosKey, 4) = 'true' then Result := 'true'
-      else if Copy(Content, PosKey, 5) = 'false' then Result := 'false';
-    end;
+    SecBlock := Copy(Content, SecPos, Length(Content) - SecPos + 1);
+    EndSecPos := Pos('}', SecBlock);
+    if EndSecPos > 0 then
+      SecBlock := Copy(SecBlock, 1, EndSecPos);
+    Result := ExtractJsonValue(SecBlock, KeyName);
   end;
 end;
 
@@ -128,6 +105,7 @@ var
   StateFile: String;
   RawContent: AnsiString;
   Content: String;
+  IsV3: Boolean;
 begin
   Result := False;
   StateFile := GetInstallerStateFilePath();
@@ -136,21 +114,47 @@ begin
   if LoadStringFromFile(StateFile, RawContent) then
   begin
     Content := String(RawContent);
-    // ETS2 state
-    ETS2Config.SelectedPath := ExtractJsonValue(Content, 'ets2_path');
-    ETS2Config.OwnershipStatus := ExtractJsonValue(Content, 'ets2_ownership');
-    ETS2Config.ExistingFileHash := ExtractJsonValue(Content, 'ets2_hash');
-    ETS2Config.BackupPath := ExtractJsonValue(Content, 'ets2_backup');
-    if ExtractJsonValue(Content, 'ets2_enabled') = 'true' then ETS2Config.UserSelected := True
-    else if ExtractJsonValue(Content, 'ets2_enabled') = 'false' then ETS2Config.UserSelected := False;
 
-    // ATS state
-    ATSConfig.SelectedPath := ExtractJsonValue(Content, 'ats_path');
-    ATSConfig.OwnershipStatus := ExtractJsonValue(Content, 'ats_ownership');
-    ATSConfig.ExistingFileHash := ExtractJsonValue(Content, 'ats_hash');
-    ATSConfig.BackupPath := ExtractJsonValue(Content, 'ats_backup');
-    if ExtractJsonValue(Content, 'ats_enabled') = 'true' then ATSConfig.UserSelected := True
-    else if ExtractJsonValue(Content, 'ats_enabled') = 'false' then ATSConfig.UserSelected := False;
+    // Check if canonical v3 schema is present
+    IsV3 := (Pos('"games"', Content) > 0) and (Pos('"ETS2"', Content) > 0);
+
+    if IsV3 then
+    begin
+      LogInfo('Detected canonical v3 install-state schema.');
+      // ETS2 state
+      ETS2Config.SelectedPath := ExtractNestedJsonValue(Content, 'ETS2', 'gamePath');
+      ETS2Config.OwnershipStatus := ExtractNestedJsonValue(Content, 'ETS2', 'status');
+      ETS2Config.ExistingFileHash := ExtractNestedJsonValue(Content, 'ETS2', 'fileHash');
+      ETS2Config.BackupPath := ExtractNestedJsonValue(Content, 'ETS2', 'backupPath');
+      if ExtractNestedJsonValue(Content, 'ETS2', 'configured') = 'true' then ETS2Config.UserSelected := True
+      else if ExtractNestedJsonValue(Content, 'ETS2', 'configured') = 'false' then ETS2Config.UserSelected := False;
+
+      // ATS state
+      ATSConfig.SelectedPath := ExtractNestedJsonValue(Content, 'ATS', 'gamePath');
+      ATSConfig.OwnershipStatus := ExtractNestedJsonValue(Content, 'ATS', 'status');
+      ATSConfig.ExistingFileHash := ExtractNestedJsonValue(Content, 'ATS', 'fileHash');
+      ATSConfig.BackupPath := ExtractNestedJsonValue(Content, 'ATS', 'backupPath');
+      if ExtractNestedJsonValue(Content, 'ATS', 'configured') = 'true' then ATSConfig.UserSelected := True
+      else if ExtractNestedJsonValue(Content, 'ATS', 'configured') = 'false' then ATSConfig.UserSelected := False;
+    end
+    else
+    begin
+      LogInfo('Detected legacy v2 install-state schema. Migrating to v3 on next save.');
+      // Backward-compatible v2 flat schema fallback
+      ETS2Config.SelectedPath := ExtractJsonValue(Content, 'ets2_path');
+      ETS2Config.OwnershipStatus := ExtractJsonValue(Content, 'ets2_ownership');
+      ETS2Config.ExistingFileHash := ExtractJsonValue(Content, 'ets2_hash');
+      ETS2Config.BackupPath := ExtractJsonValue(Content, 'ets2_backup');
+      if ExtractJsonValue(Content, 'ets2_enabled') = 'true' then ETS2Config.UserSelected := True
+      else if ExtractJsonValue(Content, 'ets2_enabled') = 'false' then ETS2Config.UserSelected := False;
+
+      ATSConfig.SelectedPath := ExtractJsonValue(Content, 'ats_path');
+      ATSConfig.OwnershipStatus := ExtractJsonValue(Content, 'ats_ownership');
+      ATSConfig.ExistingFileHash := ExtractJsonValue(Content, 'ats_hash');
+      ATSConfig.BackupPath := ExtractJsonValue(Content, 'ats_backup');
+      if ExtractJsonValue(Content, 'ats_enabled') = 'true' then ATSConfig.UserSelected := True
+      else if ExtractJsonValue(Content, 'ats_enabled') = 'false' then ATSConfig.UserSelected := False;
+    end;
 
     Result := True;
     LogInfo('Loaded existing installer state from: ' + StateFile);
@@ -177,22 +181,30 @@ begin
     '  "installerVersion": "' + EscapeJson(AppVersionStr) + '",' + #13#10 +
     '  "installDate": "' + EscapeJson(NowIso) + '",' + #13#10 +
     '  "installPath": "' + EscapeJson(AppInstallDir) + '",' + #13#10 +
-    '  "ets2_enabled": ' + LowerCase(BoolToStr(ETS2Config.UserSelected)) + ',' + #13#10 +
-    '  "ets2_path": "' + EscapeJson(ETS2Config.SelectedPath) + '",' + #13#10 +
-    '  "ets2_ownership": "' + EscapeJson(ETS2Config.OwnershipStatus) + '",' + #13#10 +
-    '  "ets2_hash": "' + EscapeJson(ETS2Config.ExistingFileHash) + '",' + #13#10 +
-    '  "ets2_backup": "' + EscapeJson(ETS2Config.BackupPath) + '",' + #13#10 +
-    '  "ats_enabled": ' + LowerCase(BoolToStr(ATSConfig.UserSelected)) + ',' + #13#10 +
-    '  "ats_path": "' + EscapeJson(ATSConfig.SelectedPath) + '",' + #13#10 +
-    '  "ats_ownership": "' + EscapeJson(ATSConfig.OwnershipStatus) + '",' + #13#10 +
-    '  "ats_hash": "' + EscapeJson(ATSConfig.ExistingFileHash) + '",' + #13#10 +
-    '  "ats_backup": "' + EscapeJson(ATSConfig.BackupPath) + '"' + #13#10 +
+    '  "games": {' + #13#10 +
+    '    "ETS2": {' + #13#10 +
+    '      "configured": ' + LowerCase(BoolToStr(ETS2Config.UserSelected)) + ',' + #13#10 +
+    '      "gamePath": "' + EscapeJson(ETS2Config.SelectedPath) + '",' + #13#10 +
+    '      "pluginPath": "' + EscapeJson(ETS2Config.TargetPluginFile) + '",' + #13#10 +
+    '      "status": "' + EscapeJson(ETS2Config.OwnershipStatus) + '",' + #13#10 +
+    '      "fileHash": "' + EscapeJson(ETS2Config.ExistingFileHash) + '",' + #13#10 +
+    '      "backupPath": "' + EscapeJson(ETS2Config.BackupPath) + '"' + #13#10 +
+    '    },' + #13#10 +
+    '    "ATS": {' + #13#10 +
+    '      "configured": ' + LowerCase(BoolToStr(ATSConfig.UserSelected)) + ',' + #13#10 +
+    '      "gamePath": "' + EscapeJson(ATSConfig.SelectedPath) + '",' + #13#10 +
+    '      "pluginPath": "' + EscapeJson(ATSConfig.TargetPluginFile) + '",' + #13#10 +
+    '      "status": "' + EscapeJson(ATSConfig.OwnershipStatus) + '",' + #13#10 +
+    '      "fileHash": "' + EscapeJson(ATSConfig.ExistingFileHash) + '",' + #13#10 +
+    '      "backupPath": "' + EscapeJson(ATSConfig.BackupPath) + '"' + #13#10 +
+    '    }' + #13#10 +
+    '  }' + #13#10 +
     '}' + #13#10;
 
   try
     Result := SaveStringToFile(StateFile, Json, False);
     if Result then
-      LogInfo('Saved canonical install state to: ' + StateFile)
+      LogInfo('Saved canonical v3 install state to: ' + StateFile)
     else
       LogErr('Failed to write install state to: ' + StateFile);
   except
@@ -219,7 +231,6 @@ begin
 
   if not Game.ExistingFileFound then
   begin
-    // Scenario A: File does not exist
     Game.OwnershipStatus := OWNERSHIP_NONE;
     Game.ExistingFileHash := '';
     LogInfo('[' + Game.GameId + '] No existing plugin found at: ' + PluginFile);
@@ -234,14 +245,12 @@ begin
   begin
     if (Game.ExistingFileHash <> '') and (CompareText(CurrentHash, Game.ExistingFileHash) = 0) then
     begin
-      // Scenario B: Owned and unmodified
-      LogInfo('[' + Game.GameId + '] Plugin is owned and unmodified.');
+      LogInfo('[' + Game.GameId + '] Plugin is verified owned and unmodified.');
       Game.OwnershipStatus := OWNERSHIP_OWNED;
       exit;
     end
     else
     begin
-      // Scenario D: User modified after Widget installation
       LogWarn('[' + Game.GameId + '] Plugin was owned by Widget but hash modified since install.');
       Game.OwnershipStatus := OWNERSHIP_MODIFIED_BY_USER;
       exit;
@@ -254,31 +263,21 @@ begin
     if CompareText(NormalizePath(LegacyOwnedPath), NormalizePath(PluginFile)) = 0 then
     begin
       LogInfo('[' + Game.GameId + '] Found legacy path ownership record: ' + LegacyOwnedPath);
-      // Path-only legacy ownership cannot be automatically trusted as verified
-      if CompareText(CurrentHash, BundledHash) = 0 then
-      begin
-        LogInfo('[' + Game.GameId + '] Legacy plugin matches bundled hash, adopting as Owned.');
-        Game.OwnershipStatus := OWNERSHIP_OWNED;
-        Game.ExistingFileHash := CurrentHash;
-        exit;
-      end
-      else
-      begin
-        LogWarn('[' + Game.GameId + '] Legacy plugin hash differs from bundled. Marking LegacyOwnedUnverified.');
-        Game.OwnershipStatus := OWNERSHIP_LEGACY_UNVERIFIED;
-        exit;
-      end;
+      // STRICT RULE: matching hash alone != ownership
+      // Legacy path-only records without cryptographic metadata remain strictly unverified
+      LogWarn('[' + Game.GameId + '] Conservative legacy migration: Marking as LegacyOwnedUnverified.');
+      Game.OwnershipStatus := OWNERSHIP_LEGACY_UNVERIFIED;
+      exit;
     end;
   end;
 
-  // Scenario C: File exists but no ownership record
   // STRICT RULE: matching hash alone != ownership
   if CompareText(CurrentHash, BundledHash) = 0 then
     LogInfo('[' + Game.GameId + '] Plugin matches bundled hash but has no ownership record (unmanaged/third-party).')
   else
     LogInfo('[' + Game.GameId + '] Third-party plugin detected with different hash.');
 
-  Game.OwnershipStatus := OWNERSHIP_NONE; // Unmanaged/Third-party
+  Game.OwnershipStatus := OWNERSHIP_NONE;
 end;
 
 function InstallPluginForGame(var Game: TGameConfig; const SourcePluginFile: String): Boolean;
@@ -286,9 +285,12 @@ var
   TargetDir: String;
   TargetFile: String;
   BackupTarget: String;
-  DirCreated: Boolean;
+  StagingDir: String;
+  StagingBackupFile: String;
   CurrentHash: String;
   Copied: Boolean;
+  StepIdx: Integer;
+  IsCleanOwnedUpdate: Boolean;
 begin
   Result := False;
 
@@ -307,24 +309,26 @@ begin
   LogInfo('[' + Game.GameId + '] Installing telemetry plugin to: ' + TargetFile);
 
   // Check if directory exists
-  DirCreated := False;
   if not SafeDirExists(TargetDir) then
   begin
+    StepIdx := BeginTransactionStep('CreateDir', '', TargetDir, '');
     if not ForceDirectories(TargetDir) then
     begin
-      LogErr('[' + Game.GameId + '] Could not create plugins directory: ' + TargetDir);
-      exit;
+      if not MkDirElevated(TargetDir) then
+      begin
+        LogErr('[' + Game.GameId + '] Could not create plugins directory: ' + TargetDir);
+        exit;
+      end;
     end;
-    DirCreated := True;
-    PushRollbackItem(3, TargetDir, '', '');
+    CompleteTransactionStep(StepIdx);
   end;
 
-  // Handle existing file / conflict resolution
+  // Handle existing file
   if SafeFileExists(TargetFile) then
   begin
     CurrentHash := GetFileSha256Safe(TargetFile);
 
-    // If keeping existing
+    // If user explicitly chose to keep existing
     if Game.ConflictAction = CONFLICT_ACTION_KEEP_EXISTING then
     begin
       LogInfo('[' + Game.GameId + '] User chose to keep existing plugin.');
@@ -333,69 +337,96 @@ begin
       exit;
     end;
 
-    // If backup and replace
-    if (Game.ConflictAction = CONFLICT_ACTION_BACKUP_REPLACE) or
-       (Game.OwnershipStatus = OWNERSHIP_LEGACY_UNVERIFIED) or
-       (Game.OwnershipStatus = OWNERSHIP_MODIFIED_BY_USER) or
-       (Game.OwnershipStatus = OWNERSHIP_NONE) then
+    // Check if this is a clean update of an existing Widget-owned plugin
+    IsCleanOwnedUpdate := (Game.OwnershipStatus = OWNERSHIP_OWNED);
+
+    if IsCleanOwnedUpdate then
     begin
-      BackupTarget := CombinePath(TargetDir, PLUGIN_FILENAME + PLUGIN_BACKUP_EXT);
-      if SafeFileExists(BackupTarget) then
-      begin
-        // Do not overwrite existing backup; create timestamped backup
-        BackupTarget := CombinePath(TargetDir, PLUGIN_FILENAME + '.backup_' + GetDateTimeString('yyyymmdd_hhnnss', '', '') + '.bak');
-      end;
+      // CLEAN WIDGET-OWNED UPDATE:
+      // Create temporary staging rollback backup, NOT persistent .trucksim_backup!
+      StagingDir := GetTransactionStagingDir();
+      if not SafeDirExists(StagingDir) then ForceDirectories(StagingDir);
+      StagingBackupFile := CombinePath(StagingDir, Game.GameId + '_rollback_' + GetDateTimeString('yyyymmdd_hhnnss', '', '') + '.dll');
 
-      LogInfo('[' + Game.GameId + '] Backing up existing plugin to: ' + BackupTarget);
-      if not CopyFile(TargetFile, BackupTarget, False) then
+      LogInfo('[' + Game.GameId + '] Creating temporary staging backup of owned plugin at: ' + StagingBackupFile);
+      StepIdx := BeginTransactionStep('StageOwnedBackup', TargetFile, TargetFile, StagingBackupFile);
+      if not CopyFile(TargetFile, StagingBackupFile, False) then
       begin
-        LogErr('[' + Game.GameId + '] Failed to create plugin backup at: ' + BackupTarget);
-        exit;
+        if not CopyFileElevated(TargetFile, StagingBackupFile) then
+        begin
+          LogErr('[' + Game.GameId + '] Failed to create temporary staging backup.');
+          exit;
+        end;
       end;
+      CompleteTransactionStep(StepIdx);
 
-      Game.BackupPath := BackupTarget;
-      Game.BackupHash := CurrentHash;
-      PushRollbackItem(2, TargetFile, BackupTarget, CurrentHash);
+      // Important: Persistent BackupPath remains empty!
+      Game.BackupPath := '';
+    end
+    else
+    begin
+      // THIRD-PARTY OR UNVERIFIED CONFLICT REPLACEMENT:
+      if (Game.ConflictAction = CONFLICT_ACTION_BACKUP_REPLACE) or
+         (Game.OwnershipStatus = OWNERSHIP_LEGACY_UNVERIFIED) or
+         (Game.OwnershipStatus = OWNERSHIP_MODIFIED_BY_USER) or
+         (Game.OwnershipStatus = OWNERSHIP_NONE) then
+      begin
+        BackupTarget := CombinePath(TargetDir, PLUGIN_FILENAME + PLUGIN_BACKUP_EXT);
+        if SafeFileExists(BackupTarget) then
+          BackupTarget := CombinePath(TargetDir, PLUGIN_FILENAME + '.backup_' + GetDateTimeString('yyyymmdd_hhnnss', '', '') + '.bak');
+
+        LogInfo('[' + Game.GameId + '] Creating persistent backup of third-party/unverified plugin: ' + BackupTarget);
+        StepIdx := BeginTransactionStep('CreateThirdPartyBackup', TargetFile, TargetFile, BackupTarget);
+        if not CopyFile(TargetFile, BackupTarget, False) then
+        begin
+          if not CopyFileElevated(TargetFile, BackupTarget) then
+          begin
+            LogErr('[' + Game.GameId + '] Failed to create third-party plugin backup at: ' + BackupTarget);
+            exit;
+          end;
+        end;
+        CompleteTransactionStep(StepIdx);
+
+        Game.BackupPath := BackupTarget;
+        Game.BackupHash := CurrentHash;
+      end;
     end;
 
     // Delete existing before copy
     if not DeleteFile(TargetFile) then
-    begin
-      LogWarn('[' + Game.GameId + '] DeleteFile failed on target file. Trying elevated copy.');
-    end;
-  end
-  else
-  begin
-    PushRollbackItem(1, TargetFile, '', '');
+      DeleteFileElevated(TargetFile);
   end;
 
   // Copy new plugin file
+  StepIdx := BeginTransactionStep('CopyPlugin', SourcePluginFile, TargetFile, Game.BackupPath);
   Copied := CopyFile(SourcePluginFile, TargetFile, False);
   if not Copied then
   begin
-    // Attempt targeted elevated copy if standard copy failed
     LogWarn('[' + Game.GameId + '] Standard CopyFile failed. Attempting CopyFileElevated.');
     Copied := CopyFileElevated(SourcePluginFile, TargetFile);
   end;
 
   if Copied and SafeFileExists(TargetFile) then
   begin
+    CompleteTransactionStep(StepIdx);
     Game.ExistingFileHash := GetFileSha256Safe(TargetFile);
-    if Game.BackupPath <> '' then
+
+    if IsCleanOwnedUpdate then
+      Game.OwnershipStatus := OWNERSHIP_OWNED
+    else if Game.BackupPath <> '' then
       Game.OwnershipStatus := OWNERSHIP_THIRD_PARTY_REPLACED
     else
       Game.OwnershipStatus := OWNERSHIP_OWNED;
 
-    // Mirror to HKCU registry for compatibility
     RegWriteStringValue(HKCU, 'Software\TruckSim Widget', Game.GameId + 'Path', Game.SelectedPath);
     RegWriteStringValue(HKCU, 'Software\TruckSim Widget', Game.GameId + 'PluginOwnedPath', TargetFile);
 
-    LogInfo('[' + Game.GameId + '] Telemetry plugin successfully installed. State: ' + Game.OwnershipStatus + ', Hash: ' + Game.ExistingFileHash);
+    LogInfo('[' + Game.GameId + '] Telemetry plugin installed. Status: ' + Game.OwnershipStatus + ', Hash: ' + Game.ExistingFileHash);
     Result := True;
   end
   else
   begin
-    LogErr('[' + Game.GameId + '] Failed to copy scs-telemetry.dll to: ' + TargetFile);
+    LogErr('[' + Game.GameId + '] Failed to copy plugin to: ' + TargetFile);
     Result := False;
   end;
 end;

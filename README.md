@@ -219,7 +219,7 @@ The initial setup takes a minute and only needs to be completed once:
 
 1. Download either the **Installer** or the **Portable ZIP** from the latest release.
 2. Install the app or extract the portable archive to a permanent folder.
-3. **Installer:** on the **Telemetry Plugin Setup** page, choose ETS2 and/or ATS, or skip plugin setup for now. The installer automatically discovers your games across all Steam libraries and drives (including secondary drives like `D:\SteamLibrary`), validates game directories, detects running game processes, and safely manages existing plugins.
+3. **Installer:** on the **Telemetry Plugin Setup** page, choose ETS2 and/or ATS, or skip plugin setup for now. The installer automatically discovers your games across all Steam libraries and drives, and safely configures the telemetry plugin.
 4. **Portable ZIP:** copy `scs-telemetry.dll` from the included `plugin` folder into your game's `plugins` folder manually.
 5. Start TrucksBook Client and sign in.
 6. Launch ETS2 or ATS, then start TruckSim Widget.
@@ -254,18 +254,12 @@ TruckSim Widget needs `scs-telemetry.dll` inside the `plugins` folder of each ga
 
 #### Installer
 
-The installer provides comprehensive and safe game and plugin management:
+The installer takes care of the setup automatically:
 
-- **Automatic Multi-Library Discovery**: Searches Steam registry keys, parses all libraries defined in `libraryfolders.vdf`, verifies `appmanifest_*.acf` entries, and scans fixed drives so games on secondary drives (e.g. `D:\SteamLibrary`) are detected automatically.
-- **Game Directory Validation**: Verifies the directory structure (ensuring `bin\win_x64` exists) and checks if the game is currently running before applying changes.
-- **Smart Plugin Ownership & Conflict Resolution**:
-  - Tracks plugin ownership via metadata (`install-state.json`).
-  - If a foreign or unknown plugin is present, prompts you with safe options: **Backup and replace** (saves a `.trucksim_backup` copy), **Keep existing**, or **Overwrite**.
-  - On application updates (`--update`), owned plugins are updated automatically without overwriting third-party telemetry tools.
-- **Clean, Non-Destructive Uninstall**:
-  - Removes only files belonging to TruckSim Widget.
-  - Automatically restores `.trucksim_backup` files if a backup was made during installation.
-  - Asks whether to keep or remove your user data and trip logbook (`%LOCALAPPDATA%\TruckSimWidget`).
+- **Automatic Game Detection**: Detects your Steam installations of Euro Truck Simulator 2 and American Truck Simulator across all libraries and drives.
+- **Smart Plugin Setup**: Automatically installs or updates the telemetry plugin for the selected games.
+- **Safe Conflict Handling**: If another plugin is already installed, the installer asks what you want to do (make a safe backup and replace, keep your existing plugin, or overwrite it).
+- **Clean Uninstall**: Removes only the files belonging to TruckSim Widget and restores any previous plugins that were backed up. Also lets you choose whether to keep your local settings and trip logbook.
 
 If the installer does not find a game automatically, you can browse to the game's root folder manually. It is the folder containing `bin\win_x64`, for example:
 

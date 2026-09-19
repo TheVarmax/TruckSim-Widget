@@ -59,8 +59,10 @@ static class Program
             string appDir = args[2];
             string appExe = args[3];
             logPath = args[4];
-            string language = args[5]; // "uk" или "en"
-            string expectedSha256 = args.Length > 6 ? args[6] : "";
+            string language = args[5];
+            string expectedSha256 = args.Length > 6 ? args[6].Trim() : "";
+            if (expectedSha256.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+                expectedSha256 = expectedSha256.Substring(7).Trim();
 
             WriteLog(logPath, "=== UPDATER STARTED ===");
             WriteLog(logPath, $"Download URL: {downloadUrl}");
@@ -68,8 +70,15 @@ static class Program
             WriteLog(logPath, $"App dir: {appDir}");
             WriteLog(logPath, $"App exe: {appExe}");
             WriteLog(logPath, $"Language: {language}");
-            if (!string.IsNullOrEmpty(expectedSha256))
-                WriteLog(logPath, $"Expected SHA-256: {expectedSha256}");
+            WriteLog(logPath, $"Expected SHA-256: {expectedSha256}");
+
+            if (string.IsNullOrWhiteSpace(expectedSha256))
+            {
+                throw new InvalidOperationException(
+                    language == "uk"
+                        ? "Помилка безпеки: відсутній обов'язковий SHA-256 хеш для перевірки інсталятора. Оновлення скасовано."
+                        : "Security error: Missing required SHA-256 checksum for installer verification. Update aborted.");
+            }
 
             // Запускаем форму обновления
             Application.Run(new UpdateForm(downloadUrl, assetName, appDir, appExe, logPath, language, expectedSha256));
@@ -302,20 +311,32 @@ static class Program
                 }
                 WriteLog(_logPath, $"Downloaded installer SHA-256: {downloadedHash}");
 
-                if (!string.IsNullOrWhiteSpace(_expectedSha256))
+                string cleanExpected = _expectedSha256.Trim();
+                if (cleanExpected.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+                    cleanExpected = cleanExpected.Substring(7).Trim();
+
+                if (string.IsNullOrWhiteSpace(cleanExpected))
                 {
-                    if (!string.Equals(downloadedHash, _expectedSha256.Trim(), StringComparison.OrdinalIgnoreCase))
-                    {
-                        throw new InvalidOperationException(
-                            _lang == "uk"
-                                ? $"Помилка цілісності інсталятора (SHA-256 не збігається).\nОчікувано: {_expectedSha256}\nОтримано: {downloadedHash}"
-                                : $"Installer integrity check failed (SHA-256 mismatch).\nExpected: {_expectedSha256}\nActual: {downloadedHash}");
-                    }
-                    WriteLog(_logPath, "SHA-256 integrity check passed.");
+                    if (File.Exists(installerPath)) { try { File.Delete(installerPath); } catch { } }
+                    throw new InvalidOperationException(
+                        _lang == "uk"
+                            ? "Помилка безпеки: відсутній очікуваний SHA-256 хеш для перевірки інсталятора."
+                            : "Security error: Missing expected SHA-256 digest for installer verification.");
                 }
+
+                if (!string.Equals(downloadedHash, cleanExpected, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (File.Exists(installerPath)) { try { File.Delete(installerPath); } catch { } }
+                    throw new InvalidOperationException(
+                        _lang == "uk"
+                            ? $"Помилка цілісності інсталятора (SHA-256 не збігається).\nОчікувано: {cleanExpected}\nОтримано: {downloadedHash}"
+                            : $"Installer integrity check failed (SHA-256 mismatch).\nExpected: {cleanExpected}\nActual: {downloadedHash}");
+                }
+                WriteLog(_logPath, "SHA-256 integrity check passed.");
 
                 if (!IsValidExecutable(installerPath))
                 {
+                    if (File.Exists(installerPath)) { try { File.Delete(installerPath); } catch { } }
                     throw new InvalidOperationException(
                         _lang == "uk"
                             ? "Завантажений файл не є коректним інсталятором Windows або пошкоджений."

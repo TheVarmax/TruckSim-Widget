@@ -4639,28 +4639,71 @@ namespace ETSOverlay
 
                 if (IsNewerVersion(remoteVersion, currentVersion))
                 {
-                    // Ищем ZIP-ассет в релизе
                     string? downloadUrl = null;
                     string? assetName = null;
+                    string? expectedSha256 = null;
+                    string? sha256AssetUrl = null;
 
                     if (latestRelease.TryGetProperty("assets", out var assets))
                     {
+                        string expectedName = $"TruckSimWidgetSetup-{remoteVersion}.exe";
+                        string expectedShaName = $"{expectedName}.sha256";
+
                         foreach (var asset in assets.EnumerateArray())
                         {
                             string name = asset.GetProperty("name").GetString() ?? "";
-                            string expectedName = $"TruckSimWidgetSetup-{remoteVersion}.exe";
                             if (name.Equals(expectedName, StringComparison.OrdinalIgnoreCase))
                             {
                                 downloadUrl = asset.GetProperty("browser_download_url").GetString();
                                 assetName = name;
-                                break;
+                                if (asset.TryGetProperty("digest", out var digestElem))
+                                {
+                                    expectedSha256 = NormalizeSha256(digestElem.GetString());
+                                }
+                            }
+                            else if (name.Equals(expectedShaName, StringComparison.OrdinalIgnoreCase) ||
+                                     name.Equals("checksums.txt", StringComparison.OrdinalIgnoreCase))
+                            {
+                                sha256AssetUrl = asset.GetProperty("browser_download_url").GetString();
+                            }
+                        }
+
+                        if (string.IsNullOrEmpty(expectedSha256) && !string.IsNullOrEmpty(sha256AssetUrl))
+                        {
+                            try
+                            {
+                                string checksumContent = await client.GetStringAsync(sha256AssetUrl);
+                                expectedSha256 = ExtractSha256FromChecksumText(checksumContent, expectedName);
+                            }
+                            catch (Exception ex)
+                            {
+                                WriteLog($"[WARN] Failed to download checksum asset: {ex.Message}");
                             }
                         }
                     }
 
                     if (downloadUrl != null && assetName != null)
                     {
-                        WriteLog($"Update available: {releaseName}, asset: {assetName}");
+                        if (string.IsNullOrEmpty(expectedSha256))
+                        {
+                            WriteLog($"[SECURITY ERROR] Aborting update: No valid SHA-256 digest or checksum asset found for {assetName}. Verification is fail-closed.");
+                            if (!silent)
+                            {
+                                Dispatcher.Invoke(() =>
+                                {
+                                    if (_settingsWindow != null)
+                                    {
+                                        _settingsWindow.UpdateStatusText.Foreground = Brushes.Red;
+                                        _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                                            ? "❌ Помилка безпеки оновлення: SHA-256 хеш відсутній"
+                                            : "❌ Update verification failed: SHA-256 missing";
+                                    }
+                                });
+                            }
+                            return;
+                        }
+
+                        WriteLog($"Update available: {releaseName}, asset: {assetName}, expected SHA-256: {expectedSha256}");
 
                         Dispatcher.Invoke(() =>
                         {
@@ -4674,7 +4717,7 @@ namespace ETSOverlay
                         });
 
                         // Показываем диалог подтверждения
-                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName, htmlUrl, body, isBeta);
+                        ShowUpdateConfirmDialog(releaseName, downloadUrl, assetName, htmlUrl, body, expectedSha256, isBeta);
                     }
                     else
                     {
@@ -4769,6 +4812,42 @@ namespace ETSOverlay
             }
         }
 
+        internal static string NormalizeSha256(string? input)
+        {
+            if (string.IsNullOrWhiteSpace(input)) return "";
+            string clean = input.Trim();
+            if (clean.StartsWith("sha256:", StringComparison.OrdinalIgnoreCase))
+                clean = clean.Substring(7).Trim();
+            if (clean.Length == 64 && System.Text.RegularExpressions.Regex.IsMatch(clean, "^[0-9a-fA-F]{64}$"))
+                return clean.ToLowerInvariant();
+            return "";
+        }
+
+        internal static string ExtractSha256FromChecksumText(string text, string targetAssetName)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var line in lines)
+            {
+                var trimmed = line.Trim();
+                var parts = trimmed.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length >= 2)
+                {
+                    string candidateHash = NormalizeSha256(parts[0]);
+                    string fileName = parts[1].TrimStart('*').Trim();
+                    if (!string.IsNullOrEmpty(candidateHash) && fileName.Equals(targetAssetName, StringComparison.OrdinalIgnoreCase))
+                        return candidateHash;
+                }
+                else if (parts.Length == 1)
+                {
+                    string candidateHash = NormalizeSha256(parts[0]);
+                    if (!string.IsNullOrEmpty(candidateHash))
+                        return candidateHash;
+                }
+            }
+            return "";
+        }
+
         /// <summary>
         /// Загружает release notes текущей версии из GitHub API.
         /// Используется как fallback, если предыдущая версия не сохранила body в state.
@@ -4818,7 +4897,7 @@ namespace ETSOverlay
         /// <summary>
         /// Показывает диалог подтверждения обновления
         /// </summary>
-        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName, string htmlUrl, string body, bool isBeta = false)
+        private void ShowUpdateConfirmDialog(string releaseName, string downloadUrl, string assetName, string htmlUrl, string body, string expectedSha256, bool isBeta = false)
         {
             Dispatcher.Invoke(() =>
             {
@@ -4838,7 +4917,7 @@ namespace ETSOverlay
                     LatestReleaseName = releaseName;
                     LatestReleaseBody = body;
                     SaveState();
-                    LaunchUpdaterAndShutdown(downloadUrl, assetName);
+                    LaunchUpdaterAndShutdown(downloadUrl, assetName, expectedSha256);
                 }
                 else if (isBeta)
                 {
@@ -4852,7 +4931,7 @@ namespace ETSOverlay
         /// <summary>
         /// Запускает updater.exe, передавая URL для скачивания, и сразу закрывает виджет
         /// </summary>
-        private void LaunchUpdaterAndShutdown(string downloadUrl, string assetName)
+        private void LaunchUpdaterAndShutdown(string downloadUrl, string assetName, string expectedSha256)
         {
             try
             {
@@ -4879,13 +4958,13 @@ namespace ETSOverlay
                 string logPath = appLogFilePath;
 
                 WriteLog($"Launching updater: {updaterPath}");
-                WriteLog($"Args: \"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\"");
+                WriteLog($"Args: \"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\" \"{expectedSha256}\"");
 
-                // Запускаем updater.exe с URL для скачивания
+                // Запускаем updater.exe с URL для скачивания и ожидаемым хешем
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = updaterPath,
-                    Arguments = $"\"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\"",
+                    Arguments = $"\"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\" \"{expectedSha256}\"",
                     UseShellExecute = true
                 });
 

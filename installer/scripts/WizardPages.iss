@@ -1,4 +1,4 @@
-// WizardPages.iss - Modern Dynamic Wizard Flow & TruckSim Widget Styling
+// WizardPages.iss - Modern Dynamic Wizard Flow & TruckSim Widget Branded Styling
 // Part of TruckSim Widget Installer
 
 [Code]
@@ -21,20 +21,54 @@ var
   // Conflict page controls
   ConflictHeaderLabel: TNewStaticText;
   ConflictDescLabel: TNewStaticText;
-  ConflictOptionBackup: TNewRadioButton;
-  ConflictOptionKeep: TNewRadioButton;
-  ConflictOptionOverwrite: TNewRadioButton;
+
+  ETS2ConflictHeader: TNewStaticText;
+  ETS2ConflictOptionBackup: TNewRadioButton;
+  ETS2ConflictOptionKeep: TNewRadioButton;
+  ETS2ConflictOptionOverwrite: TNewRadioButton;
+
+  ATSConflictHeader: TNewStaticText;
+  ATSConflictOptionBackup: TNewRadioButton;
+  ATSConflictOptionKeep: TNewRadioButton;
+  ATSConflictOptionOverwrite: TNewRadioButton;
 
   // State
   GlobalETS2Config: TGameConfig;
   GlobalATSConfig: TGameConfig;
   HasConflict: Boolean;
+  HasETS2Conflict: Boolean;
+  HasATSConflict: Boolean;
   InitialUpdateDir: String;
 
 procedure ApplyWidgetTheme();
 begin
+  // Set clean modern typography
   WizardForm.Font.Name := 'Segoe UI';
-  // Standard modern wizard styling
+
+  // Dark Theme Palette:
+  // Background: #181818 ($181818)
+  // Surface:    #1E1E1E ($1E1E1E)
+  // Primary:    #FFFFFF ($FFFFFF)
+  // Secondary:  #AAAAAA ($AAAAAA)
+  WizardForm.Color := $181818;
+  WizardForm.MainPanel.Color := $181818;
+
+  // Labels & Header
+  WizardForm.PageNameLabel.Font.Color := $FFFFFF;
+  WizardForm.PageNameLabel.Font.Style := [fsBold];
+  WizardForm.PageDescriptionLabel.Font.Color := $AAAAAA;
+  
+  WizardForm.WelcomeLabel1.Font.Color := $FFFFFF;
+  WizardForm.WelcomeLabel1.Font.Style := [fsBold];
+  WizardForm.WelcomeLabel2.Font.Color := $CCCCCC;
+  
+  WizardForm.FinishedHeadingLabel.Font.Color := $FFFFFF;
+  WizardForm.FinishedHeadingLabel.Font.Style := [fsBold];
+  WizardForm.FinishedLabel.Font.Color := $CCCCCC;
+
+  // Bevel
+  WizardForm.Bevel.Visible := False;
+  WizardForm.BeveledLabel.Visible := False;
 end;
 
 procedure BrowseETS2FolderClick(Sender: TObject);
@@ -55,10 +89,68 @@ begin
     ATSPathEdit.Text := Dir;
 end;
 
-procedure CreateGameConfigControls();
+procedure InitGameConfigs();
+begin
+  GlobalETS2Config.GameId := GAME_ETS2;
+  GlobalETS2Config.DisplayName := CustomMessage('GameNameETS2');
+  GlobalETS2Config.ExeName := GAME_EXE_ETS2;
+  GlobalETS2Config.DefaultFolderName := GAME_DIRNAME_ETS2;
+  GlobalETS2Config.SteamAppId := STEAM_APPID_ETS2;
+  GlobalETS2Config.UserSelected := False;
+  GlobalETS2Config.DetectedPath := '';
+  GlobalETS2Config.SelectedPath := '';
+  GlobalETS2Config.ExistingFileFound := False;
+  GlobalETS2Config.ExistingFileHash := '';
+  GlobalETS2Config.OwnershipStatus := OWNERSHIP_NONE;
+  GlobalETS2Config.ConflictAction := CONFLICT_ACTION_NONE;
+  GlobalETS2Config.BackupPath := '';
+  GlobalETS2Config.BackupHash := '';
+  GlobalETS2Config.NeedsElevation := False;
+  GlobalETS2Config.IsRunning := False;
+
+  GlobalATSConfig.GameId := GAME_ATS;
+  GlobalATSConfig.DisplayName := CustomMessage('GameNameATS');
+  GlobalATSConfig.ExeName := GAME_EXE_ATS;
+  GlobalATSConfig.DefaultFolderName := GAME_DIRNAME_ATS;
+  GlobalATSConfig.SteamAppId := STEAM_APPID_ATS;
+  GlobalATSConfig.UserSelected := False;
+  GlobalATSConfig.DetectedPath := '';
+  GlobalATSConfig.SelectedPath := '';
+  GlobalATSConfig.ExistingFileFound := False;
+  GlobalATSConfig.ExistingFileHash := '';
+  GlobalATSConfig.OwnershipStatus := OWNERSHIP_NONE;
+  GlobalATSConfig.ConflictAction := CONFLICT_ACTION_NONE;
+  GlobalATSConfig.BackupPath := '';
+  GlobalATSConfig.BackupHash := '';
+  GlobalATSConfig.NeedsElevation := False;
+  GlobalATSConfig.IsRunning := False;
+
+  HasConflict := False;
+  HasETS2Conflict := False;
+  HasATSConflict := False;
+end;
+
+procedure CreateGameSelectionControls();
 var
   TopPos: Integer;
 begin
+  // 1. Component Selection Page
+  PluginOptionsPage := CreateInputOptionPage(
+    wpSelectDir,
+    CustomMessage('TelemetryPageTitle'),
+    CustomMessage('TelemetryPageSub'),
+    CustomMessage('TelemetryPagePrompt'),
+    False,
+    False
+  );
+  PluginOptionsPage.Add(CustomMessage('InstallETS2Plugin'));
+  PluginOptionsPage.Add(CustomMessage('InstallATSPlugin'));
+
+  // Pre-select if detected
+  PluginOptionsPage.Values[0] := GlobalETS2Config.DetectedPath <> '';
+  PluginOptionsPage.Values[1] := GlobalATSConfig.DetectedPath <> '';
+
+  // 2. Game Directories Configuration Page
   GameConfigPage := CreateCustomPage(
     PluginOptionsPage.ID,
     CustomMessage('GameDirPageTitle'),
@@ -142,7 +234,7 @@ begin
     CustomMessage('ConflictPageSub')
   );
 
-  TopPos := ScaleY(10);
+  TopPos := ScaleY(5);
   ConflictHeaderLabel := TNewStaticText.Create(WizardForm);
   ConflictHeaderLabel.Parent := ConflictPage.Surface;
   ConflictHeaderLabel.Top := TopPos;
@@ -151,7 +243,7 @@ begin
   ConflictHeaderLabel.Font.Style := [fsBold];
   ConflictHeaderLabel.Caption := CustomMessage('ConflictHeader');
 
-  TopPos := TopPos + ScaleY(28);
+  TopPos := TopPos + ScaleY(20);
   ConflictDescLabel := TNewStaticText.Create(WizardForm);
   ConflictDescLabel.Parent := ConflictPage.Surface;
   ConflictDescLabel.Top := TopPos;
@@ -159,30 +251,86 @@ begin
   ConflictDescLabel.Width := ScaleX(400);
   ConflictDescLabel.Caption := CustomMessage('ConflictDesc');
 
-  TopPos := TopPos + ScaleY(55);
-  ConflictOptionBackup := TNewRadioButton.Create(WizardForm);
-  ConflictOptionBackup.Parent := ConflictPage.Surface;
-  ConflictOptionBackup.Top := TopPos;
-  ConflictOptionBackup.Left := ScaleX(15);
-  ConflictOptionBackup.Width := ScaleX(390);
-  ConflictOptionBackup.Caption := CustomMessage('ConflictOptionBackup');
-  ConflictOptionBackup.Checked := True;
+  // ETS2 Conflict Section
+  TopPos := TopPos + ScaleY(26);
+  ETS2ConflictHeader := TNewStaticText.Create(WizardForm);
+  ETS2ConflictHeader.Parent := ConflictPage.Surface;
+  ETS2ConflictHeader.Top := TopPos;
+  ETS2ConflictHeader.Left := ScaleX(5);
+  ETS2ConflictHeader.Font.Style := [fsBold];
+  ETS2ConflictHeader.Caption := 'Euro Truck Simulator 2:';
 
-  TopPos := TopPos + ScaleY(35);
-  ConflictOptionKeep := TNewRadioButton.Create(WizardForm);
-  ConflictOptionKeep.Parent := ConflictPage.Surface;
-  ConflictOptionKeep.Top := TopPos;
-  ConflictOptionKeep.Left := ScaleX(15);
-  ConflictOptionKeep.Width := ScaleX(390);
-  ConflictOptionKeep.Caption := CustomMessage('ConflictOptionKeep');
+  TopPos := TopPos + ScaleY(18);
+  ETS2ConflictOptionBackup := TNewRadioButton.Create(WizardForm);
+  ETS2ConflictOptionBackup.Parent := ConflictPage.Surface;
+  ETS2ConflictOptionBackup.Top := TopPos;
+  ETS2ConflictOptionBackup.Left := ScaleX(15);
+  ETS2ConflictOptionBackup.Width := ScaleX(390);
+  ETS2ConflictOptionBackup.Caption := CustomMessage('ConflictOptionBackup');
+  ETS2ConflictOptionBackup.Checked := True;
 
-  TopPos := TopPos + ScaleY(35);
-  ConflictOptionOverwrite := TNewRadioButton.Create(WizardForm);
-  ConflictOptionOverwrite.Parent := ConflictPage.Surface;
-  ConflictOptionOverwrite.Top := TopPos;
-  ConflictOptionOverwrite.Left := ScaleX(15);
-  ConflictOptionOverwrite.Width := ScaleX(390);
-  ConflictOptionOverwrite.Caption := CustomMessage('ConflictOptionOverwrite');
+  TopPos := TopPos + ScaleY(20);
+  ETS2ConflictOptionKeep := TNewRadioButton.Create(WizardForm);
+  ETS2ConflictOptionKeep.Parent := ConflictPage.Surface;
+  ETS2ConflictOptionKeep.Top := TopPos;
+  ETS2ConflictOptionKeep.Left := ScaleX(15);
+  ETS2ConflictOptionKeep.Width := ScaleX(390);
+  ETS2ConflictOptionKeep.Caption := CustomMessage('ConflictOptionKeep');
+
+  TopPos := TopPos + ScaleY(20);
+  ETS2ConflictOptionOverwrite := TNewRadioButton.Create(WizardForm);
+  ETS2ConflictOptionOverwrite.Parent := ConflictPage.Surface;
+  ETS2ConflictOptionOverwrite.Top := TopPos;
+  ETS2ConflictOptionOverwrite.Left := ScaleX(15);
+  ETS2ConflictOptionOverwrite.Width := ScaleX(390);
+  ETS2ConflictOptionOverwrite.Caption := CustomMessage('ConflictOptionOverwrite');
+
+  // ATS Conflict Section
+  TopPos := TopPos + ScaleY(26);
+  ATSConflictHeader := TNewStaticText.Create(WizardForm);
+  ATSConflictHeader.Parent := ConflictPage.Surface;
+  ATSConflictHeader.Top := TopPos;
+  ATSConflictHeader.Left := ScaleX(5);
+  ATSConflictHeader.Font.Style := [fsBold];
+  ATSConflictHeader.Caption := 'American Truck Simulator:';
+
+  TopPos := TopPos + ScaleY(18);
+  ATSConflictOptionBackup := TNewRadioButton.Create(WizardForm);
+  ATSConflictOptionBackup.Parent := ConflictPage.Surface;
+  ATSConflictOptionBackup.Top := TopPos;
+  ATSConflictOptionBackup.Left := ScaleX(15);
+  ATSConflictOptionBackup.Width := ScaleX(390);
+  ATSConflictOptionBackup.Caption := CustomMessage('ConflictOptionBackup');
+  ATSConflictOptionBackup.Checked := True;
+
+  TopPos := TopPos + ScaleY(20);
+  ATSConflictOptionKeep := TNewRadioButton.Create(WizardForm);
+  ATSConflictOptionKeep.Parent := ConflictPage.Surface;
+  ATSConflictOptionKeep.Top := TopPos;
+  ATSConflictOptionKeep.Left := ScaleX(15);
+  ATSConflictOptionKeep.Width := ScaleX(390);
+  ATSConflictOptionKeep.Caption := CustomMessage('ConflictOptionKeep');
+
+  TopPos := TopPos + ScaleY(20);
+  ATSConflictOptionOverwrite := TNewRadioButton.Create(WizardForm);
+  ATSConflictOptionOverwrite.Parent := ConflictPage.Surface;
+  ATSConflictOptionOverwrite.Top := TopPos;
+  ATSConflictOptionOverwrite.Left := ScaleX(15);
+  ATSConflictOptionOverwrite.Width := ScaleX(390);
+  ATSConflictOptionOverwrite.Caption := CustomMessage('ConflictOptionOverwrite');
+end;
+
+procedure UpdateConflictPageVisibility();
+begin
+  ETS2ConflictHeader.Visible := HasETS2Conflict;
+  ETS2ConflictOptionBackup.Visible := HasETS2Conflict;
+  ETS2ConflictOptionKeep.Visible := HasETS2Conflict;
+  ETS2ConflictOptionOverwrite.Visible := HasETS2Conflict;
+
+  ATSConflictHeader.Visible := HasATSConflict;
+  ATSConflictOptionBackup.Visible := HasATSConflict;
+  ATSConflictOptionKeep.Visible := HasATSConflict;
+  ATSConflictOptionOverwrite.Visible := HasATSConflict;
 end;
 
 function ValidateGameWithRunningCheck(var Game: TGameConfig; const PathEditVal: String): Boolean;
@@ -201,24 +349,28 @@ begin
     exit;
   end;
 
-  // 2. Running process check
+  // 2. Running process check (Retry / Skip this game / Cancel)
   while IsGameProcessRunning(Game.ExeName) do
   begin
     Msg := FmtMessage(CustomMessage('ErrGameRunningPrompt'), [Game.DisplayName, Game.ExeName]);
-    DlgResult := MsgBox(Msg, mbError, MB_ABORTRETRYIGNORE);
-    if DlgResult = IDRETRY then
+    DlgResult := MsgBox(Msg, mbConfirmation, MB_YESNOCANCEL);
+    if DlgResult = IDYES then
     begin
-      // Loop again
+      // User closed game, retry check loop
     end
-    else if DlgResult = IDIGNORE then
+    else if DlgResult = IDNO then
     begin
-      LogWarn('User chose to ignore running game warning for: ' + Game.DisplayName);
-      Break;
+      // Skip this game
+      LogInfo('User chose to skip plugin installation for: ' + Game.DisplayName);
+      Game.UserSelected := False;
+      Result := True;
+      exit;
     end
     else
     begin
-      // Abort
-      LogInfo('User aborted setup due to running game: ' + Game.DisplayName);
+      // Cancel setup
+      LogInfo('User cancelled setup due to running game: ' + Game.DisplayName);
+      Result := False;
       exit;
     end;
   end;
@@ -246,10 +398,10 @@ begin
     exit;
   end;
 
-  // Skip Conflict Page if no conflict exists
+  // Skip Conflict Page if no game has conflict
   if PageID = ConflictPage.ID then
   begin
-    Result := not HasConflict;
+    Result := (not HasETS2Conflict) and (not HasATSConflict);
     exit;
   end;
 
@@ -321,37 +473,47 @@ begin
       EvaluatePluginOwnership(GlobalATSConfig, BundledPluginHash);
     end;
 
-    // Check if any game has conflict
-    HasConflict := False;
-    if GlobalETS2Config.UserSelected and (GlobalETS2Config.ExistingFileFound) and
-       (GlobalETS2Config.OwnershipStatus <> OWNERSHIP_OWNED) then
-      HasConflict := True;
+    // Per-game conflict evaluation
+    HasETS2Conflict := GlobalETS2Config.UserSelected and (GlobalETS2Config.ExistingFileFound) and
+                       (GlobalETS2Config.OwnershipStatus <> OWNERSHIP_OWNED);
 
-    if GlobalATSConfig.UserSelected and (GlobalATSConfig.ExistingFileFound) and
-       (GlobalATSConfig.OwnershipStatus <> OWNERSHIP_OWNED) then
-      HasConflict := True;
+    HasATSConflict := GlobalATSConfig.UserSelected and (GlobalATSConfig.ExistingFileFound) and
+                      (GlobalATSConfig.OwnershipStatus <> OWNERSHIP_OWNED);
 
-    LogInfo('Conflict evaluation result: HasConflict=' + BoolToStr(HasConflict));
+    HasConflict := HasETS2Conflict or HasATSConflict;
+    UpdateConflictPageVisibility();
+
+    LogInfo('Conflict evaluation: HasETS2Conflict=' + BoolToStr(HasETS2Conflict) + ', HasATSConflict=' + BoolToStr(HasATSConflict));
   end;
 
-  // Conflict resolution selection
+  // Conflict resolution selection per game
   if CurPageID = ConflictPage.ID then
   begin
-    if ConflictOptionBackup.Checked then
+    if HasETS2Conflict then
     begin
-      GlobalETS2Config.ConflictAction := CONFLICT_ACTION_BACKUP_REPLACE;
-      GlobalATSConfig.ConflictAction := CONFLICT_ACTION_BACKUP_REPLACE;
-    end
-    else if ConflictOptionKeep.Checked then
-    begin
-      GlobalETS2Config.ConflictAction := CONFLICT_ACTION_KEEP_EXISTING;
-      GlobalATSConfig.ConflictAction := CONFLICT_ACTION_KEEP_EXISTING;
+      if ETS2ConflictOptionBackup.Checked then
+        GlobalETS2Config.ConflictAction := CONFLICT_ACTION_BACKUP_REPLACE
+      else if ETS2ConflictOptionKeep.Checked then
+        GlobalETS2Config.ConflictAction := CONFLICT_ACTION_KEEP_EXISTING
+      else
+        GlobalETS2Config.ConflictAction := CONFLICT_ACTION_OVERWRITE;
+      LogInfo('ETS2 conflict action selected: ' + IntToStr(GlobalETS2Config.ConflictAction));
     end
     else
+      GlobalETS2Config.ConflictAction := CONFLICT_ACTION_NONE;
+
+    if HasATSConflict then
     begin
-      GlobalETS2Config.ConflictAction := CONFLICT_ACTION_OVERWRITE;
-      GlobalATSConfig.ConflictAction := CONFLICT_ACTION_OVERWRITE;
-    end;
+      if ATSConflictOptionBackup.Checked then
+        GlobalATSConfig.ConflictAction := CONFLICT_ACTION_BACKUP_REPLACE
+      else if ATSConflictOptionKeep.Checked then
+        GlobalATSConfig.ConflictAction := CONFLICT_ACTION_KEEP_EXISTING
+      else
+        GlobalATSConfig.ConflictAction := CONFLICT_ACTION_OVERWRITE;
+      LogInfo('ATS conflict action selected: ' + IntToStr(GlobalATSConfig.ConflictAction));
+    end
+    else
+      GlobalATSConfig.ConflictAction := CONFLICT_ACTION_NONE;
   end;
 end;
 
@@ -372,12 +534,23 @@ begin
   else
     S := S + '  ATS: ' + CustomMessage('SummarySkipped') + #13#10;
 
-  if HasConflict then
+  if HasETS2Conflict then
   begin
-    S := S + #13#10 + CustomMessage('SummaryConflictAction') + #13#10;
-    if ConflictOptionBackup.Checked then
+    S := S + #13#10 + 'ETS2 Conflict Action:' + #13#10;
+    if ETS2ConflictOptionBackup.Checked then
       S := S + '  ' + CustomMessage('ConflictOptionBackup') + #13#10
-    else if ConflictOptionKeep.Checked then
+    else if ETS2ConflictOptionKeep.Checked then
+      S := S + '  ' + CustomMessage('ConflictOptionKeep') + #13#10
+    else
+      S := S + '  ' + CustomMessage('ConflictOptionOverwrite') + #13#10;
+  end;
+
+  if HasATSConflict then
+  begin
+    S := S + #13#10 + 'ATS Conflict Action:' + #13#10;
+    if ATSConflictOptionBackup.Checked then
+      S := S + '  ' + CustomMessage('ConflictOptionBackup') + #13#10
+    else if ATSConflictOptionKeep.Checked then
       S := S + '  ' + CustomMessage('ConflictOptionKeep') + #13#10
     else
       S := S + '  ' + CustomMessage('ConflictOptionOverwrite') + #13#10;

@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="TruckSim Widget.csproj" />
   <Project Path="Updater\Updater.csproj" />
+  <Project Path="ElevatedHelper\ElevatedHelper.csproj" />
 </Solution>

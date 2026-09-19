@@ -38,9 +38,17 @@ const
   OWNERSHIP_MODIFIED_BY_USER    = 'ModifiedByUser';
 
   // Conflict actions chosen by user
+  CONFLICT_ACTION_NONE           = 0;
   CONFLICT_ACTION_BACKUP_REPLACE = 1;
   CONFLICT_ACTION_KEEP_EXISTING  = 2;
   CONFLICT_ACTION_OVERWRITE      = 3;
+
+  // Transaction Journal statuses
+  TRANSACTION_STATUS_PENDING     = 'PENDING';
+  TRANSACTION_STATUS_COMMITTED   = 'COMMITTED';
+  TRANSACTION_STATUS_ROLLED_BACK = 'ROLLED_BACK';
+  STEP_STATUS_PENDING            = 'STEP_PENDING';
+  STEP_STATUS_COMPLETED          = 'STEP_COMPLETED';
 
   // Drive types from Win32
   DRIVE_FIXED = 3;
@@ -82,6 +90,46 @@ begin
     Result := 'True'
   else
     Result := 'False';
+end;
+
+function EscapeJson(const S: String): String;
+var
+  Res: String;
+begin
+  Res := S;
+  StringChange(Res, '\', '\\');
+  StringChange(Res, '"', '\"');
+  Result := Res;
+end;
+
+function ExtractJsonValue(const Content, Key: String): String;
+var
+  KeyPat: String;
+  PosKey, StartPos: Integer;
+begin
+  Result := '';
+  KeyPat := '"' + Key + '"';
+  PosKey := Pos(KeyPat, Content);
+  if PosKey > 0 then
+  begin
+    PosKey := PosKey + Length(KeyPat);
+    while (PosKey <= Length(Content)) and (Content[PosKey] in [' ', ':', #9, #13, #10]) do
+      PosKey := PosKey + 1;
+    if (PosKey <= Length(Content)) and (Content[PosKey] = '"') then
+    begin
+      PosKey := PosKey + 1;
+      StartPos := PosKey;
+      while (PosKey <= Length(Content)) and (Content[PosKey] <> '"') do
+        PosKey := PosKey + 1;
+      Result := Copy(Content, StartPos, PosKey - StartPos);
+      StringChange(Result, '\\', '\');
+    end
+    else if (PosKey <= Length(Content)) and ((Content[PosKey] = 't') or (Content[PosKey] = 'f')) then
+    begin
+      if Copy(Content, PosKey, 4) = 'true' then Result := 'true'
+      else if Copy(Content, PosKey, 5) = 'false' then Result := 'false';
+    end;
+  end;
 end;
 
 function NormalizePath(const P: String): String;
@@ -138,4 +186,29 @@ end;
 function SafeDirExists(const Path: String): Boolean;
 begin
   Result := (Trim(Path) <> '') and DirExists(Path);
+end;
+
+function GetTransactionJournalFilePath(): String;
+begin
+  Result := CombinePath(CombinePath(GetAppDataWidgetDir(), 'installer'), 'transaction_journal.json');
+end;
+
+function GetTransactionStagingDir(): String;
+begin
+  Result := CombinePath(CombinePath(GetAppDataWidgetDir(), 'installer'), 'staging');
+end;
+
+function GetElevatedHelperPath(): String;
+var
+  TmpHelper: String;
+  AppHelper: String;
+begin
+  TmpHelper := ExpandConstant('{tmp}\ElevatedHelper.exe');
+  AppHelper := ExpandConstant('{app}\ElevatedHelper.exe');
+  if SafeFileExists(TmpHelper) then
+    Result := TmpHelper
+  else if SafeFileExists(AppHelper) then
+    Result := AppHelper
+  else
+    Result := TmpHelper;
 end;

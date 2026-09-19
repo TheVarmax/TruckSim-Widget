@@ -18,6 +18,10 @@
     <None Remove="Updater\**" />
     <Content Remove="Updater\**" />
     <EmbeddedResource Remove="Updater\**" />
+    <Compile Remove="ElevatedHelper\**" />
+    <None Remove="ElevatedHelper\**" />
+    <Content Remove="ElevatedHelper\**" />
+    <EmbeddedResource Remove="ElevatedHelper\**" />
     <Compile Remove="*Tests\**;*.Tests\**" />
     <None Remove="*Tests\**;*.Tests\**" />
   </ItemGroup>
@@ -52,9 +56,12 @@
   <ItemGroup>
     <PackageReference Include="MdXaml" Version="1.27.0" />
   </ItemGroup>
-  <Target Name="BuildAndCopyUpdater" AfterTargets="Build;Publish">
+  <Target Name="BuildAndCopyHelpers" AfterTargets="Build;Publish">
     <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true --nologo -v q" ContinueOnError="true" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\ElevatedHelper\ElevatedHelper.csproj&quot; -c $(Configuration) -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true --nologo -v q" ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
   </Target>
 </Project>

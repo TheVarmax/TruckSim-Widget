@@ -131,25 +131,62 @@ begin
   Result := True;
 end;
 
-function CopyFileElevated(const SourceFile, TargetFile: String): Boolean;
+function ExecuteElevatedHelper(const Operation, Path1, Path2: String): Boolean;
 var
+  HelperExe: String;
   CmdParams: String;
   ResultCode: Integer;
 begin
   Result := False;
-  CmdParams := '/c copy /y "' + SourceFile + '" "' + TargetFile + '"';
-  LogInfo('Requesting targeted elevation to copy plugin: ' + SourceFile + ' -> ' + TargetFile);
+  HelperExe := GetElevatedHelperPath();
   
-  if ShellExec('runas', 'cmd.exe', CmdParams, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  if not SafeFileExists(HelperExe) then
   begin
-    if (ResultCode = 0) and SafeFileExists(TargetFile) then
+    LogErr('ElevatedHelper.exe not found at: ' + HelperExe);
+    exit;
+  end;
+
+  if Path2 <> '' then
+    CmdParams := Operation + ' "' + Path1 + '" "' + Path2 + '"'
+  else
+    CmdParams := Operation + ' "' + Path1 + '"';
+
+  LogInfo('Executing ElevatedHelper: ' + HelperExe + ' ' + CmdParams);
+
+  if ShellExec('runas', HelperExe, CmdParams, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+  begin
+    if ResultCode = 0 then
     begin
-      LogInfo('Targeted elevated copy succeeded.');
+      LogInfo('ElevatedHelper operation (' + Operation + ') succeeded.');
       Result := True;
     end
     else
-      LogWarn('Targeted elevated copy failed with exit code: ' + IntToStr(ResultCode));
+    begin
+      LogWarn('ElevatedHelper operation (' + Operation + ') returned exit code: ' + IntToStr(ResultCode));
+    end;
   end
   else
-    LogWarn('User declined targeted elevation prompt or ShellExec failed.');
+  begin
+    LogWarn('User cancelled UAC prompt or failed to run ElevatedHelper.');
+  end;
+end;
+
+function CopyFileElevated(const SourceFile, TargetFile: String): Boolean;
+begin
+  Result := ExecuteElevatedHelper('copy', SourceFile, TargetFile);
+end;
+
+function MoveFileElevated(const SourceFile, TargetFile: String): Boolean;
+begin
+  Result := ExecuteElevatedHelper('move', SourceFile, TargetFile);
+end;
+
+function DeleteFileElevated(const TargetFile: String): Boolean;
+begin
+  Result := ExecuteElevatedHelper('delete', TargetFile, '');
+end;
+
+function MkDirElevated(const TargetDir: String): Boolean;
+begin
+  Result := ExecuteElevatedHelper('mkdir', TargetDir, '');
 end;

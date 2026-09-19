@@ -2,14 +2,58 @@
 // Part of TruckSim Widget Installer
 
 [Code]
+function RedactPattern(const S, KeyPattern: String): String;
+var
+  P, StartPos, EndPos: Integer;
+  ResultStr: String;
+  LowerS: String;
+begin
+  ResultStr := S;
+  LowerS := LowerCase(ResultStr);
+  P := Pos(LowerCase(KeyPattern), LowerS);
+  while P > 0 do
+  begin
+    StartPos := P + Length(KeyPattern);
+    EndPos := StartPos;
+    while (EndPos <= Length(ResultStr)) and (ResultStr[EndPos] <> ' ') and 
+          (ResultStr[EndPos] <> '&') and (ResultStr[EndPos] <> ';') and 
+          (ResultStr[EndPos] <> '"') and (ResultStr[EndPos] <> '''') do
+      Inc(EndPos);
+    if EndPos > StartPos then
+    begin
+      Delete(ResultStr, StartPos, EndPos - StartPos);
+      Insert('[REDACTED]', ResultStr, StartPos);
+    end;
+    LowerS := LowerCase(ResultStr);
+    P := Pos(LowerCase(KeyPattern), LowerS);
+  end;
+  Result := ResultStr;
+end;
+
 function SanitizeLogMessage(const Msg: String): String;
 var
   S: String;
+  UserName: String;
+  UserPath: String;
 begin
   S := Msg;
-  // Redact potential sensitive tokens or tokens in URLs
-  // (e.g. token=..., password=..., secret=..., key=...)
-  // Basic safety pass
+
+  try
+    UserName := ExpandConstant('{username}');
+    if (UserName <> '') and (Length(UserName) > 1) then
+    begin
+      UserPath := '\Users\' + UserName;
+      StringChangeEx(S, UserPath, '\Users\<redacted>', True);
+    end;
+  except
+  end;
+
+  S := RedactPattern(S, 'token=');
+  S := RedactPattern(S, 'password=');
+  S := RedactPattern(S, 'secret=');
+  S := RedactPattern(S, 'key=');
+  S := RedactPattern(S, 'bearer ');
+
   Result := S;
 end;
 
