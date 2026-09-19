@@ -440,6 +440,18 @@ namespace ETSOverlay
             catch { }
             if (_lastDeliveredTimestamp < DateTime.Now) _lastDeliveredTimestamp = DateTime.Now;
 
+            LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
+            LicenseManager.Instance.OnLicenseChanged += () => ClientPresenceService.Instance.Start();
+            LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
+            {
+                Dispatcher.Invoke(() =>
+                {
+                    WriteLog($"License plan: {LicenseManager.Instance.CurrentPlan}");
+                    WriteLog($"License features: {string.Join(", ", features)}");
+                    WriteLog($"Cloud Sync available: {hasCloudSync.ToString().ToLower()}");
+                });
+            };
+
             LoadState();
             LoadGameState(GameType.Ets);
             LoadGameState(GameType.Ats);
@@ -491,18 +503,6 @@ namespace ETSOverlay
 
             // Validate license in the background
             _ = ValidateLicenseOnStartupAsync();
-            LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
-            LicenseManager.Instance.OnLicenseChanged += () => ClientPresenceService.Instance.Start();
-            LicenseManager.Instance.OnLicenseChanged += () => SaveState();
-            LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
-            {
-                Dispatcher.Invoke(() =>
-                {
-                    WriteLog($"License plan: {LicenseManager.Instance.CurrentPlan}");
-                    WriteLog($"License features: {string.Join(", ", features)}");
-                    WriteLog($"Cloud Sync available: {hasCloudSync.ToString().ToLower()}");
-                });
-            };
             UpdateSupporterVisuals();
 
             Loaded += async (s, e) =>
@@ -2582,47 +2582,52 @@ namespace ETSOverlay
                 Dispatcher.Invoke(UpdateSupporterVisuals);
                 return;
             }
-            if (LicenseManager.Instance.Status == "active")
+
+            bool isSupporter = LicenseManager.Instance.Status == "active";
+
+            if (isSupporter)
             {
                 StartupLogo.Fill = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#F5C542"));
             }
             else
             {
                 StartupLogo.Fill = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#7AC5CD"));
-                
-                if (_startupComplete)
-                {
-                    CloudSyncEnabled = false;
-                    CloudSyncRevision = null;
-                    CloudSyncUpdatedAt = null;
-                    LastCloudSyncAttempt = null;
-                    CloudSyncStatus = "";
-                    
-                    // Reset Premium Features
-                    SpeedLimiterService.Instance.Disable();
-                    
-                    if (_uiMode == "custom")
-                    {
-                        OnUIModeChanged("full");
-                    }
-                    
-                    _settingsWindow?.SyncGeneralValues();
-                }
-            }
 
-            bool isSupporter = LicenseManager.Instance.Status == "active";
-            if (!isSupporter && _uiMode == "hud" && _startupComplete)
-            {
-                OnUIModeChanged("full");
-                _settingsWindow?.SyncGeneralValues();
+                CloudSyncEnabled = false;
+                CloudSyncRevision = null;
+                CloudSyncUpdatedAt = null;
+                LastCloudSyncAttempt = null;
+                CloudSyncStatus = "";
+
+                // Reset Premium Features
+                SpeedLimiterService.Instance.Disable();
+
+                if (_uiMode == "custom" || _uiMode == "hud")
+                {
+                    OnUIModeChanged("full");
+                }
+                _showDistance = true;
+                _showRoute = true;
+                _showBottomInfo = true;
+
+                // Reset Appearance to free defaults
+                SavedTheme = "classic";
+                SavedAccent = "teal";
+                SavedCardStyle = "standard";
+                SavedAccentMode = "standard";
+                SavedCustomAccents.Clear();
+                ActiveCustomAccents.Clear();
+
+                SkipBetaUpdates = true;
             }
 
             ApplyAppearance();
+            _settingsWindow?.UpdateLicenseUI();
+            _settingsWindow?.SyncGeneralValues();
             _settingsWindow?.SyncAppearanceValues();
-            if (_startupComplete)
-            {
-                SaveState();
-            }
+            _settingsWindow?.UpdateCloudTab();
+
+            SaveState();
         }
 
         internal AppState GetCurrentAppState()
@@ -2755,6 +2760,30 @@ namespace ETSOverlay
             _speedWarningAts = state.SpeedWarningAts;
 
             LicenseManager.Instance.Initialize(state.HardwareHash, state.CachedFeatures, state.LastLicenseValidation, state.LicensePlan, state.LicenseSource, state.LicenseStatus, state.LicenseExpiry);
+
+            if (LicenseManager.Instance.Status != "active")
+            {
+                CloudSyncEnabled = false;
+                CloudSyncRevision = null;
+                CloudSyncUpdatedAt = null;
+                LastCloudSyncAttempt = null;
+                CloudSyncStatus = "";
+                SpeedLimiterService.Instance.Disable();
+                if (_uiMode == "custom" || _uiMode == "hud")
+                {
+                    _uiMode = "full";
+                }
+                _showDistance = true;
+                _showRoute = true;
+                _showBottomInfo = true;
+                SavedTheme = "classic";
+                SavedAccent = "teal";
+                SavedCardStyle = "standard";
+                SavedAccentMode = "standard";
+                SavedCustomAccents.Clear();
+                ActiveCustomAccents.Clear();
+                SkipBetaUpdates = true;
+            }
         }
 
         private void SaveState()
