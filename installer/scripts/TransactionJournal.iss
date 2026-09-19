@@ -65,7 +65,7 @@ end;
 procedure InitTransactionJournal();
 begin
   SetArrayLength(JournalSteps, 0);
-  JournalTxId := 'tx_' + GetDateTimeString('yyyymmdd_hhnnss', '', '');
+  JournalTxId := 'tx_' + GetDateTimeString('yyyymmdd_hhnnss', '_', '_');
   JournalStatus := TRANSACTION_STATUS_PENDING;
   LogInfo('Initialized transaction journal: ' + JournalTxId);
   FlushJournalToDisk();

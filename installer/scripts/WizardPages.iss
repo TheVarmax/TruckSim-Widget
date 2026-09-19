@@ -42,33 +42,8 @@ var
 
 procedure ApplyWidgetTheme();
 begin
-  // Set clean modern typography
+  // Set clean modern typography matching modern Inno Setup styling
   WizardForm.Font.Name := 'Segoe UI';
-
-  // Dark Theme Palette:
-  // Background: #181818 ($181818)
-  // Surface:    #1E1E1E ($1E1E1E)
-  // Primary:    #FFFFFF ($FFFFFF)
-  // Secondary:  #AAAAAA ($AAAAAA)
-  WizardForm.Color := $181818;
-  WizardForm.MainPanel.Color := $181818;
-
-  // Labels & Header
-  WizardForm.PageNameLabel.Font.Color := $FFFFFF;
-  WizardForm.PageNameLabel.Font.Style := [fsBold];
-  WizardForm.PageDescriptionLabel.Font.Color := $AAAAAA;
-  
-  WizardForm.WelcomeLabel1.Font.Color := $FFFFFF;
-  WizardForm.WelcomeLabel1.Font.Style := [fsBold];
-  WizardForm.WelcomeLabel2.Font.Color := $CCCCCC;
-  
-  WizardForm.FinishedHeadingLabel.Font.Color := $FFFFFF;
-  WizardForm.FinishedHeadingLabel.Font.Style := [fsBold];
-  WizardForm.FinishedLabel.Font.Color := $CCCCCC;
-
-  // Bevel
-  WizardForm.Bevel.Visible := False;
-  WizardForm.BeveledLabel.Visible := False;
 end;
 
 procedure BrowseETS2FolderClick(Sender: TObject);

@@ -184,7 +184,7 @@ begin
     if not SafeDirExists(StagingDir) then
       ForceDirectories(StagingDir);
 
-    BackupFile := CombinePath(StagingDir, 'state_rollback_' + GetDateTimeString('yyyymmdd_hhnnss', '', '') + '.json');
+    BackupFile := CombinePath(StagingDir, 'state_rollback_' + GetDateTimeString('yyyymmdd_hhnnss', '_', '_') + '.json');
     LogInfo('Staging rollback backup of existing install state: ' + StateFile + ' -> ' + BackupFile);
     if not CopyFile(StateFile, BackupFile, False) then
     begin
@@ -371,7 +371,7 @@ begin
     // ALWAYS create a temporary staging rollback backup before replacing or deleting:
     StagingDir := GetTransactionStagingDir();
     if not SafeDirExists(StagingDir) then ForceDirectories(StagingDir);
-    StagingBackupFile := CombinePath(StagingDir, Game.GameId + '_rollback_' + GetDateTimeString('yyyymmdd_hhnnss', '', '') + '.dll');
+    StagingBackupFile := CombinePath(StagingDir, Game.GameId + '_rollback_' + GetDateTimeString('yyyymmdd_hhnnss', '_', '_') + '.dll');
 
     LogInfo('[' + Game.GameId + '] Creating temporary staging rollback backup at: ' + StagingBackupFile);
     StepIdx := BeginTransactionStep('StageRollbackBackup', TargetFile, TargetFile, StagingBackupFile, CurrentHash);
@@ -390,7 +390,7 @@ begin
     begin
       BackupTarget := CombinePath(TargetDir, PLUGIN_FILENAME + PLUGIN_BACKUP_EXT);
       if SafeFileExists(BackupTarget) then
-        BackupTarget := CombinePath(TargetDir, PLUGIN_FILENAME + '.backup_' + GetDateTimeString('yyyymmdd_hhnnss', '', '') + '.bak');
+        BackupTarget := CombinePath(TargetDir, PLUGIN_FILENAME + '.backup_' + GetDateTimeString('yyyymmdd_hhnnss', '_', '_') + '.bak');
 
       LogInfo('[' + Game.GameId + '] Creating persistent backup of third-party plugin: ' + BackupTarget);
       StepIdx := BeginTransactionStep('CreateThirdPartyBackup', TargetFile, TargetFile, BackupTarget, CurrentHash);
