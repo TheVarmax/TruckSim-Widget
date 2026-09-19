@@ -215,6 +215,9 @@ TruckSim Widget **назавжди безкоштовний**.
 
 ## Як розпочати
 
+> [!NOTE]
+> **Вимоги до системи:** Для роботи інсталятора та віджета потрібен [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0).
+
 1. **Завантаж інсталятор**: Завантаж `TruckSimWidgetSetup-<version>.exe` з [останнього релізу](https://github.com/TheVarmax/TruckSim-Widget/releases/latest).
 2. **Запусти встановлення**: Відкрий інсталятор та обери ігри й налаштування, якщо він запитає. Усе інше відбудеться автоматично.
 3. **У рейс**:
@@ -230,7 +233,7 @@ TruckSim Widget автоматично перевіряє наявність о�
 ### Допомога та підтримка
 
 - Повідомити про проблему або запропонувати ідею: [GitHub Issues](https://github.com/TheVarmax/TruckSim-Widget/issues)
-- Спільнота у Telegram: [@thevarmax](https://t.me/thevarmax)
+- Прямий зв'язок у Telegram: [@thevarmax](https://t.me/thevarmax)
 - Електронна пошта: `support@trucksim.uk`
 
 ---

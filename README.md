@@ -215,6 +215,9 @@ Supporter subscriptions unlock additional convenience features while keeping all
 
 ## Getting Started
 
+> [!NOTE]
+> **System Requirement:** [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) is required to run the installer and the widget.
+
 1. **Download the installer**: Get `TruckSimWidgetSetup-<version>.exe` from the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/latest).
 2. **Run setup**: Launch the installer and choose your games/settings if prompted. Everything else is handled automatically.
 3. **Start driving**:
@@ -230,7 +233,7 @@ TruckSim Widget automatically checks for updates on launch. When a new version i
 ### Need help or found an issue?
 
 - Report bugs or request features: [GitHub Issues](https://github.com/TheVarmax/TruckSim-Widget/issues)
-- Community & discussion: [Telegram @thevarmax](https://t.me/thevarmax)
+- Direct contact: [Telegram @thevarmax](https://t.me/thevarmax)
 - Support email: `support@trucksim.uk`
 
 ---
