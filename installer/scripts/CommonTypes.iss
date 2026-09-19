@@ -217,6 +217,12 @@ begin
   Result := (CompareText(ActualHash, EXPECTED_HELPER_SHA256) = 0);
 end;
 
+function Win32ReplaceFile(lpReplacedFileName, lpReplacementFileName, lpBackupFileName: String; dwReplaceFlags: DWORD; lpExclude: DWORD; lpReserved: DWORD): BOOL;
+  external 'ReplaceFileW@kernel32.dll stdcall';
+
+function Win32MoveFileEx(lpExistingFileName, lpNewFileName: String; dwFlags: DWORD): BOOL;
+  external 'MoveFileExW@kernel32.dll stdcall';
+
 function AtomicSaveStringToFile(const FilePath, Content: String): Boolean;
 var
   TempPath: String;
@@ -227,23 +233,35 @@ begin
 
   if SafeFileExists(FilePath) then
   begin
-    if not DeleteFile(FilePath) then
+    // Attempt true atomic file replacement without removing target beforehand
+    if Win32ReplaceFile(FilePath, TempPath, '', 0, 0, 0) then
     begin
-      if CopyFile(TempPath, FilePath, False) then
-      begin
-        DeleteFile(TempPath);
-        Result := True;
-        exit;
-      end;
+      Result := True;
       exit;
     end;
-  end;
 
-  Result := RenameFile(TempPath, FilePath);
-  if not Result then
+    // Fallback: MoveFileEx with MOVEFILE_REPLACE_EXISTING (1) and MOVEFILE_WRITE_THROUGH (8)
+    if Win32MoveFileEx(TempPath, FilePath, 9) then
+    begin
+      Result := True;
+      exit;
+    end;
+
+    // If replacement failed, do NOT delete target FilePath; clean up TempPath and fail
+    DeleteFile(TempPath);
+    Result := False;
+  end
+  else
   begin
-    Result := CopyFile(TempPath, FilePath, False);
-    if Result then DeleteFile(TempPath);
+    if Win32MoveFileEx(TempPath, FilePath, 9) then
+    begin
+      Result := True;
+      exit;
+    end;
+
+    Result := RenameFile(TempPath, FilePath);
+    if not Result then
+      DeleteFile(TempPath);
   end;
 end;
 

@@ -301,9 +301,19 @@ begin
         InstallSuccess := False;
     end;
 
+    // Save canonical v3 state inside transaction boundary BEFORE commit
+    if InstallSuccess then
+    begin
+      if not SaveJsonStateFile('{#MyAppVersion}', WizardDirValue(), GlobalETS2Config, GlobalATSConfig) then
+      begin
+        LogErr('CRITICAL: Failed to save install state! Initiating transaction rollback.');
+        InstallSuccess := False;
+      end;
+    end;
+
     if not InstallSuccess then
     begin
-      LogErr('Plugin installation encountered an error. Initiating transaction rollback.');
+      LogErr('Installation encountered an error. Initiating transaction rollback.');
       RollbackTransaction();
       ExecuteRollback();
       MsgBox(CustomMessage('ErrPluginInstallRollback'), mbError, MB_OK);
@@ -312,9 +322,7 @@ begin
     else
     begin
       CommitTransaction();
-      // Save canonical v3 state
-      SaveJsonStateFile('{#MyAppVersion}', WizardDirValue(), GlobalETS2Config, GlobalATSConfig);
-      LogInfo('Installation and plugin setup completed successfully.');
+      LogInfo('Installation, plugin setup, and state persistence completed successfully.');
     end;
   end;
 end;

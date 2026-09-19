@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
 
 namespace TruckSimWidget.ElevatedHelper;
@@ -23,7 +24,7 @@ internal static class Program
         {
             if (args.Length < 2)
             {
-                Console.Error.WriteLine("Usage: ElevatedHelper.exe <copy|move|delete|mkdir> <path1> [path2] [--allow-root <dir>]");
+                Console.Error.WriteLine("Usage: ElevatedHelper.exe <copy|move|delete|mkdir|rmdir> <path1> [path2] [--allow-root <dir>]");
                 return EXIT_INVALID_ARGS;
             }
 
@@ -75,6 +76,9 @@ internal static class Program
 
                 case "mkdir":
                     return ExecuteMkdir(path1, allowedRoots);
+
+                case "rmdir":
+                    return ExecuteRmdir(path1, allowedRoots);
 
                 default:
                     Console.Error.WriteLine($"Unknown command: {command}");
@@ -149,12 +153,7 @@ internal static class Program
             Directory.CreateDirectory(destDir);
         }
 
-        if (File.Exists(destination))
-        {
-            File.Delete(destination);
-        }
-
-        File.Move(source, destination);
+        File.Move(source, destination, overwrite: true);
         return EXIT_SUCCESS;
     }
 
@@ -187,6 +186,29 @@ internal static class Program
             Directory.CreateDirectory(dir);
         }
 
+        return EXIT_SUCCESS;
+    }
+
+    private static int ExecuteRmdir(string dir, List<string> allowedRoots)
+    {
+        if (!IsAllowedPath(dir, isDirectory: true, isSourceOnly: false, allowedRoots))
+        {
+            Console.Error.WriteLine("Security violation: path not allowed for elevated rmdir.");
+            return EXIT_PATH_FORBIDDEN;
+        }
+
+        if (!Directory.Exists(dir))
+        {
+            return EXIT_SUCCESS;
+        }
+
+        if (Directory.EnumerateFileSystemEntries(dir).Any())
+        {
+            Console.Error.WriteLine($"Directory is not empty: {dir}");
+            return EXIT_IO_ERROR;
+        }
+
+        Directory.Delete(dir, recursive: false);
         return EXIT_SUCCESS;
     }
 

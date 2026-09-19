@@ -157,24 +157,62 @@ begin
     // If a persistent backup was created during this aborted transaction, clean it up or restore
     if (Step.BackupPath <> '') and SafeFileExists(Step.BackupPath) then
     begin
+      // 1. If TargetPath does not exist, restore it from BackupPath
       if not SafeFileExists(Step.TargetPath) then
       begin
+        LogInfo('Restoring target file from persistent backup: ' + Step.BackupPath + ' -> ' + Step.TargetPath);
         Copied := CopyFile(Step.BackupPath, Step.TargetPath, False);
         if not Copied then
           Copied := CopyFileElevated(Step.BackupPath, Step.TargetPath);
+        if not Copied or not SafeFileExists(Step.TargetPath) then
+        begin
+          LogErr('CRITICAL: Failed to restore target file from persistent backup: ' + Step.BackupPath + '. Preserving backup.');
+          Result := False;
+          exit;
+        end;
       end;
 
+      // 2. TargetPath exists: verify its hash matches OriginalHash before deleting backup
       if SafeFileExists(Step.TargetPath) then
       begin
+        if Step.OriginalHash <> '' then
+        begin
+          RestoredHash := GetFileSha256Safe(Step.TargetPath);
+          if CompareText(RestoredHash, Step.OriginalHash) <> 0 then
+          begin
+            LogErr('CRITICAL: TargetPath hash (' + RestoredHash + ') does not match original hash (' + Step.OriginalHash + ')! Preserving persistent backup for diagnostics: ' + Step.BackupPath);
+            Result := False;
+            exit;
+          end;
+          LogInfo('Target file SHA-256 integrity verified against original backup hash: ' + RestoredHash);
+        end;
+
+        // Hash verified: safe to clean up redundant persistent backup
         if not DeleteFile(Step.BackupPath) then
-          DeleteFileElevated(Step.BackupPath);
+        begin
+          if not DeleteFileElevated(Step.BackupPath) then
+            LogWarn('Could not delete redundant persistent backup: ' + Step.BackupPath);
+        end;
+      end
+      else
+      begin
+        LogErr('CRITICAL: TargetPath does not exist after rollback attempt! Preserving backup: ' + Step.BackupPath);
+        Result := False;
+        exit;
       end;
     end;
   end
   else if Step.Operation = 'CreateDir' then
   begin
     if SafeDirExists(Step.TargetPath) then
-      RemoveDir(Step.TargetPath);
+    begin
+      LogInfo('Removing directory created during transaction: ' + Step.TargetPath);
+      if not RemoveDir(Step.TargetPath) then
+      begin
+        if not RmDirElevated(Step.TargetPath) then
+          LogWarn('Could not remove created directory during rollback: ' + Step.TargetPath);
+      end;
+    end;
   end;
 end;
 

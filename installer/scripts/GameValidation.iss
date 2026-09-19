@@ -219,3 +219,8 @@ function MkDirElevated(const TargetDir: String): Boolean;
 begin
   Result := ExecuteElevatedHelper('mkdir', TargetDir, '');
 end;
+
+function RmDirElevated(const TargetDir: String): Boolean;
+begin
+  Result := ExecuteElevatedHelper('rmdir', TargetDir, '');
+end;
