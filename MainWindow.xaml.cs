@@ -493,6 +493,7 @@ namespace ETSOverlay
             _ = ValidateLicenseOnStartupAsync();
             LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
             LicenseManager.Instance.OnLicenseChanged += () => ClientPresenceService.Instance.Start();
+            LicenseManager.Instance.OnLicenseChanged += () => SaveState();
             LicenseManager.Instance.OnFeaturesValidated += (features, hasCloudSync) =>
             {
                 Dispatcher.Invoke(() =>

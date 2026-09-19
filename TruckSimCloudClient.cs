@@ -242,6 +242,15 @@ namespace ETSOverlay
                 var response = await _httpClient.SendAsync(req, cancellationToken);
                 string rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
 
+                try
+                {
+                    if (System.Windows.Application.Current?.MainWindow is MainWindow main)
+                    {
+                        main.Dispatcher.Invoke(() => main.WriteLog($"[API] {endpoint} RAW JSON: {rawJson}"));
+                    }
+                }
+                catch { }
+
                 return System.Text.Json.JsonSerializer.Deserialize<ClientApiResponse>(
                     rawJson,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });

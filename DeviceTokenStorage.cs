@@ -9,11 +9,15 @@ namespace ETSOverlay
     {
         internal static string? CustomStoragePath { get; set; }
 
-        public static string StoragePath => CustomStoragePath ?? Path.Combine(
+        public static string StoragePath => PrimaryStoragePath;
+
+        public static string PrimaryStoragePath => CustomStoragePath ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "TruckSimWidget",
             "device.dat"
         );
+
+        public static string BackupStoragePath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "device.dat");
 
         private static void LogMessage(string message)
         {
@@ -39,20 +43,36 @@ namespace ETSOverlay
         {
             try
             {
-                var directory = Path.GetDirectoryName(StoragePath);
-                if (!Directory.Exists(directory) && directory != null)
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
                 byte[] plainBytes = Encoding.UTF8.GetBytes(token);
                 byte[] encryptedBytes = ProtectedData.Protect(plainBytes, null, DataProtectionScope.CurrentUser);
 
-                File.WriteAllBytes(StoragePath, encryptedBytes);
+                // 1. Save to primary AppData location
+                try
+                {
+                    var dir = Path.GetDirectoryName(PrimaryStoragePath);
+                    if (!Directory.Exists(dir) && dir != null) Directory.CreateDirectory(dir);
+                    File.WriteAllBytes(PrimaryStoragePath, encryptedBytes);
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"[DeviceTokenStorage] Failed to save primary token: {ex.Message}");
+                }
+
+                // 2. Save backup copy to BaseDirectory alongside state.dat
+                try
+                {
+                    var dir = Path.GetDirectoryName(BackupStoragePath);
+                    if (!Directory.Exists(dir) && dir != null) Directory.CreateDirectory(dir);
+                    File.WriteAllBytes(BackupStoragePath, encryptedBytes);
+                }
+                catch (Exception ex)
+                {
+                    LogMessage($"[DeviceTokenStorage] Failed to save backup token: {ex.Message}");
+                }
             }
             catch (Exception ex)
             {
-                LogMessage($"[DeviceTokenStorage] Failed to save token: {ex.Message}");
+                LogMessage($"[DeviceTokenStorage] Failed to encrypt/save token: {ex.Message}");
             }
         }
 
@@ -60,61 +80,40 @@ namespace ETSOverlay
         {
             try
             {
-                string targetPath = StoragePath;
-
-                // Migration: check legacy locations if canonical storage doesn't exist
-                if (!File.Exists(targetPath) && CustomStoragePath == null)
+                // 1. Check primary location
+                string token = TryLoadFromFile(PrimaryStoragePath);
+                if (!string.IsNullOrEmpty(token))
                 {
-                    string legacyAppData = Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                        "TruckSim Widget",
-                        "device.dat"
-                    );
-                    string legacyBaseDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "device.dat");
-
-                    if (File.Exists(legacyAppData))
-                    {
-                        try
-                        {
-                            var dir = Path.GetDirectoryName(targetPath);
-                            if (!Directory.Exists(dir) && dir != null) Directory.CreateDirectory(dir);
-                            File.Copy(legacyAppData, targetPath, overwrite: false);
-                            LogMessage("[DeviceTokenStorage] Migrated device token from legacy AppData path.");
-                        }
-                        catch (Exception ex)
-                        {
-                            LogMessage($"[DeviceTokenStorage] Failed to copy legacy AppData token: {ex.Message}");
-                        }
-                    }
-                    else if (File.Exists(legacyBaseDir))
-                    {
-                        try
-                        {
-                            var dir = Path.GetDirectoryName(targetPath);
-                            if (!Directory.Exists(dir) && dir != null) Directory.CreateDirectory(dir);
-                            File.Copy(legacyBaseDir, targetPath, overwrite: false);
-                            LogMessage("[DeviceTokenStorage] Migrated device token from legacy BaseDirectory path.");
-                        }
-                        catch (Exception ex)
-                        {
-                            LogMessage($"[DeviceTokenStorage] Failed to copy legacy BaseDirectory token: {ex.Message}");
-                        }
-                    }
+                    // Ensure backup exists
+                    EnsureMirror(BackupStoragePath, PrimaryStoragePath);
+                    return token;
                 }
 
-                if (!File.Exists(targetPath))
+                // 2. Check backup BaseDirectory location
+                token = TryLoadFromFile(BackupStoragePath);
+                if (!string.IsNullOrEmpty(token))
                 {
-                    return string.Empty;
+                    LogMessage("[DeviceTokenStorage] Recovered device token from BaseDirectory backup.");
+                    EnsureMirror(PrimaryStoragePath, BackupStoragePath);
+                    return token;
                 }
 
-                byte[] encryptedBytes = File.ReadAllBytes(targetPath);
-                if (encryptedBytes.Length == 0)
+                // 3. Migration: check legacy AppData path "TruckSim Widget"
+                string legacyAppData = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "TruckSim Widget",
+                    "device.dat"
+                );
+                token = TryLoadFromFile(legacyAppData);
+                if (!string.IsNullOrEmpty(token))
                 {
-                    return string.Empty;
+                    LogMessage("[DeviceTokenStorage] Migrated device token from legacy AppData path.");
+                    EnsureMirror(PrimaryStoragePath, legacyAppData);
+                    EnsureMirror(BackupStoragePath, legacyAppData);
+                    return token;
                 }
 
-                byte[] plainBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(plainBytes);
+                return string.Empty;
             }
             catch (Exception ex)
             {
@@ -123,19 +122,60 @@ namespace ETSOverlay
             }
         }
 
+        private static string TryLoadFromFile(string path)
+        {
+            try
+            {
+                if (!File.Exists(path)) return string.Empty;
+                byte[] encryptedBytes = File.ReadAllBytes(path);
+                if (encryptedBytes.Length == 0) return string.Empty;
+                byte[] plainBytes = ProtectedData.Unprotect(encryptedBytes, null, DataProtectionScope.CurrentUser);
+                return Encoding.UTF8.GetString(plainBytes);
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
+        private static void EnsureMirror(string destinationPath, string sourcePath)
+        {
+            try
+            {
+                if (!File.Exists(destinationPath) && File.Exists(sourcePath))
+                {
+                    var dir = Path.GetDirectoryName(destinationPath);
+                    if (!Directory.Exists(dir) && dir != null) Directory.CreateDirectory(dir);
+                    File.Copy(sourcePath, destinationPath, overwrite: false);
+                }
+            }
+            catch { }
+        }
+
         public static void DeleteToken()
         {
             try
             {
-                if (File.Exists(StoragePath))
-                {
-                    File.Delete(StoragePath);
-                }
+                if (File.Exists(PrimaryStoragePath)) File.Delete(PrimaryStoragePath);
             }
-            catch (Exception ex)
+            catch { }
+
+            try
             {
-                LogMessage($"[DeviceTokenStorage] Failed to delete token: {ex.Message}");
+                if (File.Exists(BackupStoragePath)) File.Delete(BackupStoragePath);
             }
+            catch { }
+
+            try
+            {
+                string legacyAppData = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "TruckSim Widget",
+                    "device.dat"
+                );
+                if (File.Exists(legacyAppData)) File.Delete(legacyAppData);
+            }
+            catch { }
         }
     }
 }

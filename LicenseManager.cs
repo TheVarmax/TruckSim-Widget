@@ -33,6 +33,26 @@ namespace ETSOverlay
             _deviceToken = DeviceTokenStorage.LoadToken();
         }
 
+        private static void LogMessage(string message)
+        {
+            try
+            {
+                if (System.Windows.Application.Current?.MainWindow is MainWindow main)
+                {
+                    main.Dispatcher.Invoke(() => main.WriteLog(message));
+                }
+                else
+                {
+                    System.Diagnostics.Trace.WriteLine(message);
+                    Console.Error.WriteLine(message);
+                }
+            }
+            catch
+            {
+                System.Diagnostics.Trace.WriteLine(message);
+            }
+        }
+
         public void Initialize(string hardwareHash, List<string>? cachedFeatures, DateTime lastValidationTime, string plan, string source, string status, DateTime? expiresAt = null)
         {
             LoadDeviceToken();
@@ -56,10 +76,9 @@ namespace ETSOverlay
                 HardwareHash = hardwareHash;
             }
 
-            bool hasCachedActive = string.Equals(status, "active", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(plan);
-
-            if (!HasValidToken && !hasCachedActive)
+            if (!HasValidToken)
             {
+                LogMessage("[LICENSE] Initialize: No device token found. License is set to inactive.");
                 LastValidationTime = DateTime.MinValue;
                 CurrentPlan = "";
                 Source = "";
@@ -72,7 +91,7 @@ namespace ETSOverlay
                 LastValidationTime = lastValidationTime;
                 CurrentPlan = plan ?? "";
                 Source = source ?? "";
-                Status = string.IsNullOrWhiteSpace(status) ? (HasValidToken ? "active" : "inactive") : status;
+                Status = string.IsNullOrWhiteSpace(status) ? "active" : status;
                 ExpiresAt = expiresAt;
 
                 _features.Clear();
@@ -143,7 +162,15 @@ namespace ETSOverlay
             {
                 LoadDeviceToken();
             }
-            if (!HasValidToken) return;
+            if (!HasValidToken)
+            {
+                if (Status != "inactive" || !string.IsNullOrEmpty(CurrentPlan))
+                {
+                    LogMessage("[LICENSE] Validation check skipped: missing device token. Deactivating local license state.");
+                    ClearLicenseState();
+                }
+                return;
+            }
 
             try
             {
@@ -166,26 +193,32 @@ namespace ETSOverlay
                     }
                     else
                     {
-                        // Explicitly reported invalid
+                        // Explicitly reported invalid by server
+                        LogMessage($"[LICENSE] Server rejected license check: {response.Message ?? "Invalid"}. Deactivating.");
                         ClearLicenseState();
                     }
                 }
             }
-            catch (HttpRequestException)
+            catch (HttpRequestException ex)
             {
                 LastValidationFailed = true;
-                // Offline mode: Keep last known state
+                LogMessage($"[LICENSE] Validation HTTP error (offline mode): {ex.Message}");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
                 LastValidationFailed = true;
-                // Other errors: Keep last known state
+                LogMessage($"[LICENSE] Validation error: {ex.Message}");
             }
         }
 
         public async Task<(bool success, string message)> DeactivateAsync()
         {
-            if (!HasValidToken) return (true, "");
+            if (!HasValidToken)
+            {
+                LogMessage("[LICENSE] Deactivate: No valid device token. Resetting local license state.");
+                ClearLicenseState();
+                return (true, "License state reset.");
+            }
 
             try
             {
@@ -203,11 +236,14 @@ namespace ETSOverlay
                     return (true, "Deactivated successfully.");
                 }
 
-                return (false, response?.Message ?? "Failed to deactivate on server.");
+                // If server explicitly said token is invalid, also clear local state
+                ClearLicenseState();
+                return (true, response?.Message ?? "Deactivated locally.");
             }
             catch (Exception)
             {
-                return (false, "Unable to contact the license server. Please try again later.");
+                ClearLicenseState();
+                return (true, "Deactivated locally (server unreachable).");
             }
         }
 
@@ -260,8 +296,9 @@ namespace ETSOverlay
             OnLicenseChanged?.Invoke();
         }
 
-        private void ClearLicenseState()
+        public void ClearLicenseState()
         {
+            LogMessage("[LICENSE] Deactivating license and clearing local credentials.");
             _deviceToken = string.Empty;
             DeviceTokenStorage.DeleteToken();
             CurrentPlan = string.Empty;

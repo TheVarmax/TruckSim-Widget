@@ -353,6 +353,25 @@ namespace ETSOverlay
 
         #region Presence Lifecycle & Heartbeat Loop
 
+        private void Log(string message)
+        {
+            try
+            {
+                if (System.Windows.Application.Current?.MainWindow is MainWindow main)
+                {
+                    main.Dispatcher.Invoke(() => main.WriteLog(message));
+                }
+                else
+                {
+                    Debug.WriteLine(message);
+                }
+            }
+            catch
+            {
+                Debug.WriteLine(message);
+            }
+        }
+
         public void Start()
         {
             lock (_stateLock)
@@ -364,9 +383,12 @@ namespace ETSOverlay
 
                 _isShutDown = false;
                 _heartbeatCts = new CancellationTokenSource();
+                Log("[PRESENCE] Starting presence & heartbeat service...");
                 _heartbeatLoopTask = Task.Run(() => HeartbeatLoopAsync(_heartbeatCts.Token));
             }
         }
+
+        private bool _loggedMissingToken = false;
 
         private async Task HeartbeatLoopAsync(CancellationToken ct)
         {
@@ -375,10 +397,16 @@ namespace ETSOverlay
                 string token = DeviceTokenStorage.LoadToken();
                 if (string.IsNullOrWhiteSpace(token))
                 {
+                    if (!_loggedMissingToken)
+                    {
+                        Log("[PRESENCE] Paused: No device token available. Waiting for license activation.");
+                        _loggedMissingToken = true;
+                    }
                     try { await Task.Delay(10000, ct); } catch (OperationCanceledException) { break; }
                     continue;
                 }
 
+                _loggedMissingToken = false;
                 bool acquired = false;
                 try
                 {
@@ -389,12 +417,18 @@ namespace ETSOverlay
 
                     if (!_isRegistered)
                     {
+                        Log("[PRESENCE] Registering device with server...");
                         var registerPayload = GatherRegisterPayload();
                         var regRes = await _client.RegisterClientAsync(token, registerPayload, ct);
                         if (regRes != null && regRes.Success)
                         {
                             _isRegistered = true;
+                            Log("[PRESENCE] Device registered successfully.");
                             RecordEvent("widget_started", "TruckSim Widget started");
+                        }
+                        else
+                        {
+                            Log($"[PRESENCE] Device registration response: {regRes?.Error ?? "unknown"} ({regRes?.Message})");
                         }
                     }
 
@@ -427,13 +461,23 @@ namespace ETSOverlay
                         var hbRes = await _client.SendHeartbeatAsync(token, hbReq, ct);
                         if (hbRes != null)
                         {
-                            if (hbRes.Error == "device_offline")
+                            if (hbRes.Success)
                             {
-                                _isRegistered = false;
+                                Log("[PRESENCE] Heartbeat sent successfully.");
                             }
-                            else if (hbRes.Error == "device_inactive" || hbRes.Error == "device_blocked" || hbRes.Error == "license_inactive")
+                            else
                             {
-                                _isRegistered = false;
+                                Log($"[PRESENCE] Heartbeat error: {hbRes.Error} ({hbRes.Message})");
+                                if (hbRes.Error == "device_offline")
+                                {
+                                    _isRegistered = false;
+                                }
+                                else if (hbRes.Error == "device_inactive" || hbRes.Error == "device_blocked" || hbRes.Error == "license_inactive" || hbRes.Error == "device_token_invalid")
+                                {
+                                    _isRegistered = false;
+                                    Log("[PRESENCE] Server rejected device credentials. Deactivating license.");
+                                    LicenseManager.Instance.ClearLicenseState();
+                                }
                             }
                         }
                     }
@@ -444,7 +488,7 @@ namespace ETSOverlay
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[ClientPresence] Heartbeat loop error: {ex.Message}");
+                    Log($"[PRESENCE] Heartbeat error: {ex.Message}");
                 }
                 finally
                 {
