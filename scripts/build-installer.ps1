@@ -2,11 +2,30 @@ param(
     [string]$Version = "1.6.4-beta.1",
     [string]$Configuration = "Release",
     [string]$PublishDir = "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget ($Version)",
-    [string]$OutputDir = "C:\Users\mrpry\Desktop\TruckSim Widget\Releases"
+    [string]$OutputDir = "C:\Users\mrpry\Desktop\TruckSim Widget\Releases",
+    [switch]$SkipWidgetPublish
 )
 
 $ErrorActionPreference = "Stop"
+Import-Module Microsoft.PowerShell.Utility -ErrorAction SilentlyContinue
 Add-Type -AssemblyName System.IO.Compression.FileSystem
+
+function Get-Sha256Hex([string]$filePath) {
+    $stream = [System.IO.File]::OpenRead($filePath)
+    try {
+        $sha = [System.Security.Cryptography.SHA256]::Create()
+        try {
+            $hashBytes = $sha.ComputeHash($stream)
+            return [System.BitConverter]::ToString($hashBytes).Replace('-', '').ToLowerInvariant()
+        }
+        finally {
+            $sha.Dispose()
+        }
+    }
+    finally {
+        $stream.Dispose()
+    }
+}
 
 Write-Host "================================================================" -ForegroundColor Cyan
 Write-Host " TruckSim Widget - Custom Installer Build Pipeline" -ForegroundColor Cyan
@@ -14,6 +33,7 @@ Write-Host " Version       : $Version" -ForegroundColor Yellow
 Write-Host " Configuration : $Configuration" -ForegroundColor Yellow
 Write-Host " Publish Dir   : $PublishDir" -ForegroundColor Yellow
 Write-Host " Output Dir    : $OutputDir" -ForegroundColor Yellow
+Write-Host " Skip Publish  : $SkipWidgetPublish" -ForegroundColor Yellow
 Write-Host "================================================================" -ForegroundColor Cyan
 
 $RepoRoot = Split-Path -Parent $PSScriptRoot
@@ -29,16 +49,25 @@ if (-not (Test-Path $OutputDir)) {
 }
 
 # 1. Publish Main Widget
-Write-Host ""
-Write-Host "[1/5] Publishing TruckSim Widget..." -ForegroundColor Green
-dotnet publish $WidgetProject -c $Configuration -r win-x64 --self-contained false -o $PublishDir
-if ($LASTEXITCODE -ne 0) {
-    throw "Failed to publish TruckSim Widget."
+if ($SkipWidgetPublish) {
+    Write-Host ""
+    Write-Host "[1/6] Main Widget already published, skipping publish step." -ForegroundColor DarkGray
+    if (-not (Test-Path $PublishDir)) {
+        throw "Publish directory does not exist: $PublishDir"
+    }
+} else {
+    Write-Host ""
+    Write-Host "[1/6] Publishing TruckSim Widget..." -ForegroundColor Green
+    dotnet publish $WidgetProject -c $Configuration -r win-x64 --self-contained false -o $PublishDir -p:BuildingInstaller=true
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to publish TruckSim Widget."
+    }
 }
+
 
 # 2. Package Manifest and Payload
 Write-Host ""
-Write-Host "[2/5] Generating Manifest and Packaging Payload..." -ForegroundColor Green
+Write-Host "[2/6] Generating Manifest and Packaging Payload..." -ForegroundColor Green
 if (-not (Test-Path $InstallerResourcesDir)) {
     New-Item -ItemType Directory -Path $InstallerResourcesDir -Force | Out-Null
 }
@@ -84,7 +113,7 @@ try {
         Copy-Item $File.FullName $DestFile -Force
 
         # Compute SHA-256
-        $Sha = (Get-FileHash -Path $File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        $Sha = Get-Sha256Hex $File.FullName
         $ManifestEntries += @{
             path = $RelPath
             size = $File.Length
@@ -115,17 +144,17 @@ finally {
 
 # 3. Publish Installer
 Write-Host ""
-Write-Host "[3/5] Publishing TruckSimWidgetSetup..." -ForegroundColor Green
+Write-Host "[3/6] Publishing TruckSimWidgetSetup..." -ForegroundColor Green
 $guid2 = [Guid]::NewGuid().ToString("N")
 $TempInstallerOut = Join-Path ([System.IO.Path]::GetTempPath()) ("tsw_installer_out_" + $guid2)
-dotnet publish $InstallerProject -c $Configuration -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -o $TempInstallerOut
+dotnet publish $InstallerProject -c $Configuration -r win-x64 --self-contained false -p:PublishSingleFile=true -o $TempInstallerOut
 if ($LASTEXITCODE -ne 0) {
     throw "Failed to publish TruckSimWidgetSetup."
 }
 
 # 4. Copy Output Artifact
 Write-Host ""
-Write-Host "[4/5] Copying final release artifact..." -ForegroundColor Green
+Write-Host "[4/6] Copying final release artifact..." -ForegroundColor Green
 $FinalExeName = "TruckSimWidgetSetup-" + $Version + ".exe"
 $FinalExePath = Join-Path $OutputDir $FinalExeName
 $SourceExe = Join-Path $TempInstallerOut "TruckSimWidgetSetup.exe"

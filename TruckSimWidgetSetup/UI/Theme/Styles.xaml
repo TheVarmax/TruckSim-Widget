@@ -27,11 +27,12 @@
     <!-- Button Style: Primary Accent -->
     <Style x:Key="PrimaryButton" TargetType="Button">
         <Setter Property="Background" Value="{StaticResource Accent}" />
-        <Setter Property="Foreground" Value="#1A1C20" />
+        <Setter Property="Foreground" Value="#121417" />
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Height" Value="36" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="MinWidth" Value="88" />
         <Setter Property="Padding" Value="16,0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="BorderThickness" Value="0" />
@@ -39,7 +40,7 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
@@ -60,7 +61,8 @@
         <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="13" />
-        <Setter Property="Height" Value="36" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="MinWidth" Value="88" />
         <Setter Property="Padding" Value="16,0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="BorderThickness" Value="1" />
@@ -69,11 +71,12 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="border" Property="Background" Value="#31353F" />
+                            <Setter TargetName="border" Property="BorderBrush" Value="#454A54" />
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="border" Property="Opacity" Value="0.4" />
@@ -91,7 +94,8 @@
         <Setter Property="FontFamily" Value="Segoe UI" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Height" Value="36" />
+        <Setter Property="Height" Value="34" />
+        <Setter Property="MinWidth" Value="88" />
         <Setter Property="Padding" Value="16,0" />
         <Setter Property="Cursor" Value="Hand" />
         <Setter Property="BorderThickness" Value="0" />
@@ -99,11 +103,64 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="border" Property="Opacity" Value="0.85" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Window Title Bar Buttons -->
+    <Style x:Key="WindowMinimizeButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#2A2D35" />
+                            <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="WindowCloseButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Foreground" Value="{StaticResource TextSecondary}" />
+        <Setter Property="FontFamily" Value="Segoe UI" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Width" Value="32" />
+        <Setter Property="Height" Value="28" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="4">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="border" Property="Background" Value="#E84141" />
+                            <Setter Property="Foreground" Value="White" />
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -142,8 +199,17 @@
             <Setter.Value>
                 <ControlTemplate TargetType="CheckBox">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border x:Name="checkBorder" Width="18" Height="18" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="4" Margin="0,0,10,0">
-                            <Path x:Name="checkMark" Data="M3,9 L7,13 L15,4" Stroke="{StaticResource Accent}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Visibility="Collapsed" Margin="1,1,0,0" />
+                        <Border x:Name="checkBorder" Width="18" Height="18" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1.5" CornerRadius="4" Margin="0,0,10,0">
+                            <Path x:Name="checkMark" 
+                                  Data="M3.5,8.5 L6.5,11.5 L12.5,4.5" 
+                                  Stroke="{StaticResource Accent}" 
+                                  StrokeThickness="2" 
+                                  StrokeStartLineCap="Round" 
+                                  StrokeEndLineCap="Round" 
+                                  StrokeLineJoin="Round" 
+                                  HorizontalAlignment="Center" 
+                                  VerticalAlignment="Center" 
+                                  Visibility="Collapsed" />
                         </Border>
                         <ContentPresenter VerticalAlignment="Center" />
                     </StackPanel>
@@ -151,6 +217,7 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="checkMark" Property="Visibility" Value="Visible" />
                             <Setter TargetName="checkBorder" Property="BorderBrush" Value="{StaticResource Accent}" />
+                            <Setter TargetName="checkBorder" Property="Background" Value="#22353B" />
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="checkBorder" Property="BorderBrush" Value="{StaticResource AccentHover}" />

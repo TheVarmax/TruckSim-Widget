@@ -9,8 +9,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <UseWindowsForms>true</UseWindowsForms>
-    <ApplicationIcon>..\favicon.ico</ApplicationIcon>
+    <ApplicationIcon>favicon.ico</ApplicationIcon>
     <WidgetPublishDir Condition="'$(WidgetPublishDir)' == ''">C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget ($(Version))</WidgetPublishDir>
     <InstallerOutputDir Condition="'$(InstallerOutputDir)' == ''">C:\Users\mrpry\Desktop\TruckSim Widget\Releases</InstallerOutputDir>
   </PropertyGroup>
@@ -24,9 +23,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="..\favicon.ico" Link="favicon.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
+    <Resource Include="favicon.ico" />
   </ItemGroup>
 
   <!-- Embed payload.zip and scs-telemetry.dll if present during build -->

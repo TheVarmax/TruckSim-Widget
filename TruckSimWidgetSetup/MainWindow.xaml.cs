@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Input;
+using TruckSimWidgetSetup.InstallerCore;
 using TruckSimWidgetSetup.PluginManager;
 using TruckSimWidgetSetup.UI.ViewModels;
 
@@ -11,9 +12,9 @@ public partial class MainWindow : Window
 
     public MainWindow(InstallerViewModel viewModel)
     {
-        InitializeComponent();
         ViewModel = viewModel;
         DataContext = ViewModel;
+        InitializeComponent();
 
         ViewModel.PropertyChanged += (s, e) =>
         {
@@ -24,6 +25,11 @@ public partial class MainWindow : Window
         };
 
         UpdateViewVisibility();
+
+        if (ViewModel.Options.IsUpdateMode)
+        {
+            _ = ViewModel.StartInstallationAsync();
+        }
     }
 
     private void UpdateViewVisibility()
@@ -50,42 +56,53 @@ public partial class MainWindow : Window
             ? Visibility.Collapsed
             : Visibility.Visible;
 
-        if (ViewModel.CurrentStep == WizardStep.Finished || ViewModel.CurrentStep == WizardStep.UninstallFinished)
+        switch (ViewModel.CurrentStep)
         {
-            BtnNext.Content = "Finish";
-            BtnCancel.Visibility = Visibility.Collapsed;
-        }
-        else if (ViewModel.CurrentStep == WizardStep.UninstallConfirm)
-        {
-            BtnNext.Content = "Uninstall";
-            BtnCancel.Visibility = Visibility.Visible;
-        }
-        else if (ViewModel.CurrentStep == WizardStep.GameDirectories && !ViewModel.HasAnyConflict)
-        {
-            BtnNext.Content = "Install";
-            BtnCancel.Visibility = Visibility.Visible;
-        }
-        else if (ViewModel.CurrentStep == WizardStep.ConflictResolution)
-        {
-            BtnNext.Content = "Install";
-            BtnCancel.Visibility = Visibility.Visible;
-        }
-        else if (ViewModel.CurrentStep == WizardStep.Installing || ViewModel.CurrentStep == WizardStep.Uninstalling)
-        {
-            BtnNext.Visibility = Visibility.Collapsed;
-            BtnCancel.Visibility = Visibility.Collapsed;
-        }
-        else if (ViewModel.CurrentStep == WizardStep.Manage)
-        {
-            BtnNext.Visibility = Visibility.Collapsed;
-            BtnCancel.Content = "Close";
-            BtnCancel.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            BtnNext.Content = "Next";
-            BtnNext.Visibility = Visibility.Visible;
-            BtnCancel.Visibility = Visibility.Visible;
+            case WizardStep.Welcome:
+                BtnNext.Content = "Next";
+                BtnNext.Visibility = Visibility.Visible;
+                BtnCancel.Content = "Cancel";
+                BtnCancel.Visibility = Visibility.Visible;
+                break;
+
+            case WizardStep.Manage:
+                BtnNext.Visibility = Visibility.Collapsed;
+                BtnCancel.Content = "Close";
+                BtnCancel.Visibility = Visibility.Visible;
+                break;
+
+            case WizardStep.TelemetrySelection:
+            case WizardStep.GameDirectories:
+            case WizardStep.ConflictResolution:
+                BtnNext.Content = (ViewModel.CurrentStep == WizardStep.ConflictResolution ||
+                                   (ViewModel.CurrentStep == WizardStep.TelemetrySelection && !ViewModel.Ets2Config.UserSelected && !ViewModel.AtsConfig.UserSelected) ||
+                                   (ViewModel.CurrentStep == WizardStep.GameDirectories && !ViewModel.HasAnyConflict))
+                    ? "Install"
+                    : "Next";
+                BtnNext.Visibility = Visibility.Visible;
+                BtnCancel.Content = "Cancel";
+                BtnCancel.Visibility = Visibility.Visible;
+                break;
+
+            case WizardStep.Installing:
+            case WizardStep.Uninstalling:
+                BtnNext.Visibility = Visibility.Collapsed;
+                BtnCancel.Visibility = Visibility.Collapsed;
+                break;
+
+            case WizardStep.Finished:
+            case WizardStep.UninstallFinished:
+                BtnNext.Content = "Finish";
+                BtnNext.Visibility = Visibility.Visible;
+                BtnCancel.Visibility = Visibility.Collapsed;
+                break;
+
+            case WizardStep.UninstallConfirm:
+                BtnNext.Content = "Uninstall";
+                BtnNext.Visibility = Visibility.Visible;
+                BtnCancel.Content = "Cancel";
+                BtnCancel.Visibility = Visibility.Visible;
+                break;
         }
     }
 
@@ -114,7 +131,17 @@ public partial class MainWindow : Window
 
     private void BtnNext_Click(object sender, RoutedEventArgs e)
     {
-        if (ViewModel.CurrentStep == WizardStep.Finished || ViewModel.CurrentStep == WizardStep.UninstallFinished)
+        if (ViewModel.CurrentStep == WizardStep.Finished)
+        {
+            if (ViewModel.LaunchAppAfter)
+            {
+                InstallerService.LaunchInstalledApp(ViewModel.InstallInfo.InstallPath, isUpdate: ViewModel.Options.IsUpdateMode);
+            }
+            Close();
+            return;
+        }
+
+        if (ViewModel.CurrentStep == WizardStep.UninstallFinished)
         {
             Close();
             return;
@@ -153,48 +180,49 @@ public partial class MainWindow : Window
 
     private void BtnBrowseEts2_Click(object sender, RoutedEventArgs e)
     {
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Description = "Select Euro Truck Simulator 2 Installation Folder",
-            UseDescriptionForTitle = true,
+            Title = "Select Euro Truck Simulator 2 Installation Folder",
             InitialDirectory = ViewModel.Ets2Config.SelectedPath
         };
 
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        if (dialog.ShowDialog() == true)
         {
-            ViewModel.Ets2Config.SelectedPath = dialog.SelectedPath;
+            ViewModel.Ets2Config.SelectedPath = dialog.FolderName;
         }
     }
 
     private void BtnBrowseAts_Click(object sender, RoutedEventArgs e)
     {
-        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        var dialog = new Microsoft.Win32.OpenFolderDialog
         {
-            Description = "Select American Truck Simulator Installation Folder",
-            UseDescriptionForTitle = true,
+            Title = "Select American Truck Simulator Installation Folder",
             InitialDirectory = ViewModel.AtsConfig.SelectedPath
         };
 
-        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+        if (dialog.ShowDialog() == true)
         {
-            ViewModel.AtsConfig.SelectedPath = dialog.SelectedPath;
+            ViewModel.AtsConfig.SelectedPath = dialog.FolderName;
         }
     }
 
     private void RadioConflictBackup_Checked(object sender, RoutedEventArgs e)
     {
+        if (ViewModel == null) return;
         if (ViewModel.HasEts2Conflict) ViewModel.Ets2Config.ConflictAction = PluginConflictAction.BackupReplace;
         if (ViewModel.HasAtsConflict) ViewModel.AtsConfig.ConflictAction = PluginConflictAction.BackupReplace;
     }
 
     private void RadioConflictKeep_Checked(object sender, RoutedEventArgs e)
     {
+        if (ViewModel == null) return;
         if (ViewModel.HasEts2Conflict) ViewModel.Ets2Config.ConflictAction = PluginConflictAction.KeepExisting;
         if (ViewModel.HasAtsConflict) ViewModel.AtsConfig.ConflictAction = PluginConflictAction.KeepExisting;
     }
 
     private void RadioConflictOverwrite_Checked(object sender, RoutedEventArgs e)
     {
+        if (ViewModel == null) return;
         if (ViewModel.HasEts2Conflict) ViewModel.Ets2Config.ConflictAction = PluginConflictAction.Overwrite;
         if (ViewModel.HasAtsConflict) ViewModel.AtsConfig.ConflictAction = PluginConflictAction.Overwrite;
     }

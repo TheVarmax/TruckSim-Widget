@@ -33,7 +33,17 @@ public static class InstallerLogger
 
     public static void LogInfo(string message) => Log("INFO", message);
     public static void LogWarn(string message) => Log("WARN", message);
-    public static void LogErr(string message) => Log("ERROR", message);
+    public static void LogErr(string message, Exception? ex = null)
+    {
+        if (ex != null)
+        {
+            Log("ERROR", $"{message}: {ex.GetType().Name}: {ex.Message}{Environment.NewLine}{ex.StackTrace}");
+        }
+        else
+        {
+            Log("ERROR", message);
+        }
+    }
     public static void LogDebug(string message) => Log("DEBUG", message);
 
     public static void LogIgnoredUserFile(string path)

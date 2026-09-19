@@ -42,7 +42,7 @@ public class TransactionJournal
         PropertyNameCaseInsensitive = true
     };
 
-    public static TransactionJournal StartNew(string operation, string version)
+    public static TransactionJournal StartNew(string operation, string version, string? journalFilePath = null, string? stagingDir = null)
     {
         var journal = new TransactionJournal
         {
@@ -52,6 +52,15 @@ public class TransactionJournal
             Status = "PENDING",
             Timestamp = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
         };
+
+        if (!string.IsNullOrEmpty(journalFilePath))
+        {
+            journal.JournalFilePath = journalFilePath;
+        }
+        if (!string.IsNullOrEmpty(stagingDir))
+        {
+            journal.StagingDir = stagingDir;
+        }
 
         journal.FlushToDisk();
         InstallerLogger.LogInfo($"Initialized transaction: {journal.TransactionId} ({operation} v{version})");

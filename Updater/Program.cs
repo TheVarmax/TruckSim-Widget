@@ -379,6 +379,96 @@ static class Program
 
         private async Task DownloadWithProgressAsync(string url, string filePath)
         {
+            // Support local files for update simulation / testing mode
+            string localSourcePath = url;
+            bool isLocal = false;
+
+            if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+            {
+                if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                {
+                    localSourcePath = uri.LocalPath;
+                    isLocal = true;
+                }
+            }
+            else if (File.Exists(url) || (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && Path.IsPathRooted(url)))
+            {
+                isLocal = true;
+            }
+
+            if (isLocal)
+            {
+                if (!File.Exists(localSourcePath))
+                {
+                    throw new FileNotFoundException(
+                        _lang == "uk"
+                            ? $"Локальний файл оновлення не знайдено: {localSourcePath}"
+                            : $"Local update file not found: {localSourcePath}",
+                        localSourcePath);
+                }
+
+                if (string.Equals(Path.GetFullPath(localSourcePath), Path.GetFullPath(filePath), StringComparison.OrdinalIgnoreCase))
+                {
+                    Invoke(() =>
+                    {
+                        SetProgress(100);
+                        var fi = new FileInfo(filePath);
+                        string mb = (fi.Length / 1024.0 / 1024.0).ToString("F1");
+                        _progressLabel.Text = _lang == "uk" ? $"✅ {mb} МБ" : $"✅ {mb} MB";
+                    });
+                    return;
+                }
+
+                var srcInfo = new FileInfo(localSourcePath);
+                long totalBytes = srcInfo.Length;
+                long copiedBytes = 0;
+
+                using (var srcStream = new FileStream(localSourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var destStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 65536, true))
+                {
+                    var buffer = new byte[65536];
+                    int bytesRead;
+                    DateTime lastUiUpdate = DateTime.Now;
+
+                    while ((bytesRead = await srcStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+                    {
+                        await destStream.WriteAsync(buffer, 0, bytesRead);
+                        copiedBytes += bytesRead;
+
+                        // Small async delay per 64KB chunk to simulate network progress and smoothly animate UI
+                        await Task.Delay(10);
+
+                        if ((DateTime.Now - lastUiUpdate).TotalMilliseconds > 60)
+                        {
+                            lastUiUpdate = DateTime.Now;
+                            if (totalBytes > 0)
+                            {
+                                double progress = (double)copiedBytes / totalBytes * 100;
+                                string sizeMb = (copiedBytes / 1024.0 / 1024.0).ToString("F1");
+                                string totalMb = (totalBytes / 1024.0 / 1024.0).ToString("F1");
+
+                                Invoke(() =>
+                                {
+                                    SetProgress(progress);
+                                    _progressLabel.Text = _lang == "uk"
+                                        ? $"{sizeMb} / {totalMb} МБ ({progress:F0}%)"
+                                        : $"{sizeMb} / {totalMb} MB ({progress:F0}%)";
+                                });
+                            }
+                        }
+                    }
+                }
+
+                Invoke(() =>
+                {
+                    SetProgress(100);
+                    _progressLabel.Text = _lang == "uk"
+                        ? $"✅ {(copiedBytes / 1024.0 / 1024.0):F1} МБ"
+                        : $"✅ {(copiedBytes / 1024.0 / 1024.0):F1} MB";
+                });
+                return;
+            }
+
             using var client = new HttpClient();
             client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget-Updater/1.0");
             client.Timeout = TimeSpan.FromMinutes(10);
@@ -386,29 +476,29 @@ static class Program
             using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead);
             response.EnsureSuccessStatusCode();
 
-            long totalBytes = response.Content.Headers.ContentLength ?? -1;
+            long totalBytesHttp = response.Content.Headers.ContentLength ?? -1;
             long downloadedBytes = 0;
 
             using var contentStream = await response.Content.ReadAsStreamAsync();
             using var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
 
-            var buffer = new byte[8192];
-            int bytesRead;
-            DateTime lastUiUpdate = DateTime.Now;
+            var httpBuffer = new byte[8192];
+            int httpBytesRead;
+            DateTime lastHttpUiUpdate = DateTime.Now;
 
-            while ((bytesRead = await contentStream.ReadAsync(buffer, 0, buffer.Length)) > 0)
+            while ((httpBytesRead = await contentStream.ReadAsync(httpBuffer, 0, httpBuffer.Length)) > 0)
             {
-                await fileStream.WriteAsync(buffer, 0, bytesRead);
-                downloadedBytes += bytesRead;
+                await fileStream.WriteAsync(httpBuffer, 0, httpBytesRead);
+                downloadedBytes += httpBytesRead;
 
-                if ((DateTime.Now - lastUiUpdate).TotalMilliseconds > 80)
+                if ((DateTime.Now - lastHttpUiUpdate).TotalMilliseconds > 80)
                 {
-                    lastUiUpdate = DateTime.Now;
-                    if (totalBytes > 0)
+                    lastHttpUiUpdate = DateTime.Now;
+                    if (totalBytesHttp > 0)
                     {
-                        double progress = (double)downloadedBytes / totalBytes * 100;
+                        double progress = (double)downloadedBytes / totalBytesHttp * 100;
                         string sizeMb = (downloadedBytes / 1024.0 / 1024.0).ToString("F1");
-                        string totalMb = (totalBytes / 1024.0 / 1024.0).ToString("F1");
+                        string totalMb = (totalBytesHttp / 1024.0 / 1024.0).ToString("F1");
 
                         Invoke(() =>
                         {

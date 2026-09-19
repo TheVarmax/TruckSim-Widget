@@ -89,7 +89,19 @@ public class InstallerViewModel : INotifyPropertyChanged
     public bool KeepUserData
     {
         get => _keepUserData;
-        set { _keepUserData = value; Options.RemoveUserDataOnUninstall = !value; OnPropertyChanged(); }
+        set
+        {
+            _keepUserData = value;
+            Options.RemoveUserDataOnUninstall = !value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(DeleteUserData));
+        }
+    }
+
+    public bool DeleteUserData
+    {
+        get => !_keepUserData;
+        set => KeepUserData = !value;
     }
 
     public string InstalledVersion
@@ -137,12 +149,31 @@ public class InstallerViewModel : INotifyPropertyChanged
         // Multi-stage discovery if not previously configured
         InitializeGameDiscovery();
 
+        // Desktop shortcut default:
+        // Active (true) for fresh installs, inactive (false) for updates/reinstalls
+        CreateDesktopShortcut = options.CreateDesktopShortcut || !installInfo.IsInstalled;
+
         // Set initial step
         if (options.IsUninstallMode)
         {
             CurrentStep = WizardStep.UninstallConfirm;
         }
-        else if (installInfo.IsInstalled && !options.IsUpdateMode && !options.IsReinstallMode)
+        else if (options.IsUpdateMode)
+        {
+            // Autonomous update mode: auto-configure games with overwrite
+            if (!string.IsNullOrEmpty(Ets2Config.SelectedPath))
+            {
+                Ets2Config.UserSelected = true;
+                Ets2Config.ConflictAction = PluginConflictAction.Overwrite;
+            }
+            if (!string.IsNullOrEmpty(AtsConfig.SelectedPath))
+            {
+                AtsConfig.UserSelected = true;
+                AtsConfig.ConflictAction = PluginConflictAction.Overwrite;
+            }
+            CurrentStep = WizardStep.Installing;
+        }
+        else if (installInfo.IsInstalled && !options.IsReinstallMode)
         {
             CurrentStep = WizardStep.Manage;
         }
@@ -366,11 +397,21 @@ public class InstallerViewModel : INotifyPropertyChanged
         IsBusy = false;
         if (success)
         {
+            if (Options.IsUpdateMode)
+            {
+                // In auto-update mode: automatically launch updated app and shut down installer
+                InstallerService.LaunchInstalledApp(InstallInfo.InstallPath, isUpdate: true);
+                System.Windows.Application.Current?.Dispatcher.Invoke(() => System.Windows.Application.Current.Shutdown(0));
+                return;
+            }
+
             CurrentStep = WizardStep.Finished;
         }
         else
         {
-            ErrorMessage = "Installation encountered an error and was rolled back.";
+            ErrorMessage = Options.IsUpdateMode
+                ? "Update encountered an error and was rolled back."
+                : "Installation encountered an error and was rolled back.";
         }
     }
 

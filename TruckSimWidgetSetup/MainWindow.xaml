@@ -5,9 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="clr-namespace:TruckSimWidgetSetup.UI.ViewModels"
         mc:Ignorable="d"
-        Title="TruckSim Widget Setup" Height="440" Width="520"
+        Title="TruckSim Widget Setup" Height="360" Width="500"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
-        WindowStartupLocation="CenterScreen" Icon="favicon.ico">
+        WindowStartupLocation="CenterScreen" Icon="pack://application:,,,/TruckSimWidgetSetup;component/favicon.ico">
 
     <Window.Resources>
         <ResourceDictionary>
@@ -26,20 +26,20 @@
                 <!-- Header -->
                 <RowDefinition Height="*" />
                 <!-- Content -->
-                <RowDefinition Height="60" />
+                <RowDefinition Height="52" />
                 <!-- Footer -->
             </Grid.RowDefinitions>
 
             <!-- Custom Title Bar -->
             <Grid Grid.Row="0" x:Name="TitleBar" Background="Transparent" MouseDown="TitleBar_MouseDown">
                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="16,0,0,0">
-                    <TextBlock Text="🚛" FontSize="16" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <Image Source="pack://application:,,,/TruckSimWidgetSetup;component/favicon.ico" Width="18" Height="18" Margin="0,0,10,0" VerticalAlignment="Center" RenderOptions.BitmapScalingMode="HighQuality" />
                     <TextBlock Text="TruckSim Widget Setup" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" FontSize="13" VerticalAlignment="Center" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,8,0">
-                    <Button Content="—" Width="30" Height="26" Click="BtnMinimize_Click" Style="{StaticResource SecondaryButton}" BorderThickness="0" Background="Transparent" Foreground="{StaticResource TextSecondary}" Margin="0,0,4,0" />
-                    <Button Content="✕" Width="30" Height="26" Click="BtnClose_Click" Style="{StaticResource SecondaryButton}" BorderThickness="0" Background="Transparent" Foreground="{StaticResource TextSecondary}" />
+                    <Button Content="—" Click="BtnMinimize_Click" Style="{StaticResource WindowMinimizeButton}" Margin="0,0,4,0" />
+                    <Button Content="✕" Click="BtnClose_Click" Style="{StaticResource WindowCloseButton}" />
                 </StackPanel>
             </Grid>
 
@@ -48,26 +48,26 @@
 
                 <!-- 1. Welcome View -->
                 <StackPanel x:Name="WelcomePanel" Visibility="Collapsed">
-                    <TextBlock Text="Welcome to TruckSim Widget Setup" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,12" />
-                    <TextBlock Text="This wizard will install TruckSim Widget on your computer." Foreground="{StaticResource TextSecondary}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,20" />
+                    <TextBlock Text="Welcome to TruckSim Widget Setup" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
+                    <TextBlock Text="This wizard will install TruckSim Widget on your computer." Foreground="{StaticResource TextSecondary}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,14" />
 
-                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,20">
+                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,16">
                         <StackPanel>
-                            <TextBlock Text="Package Information" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,0,8" />
+                            <TextBlock Text="Package Information" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,0,6" />
                             <TextBlock Text="{Binding PackageVersion, StringFormat='Version: {0}'}" Foreground="{StaticResource TextSecondary}" Margin="0,0,0,4" />
                             <TextBlock Text="Location: %LOCALAPPDATA%\Programs\TruckSim Widget" Foreground="{StaticResource TextSecondary}" />
                         </StackPanel>
                     </Border>
 
-                    <CheckBox Content="Create a desktop shortcut" IsChecked="{Binding CreateDesktopShortcut}" Margin="0,0,0,10" />
+                    <CheckBox Content="Create a desktop shortcut" IsChecked="{Binding CreateDesktopShortcut}" Margin="0,0,0,8" />
                 </StackPanel>
 
                 <!-- 2. Manage View (Already Installed) -->
                 <StackPanel x:Name="ManagePanel" Visibility="Collapsed">
-                    <TextBlock Text="TruckSim Widget is Installed" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,12" />
-                    <TextBlock Text="A valid installation was detected on your computer. Choose an action:" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,16" />
+                    <TextBlock Text="TruckSim Widget is Installed" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
+                    <TextBlock Text="A valid installation was detected on your computer. Choose an action:" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,14" />
 
-                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="14,10" Margin="0,0,0,16">
                         <StackPanel>
                             <TextBlock Text="{Binding InstalledVersion, StringFormat='Installed Version: {0}'}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,0,4" />
                             <TextBlock Text="{Binding PackageVersion, StringFormat='Package Version: {0}'}" Foreground="{StaticResource Accent}" Margin="0,0,0,4" />
@@ -84,10 +84,10 @@
 
                 <!-- 3. Telemetry Selection View -->
                 <StackPanel x:Name="TelemetrySelectionPanel" Visibility="Collapsed">
-                    <TextBlock Text="Telemetry Plugin Setup" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,12" />
-                    <TextBlock Text="TruckSim Widget requires scs-telemetry.dll inside each game's plugins folder. Select the games you want to configure:" Foreground="{StaticResource TextSecondary}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,20" />
+                    <TextBlock Text="Telemetry Plugin Setup" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,10" />
+                    <TextBlock Text="TruckSim Widget requires scs-telemetry.dll inside each game's plugins folder. Select the games you want to configure:" Foreground="{StaticResource TextSecondary}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,14" />
 
-                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="14,12">
                         <StackPanel>
                             <CheckBox Content="Euro Truck Simulator 2" IsChecked="{Binding Ets2Config.UserSelected}" Margin="0,0,0,12" />
                             <CheckBox Content="American Truck Simulator" IsChecked="{Binding AtsConfig.UserSelected}" />
@@ -98,10 +98,10 @@
                 <!-- 4. Game Directories View -->
                 <StackPanel x:Name="GameDirectoriesPanel" Visibility="Collapsed">
                     <TextBlock Text="Game Folders" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,8" />
-                    <TextBlock Text="Verify or choose the root folders of your installed games:" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,16" />
+                    <TextBlock Text="Verify or choose the root folders of your installed games:" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,12" />
 
                     <!-- ETS2 -->
-                    <StackPanel Visibility="{Binding Ets2Config.UserSelected, Converter={StaticResource BoolToVis}}" Margin="0,0,0,16">
+                    <StackPanel Visibility="{Binding Ets2Config.UserSelected, Converter={StaticResource BoolToVis}}" Margin="0,0,0,12">
                         <TextBlock Text="Euro Truck Simulator 2:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,0,6" />
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -130,9 +130,9 @@
                 <!-- 5. Conflict Resolution View -->
                 <StackPanel x:Name="ConflictResolutionPanel" Visibility="Collapsed">
                     <TextBlock Text="Plugin Conflict Resolution" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,8" />
-                    <TextBlock Text="An existing telemetry plugin was detected in one or more game folders. Choose how to handle it:" Foreground="{StaticResource TextSecondary}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,16" />
+                    <TextBlock Text="An existing telemetry plugin was detected in one or more game folders. Choose how to handle it:" Foreground="{StaticResource TextSecondary}" FontSize="13" TextWrapping="Wrap" Margin="0,0,0,12" />
 
-                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="16">
+                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="14,12">
                         <StackPanel>
                             <RadioButton Content="Backup existing plugin and install TruckSim Widget plugin (Recommended)" IsChecked="True" Checked="RadioConflictBackup_Checked" Margin="0,0,0,10" />
                             <RadioButton Content="Keep existing plugin (skip Widget plugin for that game)" Checked="RadioConflictKeep_Checked" Margin="0,0,0,10" />
@@ -150,22 +150,22 @@
 
                 <!-- 7. Finished View -->
                 <StackPanel x:Name="FinishedPanel" Visibility="Collapsed" VerticalAlignment="Center">
-                    <TextBlock Text="🎉 Installation Completed!" Foreground="{StaticResource Success}" FontSize="20" FontWeight="Bold" Margin="0,0,0,12" />
-                    <TextBlock Text="TruckSim Widget has been successfully installed." Foreground="{StaticResource TextPrimary}" FontSize="14" Margin="0,0,0,24" />
+                    <TextBlock Text="Installation Completed!" Foreground="{StaticResource Success}" FontSize="20" FontWeight="Bold" Margin="0,0,0,8" />
+                    <TextBlock Text="TruckSim Widget has been successfully installed." Foreground="{StaticResource TextPrimary}" FontSize="14" Margin="0,0,0,16" />
 
-                    <CheckBox Content="Launch TruckSim Widget now" IsChecked="{Binding LaunchAppAfter}" Margin="0,0,0,20" />
+                    <CheckBox Content="Launch TruckSim Widget now" IsChecked="{Binding LaunchAppAfter}" Margin="0,0,0,14" />
                 </StackPanel>
 
                 <!-- 8. Uninstall Confirm View -->
                 <StackPanel x:Name="UninstallConfirmPanel" Visibility="Collapsed">
                     <TextBlock Text="Uninstall TruckSim Widget" Foreground="{StaticResource TextPrimary}" FontSize="18" FontWeight="Bold" Margin="0,0,0,8" />
-                    <TextBlock Text="Are you sure you want to uninstall TruckSim Widget?" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,16" />
+                    <TextBlock Text="Are you sure you want to uninstall TruckSim Widget?" Foreground="{StaticResource TextSecondary}" FontSize="13" Margin="0,0,0,12" />
 
-                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                    <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BgBorder}" BorderThickness="1" CornerRadius="8" Padding="14,12" Margin="0,0,0,12">
                         <StackPanel>
                             <TextBlock Text="User Data Options:" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" Margin="0,0,0,8" />
                             <RadioButton Content="Keep user data (Preserves settings, logs, and trip history)" IsChecked="{Binding KeepUserData}" Margin="0,0,0,10" />
-                            <RadioButton Content="Delete everything (Removes all user data and settings)" IsChecked="{Binding KeepUserData, Converter={StaticResource BoolToVis}}" Margin="0,0,0,6" />
+                            <RadioButton Content="Delete everything (Removes all user data and settings)" IsChecked="{Binding DeleteUserData}" Margin="0,0,0,6" />
                             <TextBlock Text="Note: Unknown/user files in application folder will always be preserved." Foreground="{StaticResource TextSecondary}" FontSize="11" />
                         </StackPanel>
                     </Border>

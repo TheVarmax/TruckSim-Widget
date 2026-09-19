@@ -92,7 +92,7 @@ public class InstallerService
             statusText?.Report("Configuring telemetry plugins...");
             if (options.Ets2Config.UserSelected && !string.IsNullOrEmpty(options.Ets2Config.SelectedPath))
             {
-                bool success = TelemetryPluginManager.InstallPluginForGame(options.Ets2Config, payload, journal);
+                bool success = TelemetryPluginManager.InstallPluginForGame(options.Ets2Config, payload, journal, options.IsUpdateMode);
                 if (!success)
                 {
                     throw new InvalidOperationException("Failed to install telemetry plugin for ETS2.");
@@ -101,7 +101,7 @@ public class InstallerService
 
             if (options.AtsConfig.UserSelected && !string.IsNullOrEmpty(options.AtsConfig.SelectedPath))
             {
-                bool success = TelemetryPluginManager.InstallPluginForGame(options.AtsConfig, payload, journal);
+                bool success = TelemetryPluginManager.InstallPluginForGame(options.AtsConfig, payload, journal, options.IsUpdateMode);
                 if (!success)
                 {
                     throw new InvalidOperationException("Failed to install telemetry plugin for ATS.");
@@ -203,8 +203,9 @@ public class InstallerService
             InstallerLogger.LogInfo($"{opName} completed successfully.");
             statusText?.Report("Completed!");
 
-            // 13. Launch application if requested
-            if (options.LaunchAppAfter)
+            // 13. Launch application only in headless silent mode
+            // (In GUI mode, ViewModel/MainWindow handles launching once upon completion)
+            if (options.IsSilent && options.LaunchAppAfter)
             {
                 LaunchInstalledApp(targetDir, isUpdate: options.IsUpdateMode);
             }
@@ -497,7 +498,7 @@ public class InstallerService
         catch { }
     }
 
-    private static void LaunchInstalledApp(string appDir, bool isUpdate)
+    public static void LaunchInstalledApp(string appDir, bool isUpdate)
     {
         string exePath = Path.Combine(appDir, Constants.AppExeName);
         if (File.Exists(exePath))

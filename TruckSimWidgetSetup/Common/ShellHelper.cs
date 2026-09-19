@@ -24,6 +24,8 @@ public static class ShellHelper
 
             dynamic shortcut = shell.CreateShortcut(shortcutPath);
             shortcut.TargetPath = targetPath;
+            string? targetDir = Path.GetDirectoryName(targetPath);
+            if (!string.IsNullOrEmpty(targetDir)) shortcut.WorkingDirectory = targetDir;
             if (!string.IsNullOrEmpty(arguments)) shortcut.Arguments = arguments;
             if (!string.IsNullOrEmpty(description)) shortcut.Description = description;
             if (!string.IsNullOrEmpty(iconPath)) shortcut.IconLocation = iconPath;

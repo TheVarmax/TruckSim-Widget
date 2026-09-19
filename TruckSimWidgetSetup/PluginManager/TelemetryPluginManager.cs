@@ -74,13 +74,19 @@ public static class TelemetryPluginManager
     public static bool InstallPluginForGame(
         GameConfig game,
         EmbeddedPayloadProvider payloadProvider,
-        TransactionJournal journal)
+        TransactionJournal journal,
+        bool isUpdateMode = false)
     {
         if (!game.UserSelected || string.IsNullOrEmpty(game.SelectedPath))
         {
             InstallerLogger.LogInfo($"[{game.GameId}] Plugin installation skipped by user preference.");
             game.OwnershipStatus = PluginOwnershipStatus.Skipped;
             return true;
+        }
+
+        if (isUpdateMode && game.ConflictAction == PluginConflictAction.None)
+        {
+            game.ConflictAction = PluginConflictAction.Overwrite;
         }
 
         string targetDir = Path.Combine(game.SelectedPath, Constants.GameRelPluginDir);
@@ -201,9 +207,9 @@ public static class TelemetryPluginManager
             File.Copy(tempStagedPlugin, targetFile, overwrite: true);
             copied = true;
         }
-        catch
+        catch (Exception ex)
         {
-            InstallerLogger.LogWarn($"[{game.GameId}] Standard Copy failed. Attempting elevated copy.");
+            InstallerLogger.LogWarn($"[{game.GameId}] Standard Copy failed ({ex.Message}). Attempting elevated copy.");
             copied = ElevatedHelperRunner.CopyFileElevated(tempStagedPlugin, targetFile);
         }
 
@@ -222,7 +228,31 @@ public static class TelemetryPluginManager
         }
         else
         {
+            if (isUpdateMode || IsFileLocked(targetFile))
+            {
+                InstallerLogger.LogWarn($"[{game.GameId}] Telemetry plugin file '{targetFile}' is locked or in use (likely by running game). Skipping plugin overwrite as requested.");
+                return true;
+            }
+
             InstallerLogger.LogErr($"[{game.GameId}] Failed to copy plugin to: {targetFile}");
+            return false;
+        }
+    }
+
+    private static bool IsFileLocked(string filePath)
+    {
+        if (!File.Exists(filePath)) return false;
+        try
+        {
+            using var stream = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch
+        {
             return false;
         }
     }
