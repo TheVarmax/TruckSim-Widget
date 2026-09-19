@@ -22,6 +22,12 @@
     <None Remove="ElevatedHelper\**" />
     <Content Remove="ElevatedHelper\**" />
     <EmbeddedResource Remove="ElevatedHelper\**" />
+    <Compile Remove="TruckSimWidgetSetup\**" />
+    <None Remove="TruckSimWidgetSetup\**" />
+    <Content Remove="TruckSimWidgetSetup\**" />
+    <EmbeddedResource Remove="TruckSimWidgetSetup\**" />
+    <Page Remove="TruckSimWidgetSetup\**" />
+    <ApplicationDefinition Remove="TruckSimWidgetSetup\**" />
     <Compile Remove="*Tests\**;*.Tests\**" />
     <None Remove="*Tests\**;*.Tests\**" />
   </ItemGroup>

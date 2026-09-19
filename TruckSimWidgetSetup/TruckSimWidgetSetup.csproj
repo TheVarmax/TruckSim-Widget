@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <RootNamespace>TruckSimWidgetSetup</RootNamespace>
+    <AssemblyName>TruckSimWidgetSetup</AssemblyName>
+    <Version>1.6.4-beta.1</Version>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>..\favicon.ico</ApplicationIcon>
+    <WidgetPublishDir Condition="'$(WidgetPublishDir)' == ''">C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget ($(Version))</WidgetPublishDir>
+    <InstallerOutputDir Condition="'$(InstallerOutputDir)' == ''">C:\Users\mrpry\Desktop\TruckSim Widget\Releases</InstallerOutputDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.IO" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="TruckSimWidget.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\favicon.ico" Link="favicon.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Embed payload.zip and scs-telemetry.dll if present during build -->
+  <ItemGroup>
+    <EmbeddedResource Include="Resources\payload.zip" Condition="Exists('Resources\payload.zip')" />
+    <EmbeddedResource Include="Resources\scs-telemetry.dll" Condition="Exists('Resources\scs-telemetry.dll')" />
+  </ItemGroup>
+
+</Project>
