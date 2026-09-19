@@ -53,8 +53,12 @@ english.OpenPluginFolder=Open telemetry plugin folder
 english.ErrElevatedHelperCorrupt=Security error: ElevatedHelper.exe failed integrity verification. Installation aborted.
 ukrainian.ErrElevatedHelperCorrupt=Помилка безпеки: ElevatedHelper.exe не пройшов перевірку цілісності. Встановлення скасовано.
 
+english.GameNameETS2=Euro Truck Simulator 2
+english.GameNameATS=American Truck Simulator
+
 english.TelemetryPageTitle=Telemetry Plugin Setup
 english.TelemetryPageSub=Configure ETS2 and ATS telemetry automatically.
+english.TelemetryPagePrompt=TruckSim Widget requires scs-telemetry.dll inside each game's plugins folder. Select the games you want the installer to configure:
 english.TelemetryPageDesc=TruckSim Widget requires scs-telemetry.dll inside each game's plugins folder. Select the games you want the installer to configure:
 english.InstallETS2Plugin=Configure telemetry plugin for Euro Truck Simulator 2
 english.InstallATSPlugin=Configure telemetry plugin for American Truck Simulator
@@ -98,8 +102,12 @@ ukrainian.AdditionalShortcuts=Додаткові ярлики:
 ukrainian.LaunchApp=Запустити TruckSim Widget
 ukrainian.OpenPluginFolder=Відкрити папку плагіна телеметрії
 
+ukrainian.GameNameETS2=Euro Truck Simulator 2
+ukrainian.GameNameATS=American Truck Simulator
+
 ukrainian.TelemetryPageTitle=Налаштування плагіна телеметрії
 ukrainian.TelemetryPageSub=Автоматичне налаштування телеметрії для ETS2 та ATS.
+ukrainian.TelemetryPagePrompt=TruckSim Widget потребує scs-telemetry.dll у папці plugins кожної гри. Обери ігри для налаштування:
 ukrainian.TelemetryPageDesc=TruckSim Widget потребує scs-telemetry.dll у папці plugins кожної гри. Обери ігри для налаштування:
 ukrainian.InstallETS2Plugin=Налаштувати плагін телеметрії для Euro Truck Simulator 2
 ukrainian.InstallATSPlugin=Налаштувати плагін телеметрії для American Truck Simulator
