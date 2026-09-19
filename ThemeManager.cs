@@ -86,36 +86,46 @@ namespace ETSOverlay
             }
 
             // 2. Accent
+            SolidColorBrush standardAccent = CreateBrush("#7AC5CD");
+            SolidColorBrush chosenAccent;
             switch (accent?.ToLowerInvariant())
             {
                 case "blue":
-                    dict["AccentColorBrush"] = CreateBrush("#4DA8DA");
+                    chosenAccent = CreateBrush("#4DA8DA");
                     break;
                 case "amber":
-                    dict["AccentColorBrush"] = CreateBrush("#FFC107");
+                    chosenAccent = CreateBrush("#FFC107");
                     break;
                 case "violet":
-                    dict["AccentColorBrush"] = CreateBrush("#9D4EDD");
+                    chosenAccent = CreateBrush("#9D4EDD");
                     break;
                 case "red":
-                    dict["AccentColorBrush"] = CreateBrush("#E63946");
+                    chosenAccent = CreateBrush("#E63946");
                     break;
                 case "teal":
                 default:
-                    dict["AccentColorBrush"] = CreateBrush("#7AC5CD");
+                    chosenAccent = standardAccent;
                     break;
             }
 
-            var globalAccent = (SolidColorBrush)dict["AccentColorBrush"];
             var mainText = (SolidColorBrush)dict["MainTextBrush"];
             var mutedText = (SolidColorBrush)dict["MutedTextBrush"];
 
             if (customAccents == null) customAccents = new System.Collections.Generic.Dictionary<string, string>();
 
+            bool isStandardMode = string.Equals(accentMode, "standard", StringComparison.OrdinalIgnoreCase);
+            bool isUniformMode = string.Equals(accentMode, "uniform", StringComparison.OrdinalIgnoreCase);
+            bool isCustomMode = string.Equals(accentMode, "custom", StringComparison.OrdinalIgnoreCase);
+
+            // In standard mode, AccentColorBrush is strictly standard teal (#7AC5CD).
+            // Global accent has NO influence when Accent mode is Standard.
+            dict["AccentColorBrush"] = isStandardMode ? standardAccent : chosenAccent;
+
             SolidColorBrush GetCardAccent(string cardName, SolidColorBrush standardBrush)
             {
-                if (accentMode == "uniform") return globalAccent;
-                if (accentMode == "custom")
+                if (isStandardMode) return standardBrush;
+                if (isUniformMode) return chosenAccent;
+                if (isCustomMode)
                 {
                     if (customAccents.TryGetValue(cardName, out string? colorNameOrHex))
                     {
@@ -137,21 +147,17 @@ namespace ETSOverlay
                         }
                         catch
                         {
-                            return globalAccent;
+                            return chosenAccent;
                         }
                     }
-                    return globalAccent;
+                    return chosenAccent;
                 }
                 return standardBrush; // "standard" mode
             }
 
             dict["AccentBrush_Sim"] = GetCardAccent("Sim", CreateBrush("#4CAF50"));
-            dict["AccentBrush_Status"] = GetCardAccent("Status", globalAccent);
-            dict["AccentBrush_Game"] = GetCardAccent("Game", CreateBrush("#4CAF50")); // Game status is #4CAF50, icon is globalAccent. We'll simplify to both using Game brush, or if standard, they differ. Wait, to keep standard exactly the same, I should make 2 brushes or let Game icon use AccentColorBrush directly. Let's make the Game icon use AccentBrush_GameIcon and Game text use AccentBrush_GameText.
-            // Let's refine standard brushes:
-            dict["AccentBrush_Sim"] = GetCardAccent("Sim", CreateBrush("#4CAF50"));
-            dict["AccentBrush_Status"] = GetCardAccent("Status", globalAccent);
-            dict["AccentBrush_GameIcon"] = GetCardAccent("Game", globalAccent);
+            dict["AccentBrush_Status"] = GetCardAccent("Status", standardAccent);
+            dict["AccentBrush_GameIcon"] = GetCardAccent("Game", standardAccent);
             dict["AccentBrush_GameText"] = GetCardAccent("Game", CreateBrush("#4CAF50"));
             dict["AccentBrush_Distance"] = GetCardAccent("Distance", CreateBrush("#52C14F"));
             dict["AccentBrush_Route"] = GetCardAccent("Route", mutedText);

@@ -81,6 +81,7 @@ namespace ETSOverlay
         private long _tripFinesTotal = 0;
         private List<TripFine> _tripFines = new();
         private bool _pendingDeliveryData = false;
+        private bool _lastSpecialEventsJobDelivered = false;
         private bool _pendingFineData = false;
         private string _tripTruckBrand = "";
         private string _tripTruckName = "";
@@ -93,6 +94,7 @@ namespace ETSOverlay
         private string _tripPlayMode = "";
         private int _navZeroTicks = 0; // Для отслеживания сброса GPS-маршрута
         private int _navPositiveTicks = 0; // Для отслеживания возврата GPS-маршрута
+        private int _onJobFalseTicks = 0; // Для отслеживания сброса OnJob
         private float _lastValidNavDist = 0; // Для отслеживания внезапного обрыва маршрута
         private float _lastNavDistWithTrailer = -1f; // Расстояние до финиша пока прицеп прицеплен
         private bool _forceProfileUnloaded = false; // Жестко глушим телеметрию, если вышли из профиля
@@ -112,7 +114,7 @@ namespace ETSOverlay
         private Dictionary<string, JobState> _jobStates = new();
 
         private bool _tbLogSaysActive = false;
-        private DateTime _lastDeliveredTimestamp = DateTime.MinValue;
+        private DateTime _lastDeliveredTimestamp = DateTime.Now;
         private string _lastDeliveredJobIdEts = "";
         private string _lastDeliveredJobIdAts = "";
         private DateTime _deliveredIndicatorUntil = DateTime.MinValue;
@@ -420,6 +422,24 @@ namespace ETSOverlay
 
             WriteLog("=== OVERLAY STARTED ===");
 
+            // Initialize _lastDeliveredTimestamp so past deliveries don't falsely show DELIVERED on startup
+            try
+            {
+                if (Directory.Exists(deliveredFolderPath))
+                {
+                    var latestDelivered = Directory.GetFiles(deliveredFolderPath, "*", SearchOption.TopDirectoryOnly)
+                        .Select(p => new FileInfo(p))
+                        .OrderByDescending(f => f.LastWriteTimeUtc)
+                        .FirstOrDefault();
+                    if (latestDelivered != null)
+                    {
+                        _lastDeliveredTimestamp = latestDelivered.LastWriteTimeUtc.ToLocalTime();
+                    }
+                }
+            }
+            catch { }
+            if (_lastDeliveredTimestamp < DateTime.Now) _lastDeliveredTimestamp = DateTime.Now;
+
             LoadState();
             LoadGameState(GameType.Ets);
             LoadGameState(GameType.Ats);
@@ -692,6 +712,7 @@ namespace ETSOverlay
             _lastValidNavDist = 0;
             _navZeroTicks = 0;
             _navPositiveTicks = 0;
+            _onJobFalseTicks = 0;
             _jobCancelledOrDeliveredFlag = true;
 
             // 2. Reset counters & timer
@@ -755,9 +776,11 @@ namespace ETSOverlay
         {
             WriteLog($"[DEBUG] ProcessJobDelivered check: _tripTrackingActive={_tripTrackingActive}, _cargoWasLoaded={_cargoWasLoaded}, dist={jobDrivenDistance}, orig={_tripOrigin}, dest={_tripDestination}");
             // Trip Logbook: save completed trip
-            if (_tripTrackingActive && _cargoWasLoaded && jobDrivenDistance > 0
+            bool hadActiveTrip = _tripTrackingActive && _cargoWasLoaded && jobDrivenDistance > 0
                 && !string.IsNullOrWhiteSpace(_tripOrigin)
-                && !string.IsNullOrWhiteSpace(_tripDestination))
+                && !string.IsNullOrWhiteSpace(_tripDestination);
+
+            if (hadActiveTrip)
             {
                 try
                 {
@@ -830,14 +853,17 @@ namespace ETSOverlay
             _tripDestination = "";
             _tripCargoName = "";
 
-            Dispatcher.Invoke(() => {
-                _deliveredIndicatorUntil = DateTime.Now.AddSeconds(15);
-                UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), true);
-                if (!string.IsNullOrWhiteSpace(CurrentLastJobId))
-                {
-                    CurrentLastDeliveredJobId = CurrentLastJobId;
-                }
-            });
+            if (hadActiveTrip)
+            {
+                Dispatcher.Invoke(() => {
+                    _deliveredIndicatorUntil = DateTime.Now.AddSeconds(10);
+                    UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), true);
+                    if (!string.IsNullOrWhiteSpace(CurrentLastJobId))
+                    {
+                        CurrentLastDeliveredJobId = CurrentLastJobId;
+                    }
+                });
+            }
         }
 
         private void Telemetry_Fined(object? sender, EventArgs e)
@@ -877,6 +903,16 @@ namespace ETSOverlay
         private void Telemetry_Data(SCSTelemetry data, bool updated)
         {
             lastTelemetryUpdate = DateTime.Now;
+
+            // Direct check from shared memory: ONLY on rising edge (false -> true) while a delivery was active
+            bool isJobDeliveredInTelemetry = data.SpecialEventsValues != null && (data.SpecialEventsValues.JobDelivered || data.SpecialEventsValues.JobFinished);
+            if (isJobDeliveredInTelemetry && !_lastSpecialEventsJobDelivered && (_tripTrackingActive || _cargoWasLoaded))
+            {
+                WriteLog("[EVENT] Rising edge of JobDelivered in shared memory.");
+                _pendingDeliveryData = true;
+                _jobCancelledOrDeliveredFlag = true;
+            }
+            _lastSpecialEventsJobDelivered = isJobDeliveredInTelemetry;
 
             // Process pending events before the update check
             if (_pendingCancelledData)
@@ -1043,12 +1079,13 @@ namespace ETSOverlay
                     bool isCargoLoaded = _cargoLoadedTicks >= 3;
 
                     bool isOnJobInTelemetry = data.SpecialEventsValues != null && data.SpecialEventsValues.OnJob;
+                    bool isJobDeliveredInTelemetry = data.SpecialEventsValues != null && (data.SpecialEventsValues.JobDelivered || data.SpecialEventsValues.JobFinished);
                     bool hasJobInfo = _hasEnteredCabin && plannedDist > 0.5f && !string.IsNullOrWhiteSpace(data.JobValues?.CityDestination);
 
                     // 1. ПРОВЕРКА ИСТОЧНИКА ПРАВДЫ (TELEMETRY SDK):
                     // Если телеметрия игры явно говорит OnJob == false (и мы не ожидаем данные доставки прямо сейчас),
                     // значит в самой игре заказ отсутствует/отменён/завершён. Любые оставшиеся строки в JobValues — фантомный кэш памяти.
-                    if (data.SpecialEventsValues != null && !isOnJobInTelemetry && !_pendingDeliveryData)
+                    if (data.SpecialEventsValues != null && !isOnJobInTelemetry && !_pendingDeliveryData && !isJobDeliveredInTelemetry)
                     {
                         hasJobInfo = false;
                     }
@@ -1095,14 +1132,35 @@ namespace ETSOverlay
                     bool wasDeliveringActive = _hasEnteredCabin && (isDelivering || _cargoWasLoaded);
                     if (wasDeliveringActive)
                     {
+                        // Check if player is near the destination or unhooking (delivering cargo)
+                        bool isDeliveringNearFinish = (_cargoWasLoaded && _lastNavDistWithTrailer > 0 && _lastNavDistWithTrailer <= 1500f) 
+                                                     || !_isTrailerAttached 
+                                                     || (StatusValue.Text == (uiLanguage == "uk" ? "Здаємо вантаж..." : "Delivering..."));
+
                         // Сценарий A: Заказ был активен, но телеметрия сбросила OnJob в false (и это не сдача заказа)
-                        bool onJobDropped = data.SpecialEventsValues != null && !isOnJobInTelemetry && !_pendingDeliveryData;
+                        // ВАЖНО: Ни в коем случае не сбрасывать как отмену, если это доставка или игрок у финиша!
+                        bool onJobDropped = data.SpecialEventsValues != null 
+                            && !isOnJobInTelemetry 
+                            && !_pendingDeliveryData 
+                            && !isJobDeliveredInTelemetry 
+                            && !isDeliveringNearFinish;
+
+                        if (onJobDropped)
+                        {
+                            _onJobFalseTicks++;
+                        }
+                        else
+                        {
+                            _onJobFalseTicks = 0;
+                        }
 
                         // Сценарий B: В процессе доставки навигация внезапно исчезла далеко от финиша (>1000м), а прицеп/груз пропал
                         bool routeVanishedMidDelivery = _cargoWasLoaded && _lastNavDistWithTrailer > 1000f && _navZeroTicks > 5 && (!isTrailerAttached || data.JobValues == null || !data.JobValues.CargoLoaded || !isOnJobInTelemetry);
 
-                        if (onJobDropped || routeVanishedMidDelivery)
+                        // Only cancel if onJobDropped persists for several ticks mid-route, or route vanished mid-delivery
+                        if ((onJobDropped && _onJobFalseTicks > 5) || routeVanishedMidDelivery)
                         {
+                            _onJobFalseTicks = 0;
                             HandleJobCancelled(onJobDropped ? "Telemetry OnJob dropped to false during delivery" : "Route vanished and trailer unhooked mid-delivery");
                             hasJobInfo = false;
                         }
@@ -1648,7 +1706,7 @@ namespace ETSOverlay
                     if (deliveredInfo.HasValue)
                     {
                         var (deliveredId, deliveredTime) = deliveredInfo.Value;
-                        if (deliveredTime > _lastDeliveredTimestamp)
+                        if (deliveredTime > _lastDeliveredTimestamp && deliveredTime >= DateTime.Now.AddSeconds(-10))
                         {
                             _lastDeliveredTimestamp = deliveredTime;
                             if (deliveredId == _tbJobIdEts) _lastDeliveredJobIdEts = deliveredId;
@@ -1656,7 +1714,7 @@ namespace ETSOverlay
                             if (deliveredId == CurrentTbJobId)
                             {
                                 CurrentLastDeliveredJobId = deliveredId;
-                                _deliveredIndicatorUntil = DateTime.Now.AddSeconds(10);
+                                _deliveredIndicatorUntil = deliveredTime.AddSeconds(10);
                                 WriteLog($"TB delivered detected: {CurrentLastDeliveredJobId}");
                             }
                         }
@@ -2097,11 +2155,12 @@ namespace ETSOverlay
 
             if (!_isTbRunning && _telHasActiveJob) UpdateStatusUI(LocalizeStatus("TB_CLOSED_NO_REC"), Brushes.Red, false);
             else if (_isRecordingBroken && _telHasActiveJob) UpdateStatusUI(LocalizeStatus("NOT_RECORDING"), Brushes.Red, false);
+            else if (!isGameOnline) UpdateStatusUI(uiLanguage == "uk" ? "Очікування гри..." : "Wait for game...", new SolidColorBrush(Color.FromRgb(160, 160, 160)), false);
             else if (_awaitingTbResponse || _forceProfileUnloaded || !isProfileLoaded || !_hasEnteredCabin) UpdateStatusUI(LocalizeStatus("PROFILE_MENU"), Brushes.Orange, false);
             else if (isDelivering && _cargoWasLoaded && !_isTrailerAttached && _lastNavDistWithTrailer > 1000) UpdateStatusUI(LocalizeStatus("TRAILER_DETACHED"), Brushes.Red, false);
             else if (_isDesync) UpdateStatusUI(uiLanguage == "uk" ? "Гра ≠ TB" : "Game ≠ TB", Brushes.Red, false);
             else if (_isRecordingBroken && _telHasJobInfo) UpdateStatusUI(LocalizeStatus("TB_ERROR_CHECK"), Brushes.Red, false);
-            else if ((_deliveredIndicatorUntil > DateTime.Now || _deliveredFromLogUntil > DateTime.Now) && isPaused && !_telHasActiveJob) UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), false);
+            else if (isProfileLoaded && _hasEnteredCabin && (_deliveredIndicatorUntil > DateTime.Now || _deliveredFromLogUntil > DateTime.Now) && isPaused && !_telHasActiveJob) UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), false);
             else if (_telHasActiveJob && !_tbHasActiveJob && _tbSaysNoJob) UpdateStatusUI(LocalizeStatus("KM_NOT_REC"), Brushes.Red, false);
             else if (!isDelivering) UpdateStatusUI(LocalizeStatus("FREE_ROAM"), Brushes.White, false);
             else if (isDelivering && !_telHasActiveJob)
@@ -2530,25 +2589,28 @@ namespace ETSOverlay
             {
                 StartupLogo.Fill = new System.Windows.Media.SolidColorBrush((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString("#7AC5CD"));
                 
-                CloudSyncEnabled = false;
-                CloudSyncRevision = null;
-                CloudSyncUpdatedAt = null;
-                LastCloudSyncAttempt = null;
-                CloudSyncStatus = "";
-                
-                // Reset Premium Features
-                SpeedLimiterService.Instance.Disable();
-                
-                if (_uiMode == "custom")
+                if (_startupComplete)
                 {
-                    OnUIModeChanged("full");
+                    CloudSyncEnabled = false;
+                    CloudSyncRevision = null;
+                    CloudSyncUpdatedAt = null;
+                    LastCloudSyncAttempt = null;
+                    CloudSyncStatus = "";
+                    
+                    // Reset Premium Features
+                    SpeedLimiterService.Instance.Disable();
+                    
+                    if (_uiMode == "custom")
+                    {
+                        OnUIModeChanged("full");
+                    }
+                    
+                    _settingsWindow?.SyncGeneralValues();
                 }
-                
-                _settingsWindow?.SyncGeneralValues();
             }
 
             bool isSupporter = LicenseManager.Instance.Status == "active";
-            if (!isSupporter && _uiMode == "hud")
+            if (!isSupporter && _uiMode == "hud" && _startupComplete)
             {
                 OnUIModeChanged("full");
                 _settingsWindow?.SyncGeneralValues();
@@ -2556,7 +2618,10 @@ namespace ETSOverlay
 
             ApplyAppearance();
             _settingsWindow?.SyncAppearanceValues();
-            SaveState();
+            if (_startupComplete)
+            {
+                SaveState();
+            }
         }
 
         internal AppState GetCurrentAppState()
@@ -4551,16 +4616,142 @@ namespace ETSOverlay
             }
         }
 
+        internal static bool _isUpdateSimulationActive = false;
+        internal static string? _simulationInstallerPath = null;
+        internal static string? _simulationVersion = null;
+
+        internal static bool CheckUpdateSimulationArgs(string[]? args = null)
+        {
+            if (_isUpdateSimulationActive) return true;
+
+            args ??= Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length; i++)
+            {
+                string arg = args[i];
+
+                if (arg.Equals("--simulate-update", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("--test-update", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("-simulate-update", StringComparison.OrdinalIgnoreCase) ||
+                    arg.Equals("-test-update", StringComparison.OrdinalIgnoreCase))
+                {
+                    _isUpdateSimulationActive = true;
+                    if (i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+                    {
+                        _simulationInstallerPath = args[i + 1].Trim('"', ' ');
+                    }
+                    break;
+                }
+                else if (arg.StartsWith("--simulate-update=", StringComparison.OrdinalIgnoreCase))
+                {
+                    _isUpdateSimulationActive = true;
+                    _simulationInstallerPath = arg.Substring("--simulate-update=".Length).Trim('"', ' ');
+                    break;
+                }
+                else if (arg.StartsWith("--test-update=", StringComparison.OrdinalIgnoreCase))
+                {
+                    _isUpdateSimulationActive = true;
+                    _simulationInstallerPath = arg.Substring("--test-update=".Length).Trim('"', ' ');
+                    break;
+                }
+            }
+
+            for (int i = 0; i < args.Length; i++)
+            {
+                string arg = args[i];
+                if (arg.StartsWith("--simulate-version=", StringComparison.OrdinalIgnoreCase))
+                {
+                    _simulationVersion = arg.Substring("--simulate-version=".Length).Trim('"', ' ');
+                }
+                else if ((arg.Equals("--simulate-version", StringComparison.OrdinalIgnoreCase) ||
+                          arg.Equals("--test-version", StringComparison.OrdinalIgnoreCase)) &&
+                         i + 1 < args.Length && !args[i + 1].StartsWith("-"))
+                {
+                    _simulationVersion = args[i + 1].Trim('"', ' ');
+                }
+            }
+
+            return _isUpdateSimulationActive;
+        }
+
+        internal static string? FindCandidateInstaller(string? baseDir = null, string? desktopReleases = null)
+        {
+            var candidates = new List<string>();
+
+            // 1. Desktop Releases folder
+            desktopReleases ??= Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                "TruckSim Widget",
+                "Releases");
+
+            if (Directory.Exists(desktopReleases))
+            {
+                candidates.AddRange(Directory.GetFiles(desktopReleases, "TruckSimWidgetSetup*.exe"));
+            }
+
+            // 2. Installed application directory / Programs
+            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string installedSetup = Path.Combine(localAppData, "Programs", "TruckSim Widget", "TruckSimWidgetSetup.exe");
+            if (File.Exists(installedSetup))
+            {
+                candidates.Add(installedSetup);
+            }
+
+            // 3. Base directory
+            baseDir ??= AppDomain.CurrentDomain.BaseDirectory;
+            string baseDirSetup = Path.Combine(baseDir, "TruckSimWidgetSetup.exe");
+            if (File.Exists(baseDirSetup))
+            {
+                candidates.Add(baseDirSetup);
+            }
+
+            // 4. Relative solution directories (for development/testing)
+            try
+            {
+                string? current = baseDir;
+                for (int i = 0; i < 5 && current != null; i++)
+                {
+                    string releasesDir = Path.Combine(current, "Releases");
+                    if (Directory.Exists(releasesDir))
+                    {
+                        candidates.AddRange(Directory.GetFiles(releasesDir, "TruckSimWidgetSetup*.exe"));
+                    }
+                    string setupOut = Path.Combine(current, "TruckSimWidgetSetup", "bin", "Release", "net8.0-windows", "win-x64", "publish", "TruckSimWidgetSetup.exe");
+                    if (File.Exists(setupOut))
+                    {
+                        candidates.Add(setupOut);
+                    }
+                    current = Directory.GetParent(current)?.FullName;
+                }
+            }
+            catch { }
+
+            return candidates
+                .Where(File.Exists)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderByDescending(File.GetLastWriteTime)
+                .FirstOrDefault();
+        }
+
+        internal static string ComputeFileSha256(string filePath)
+        {
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            using var stream = File.OpenRead(filePath);
+            byte[] hash = sha.ComputeHash(stream);
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+
         /// <summary>
         /// Проверяет наличие обновлений через GitHub API
         /// </summary>
         private async Task CheckForUpdatesAsync(bool silent)
         {
             if (_isCheckingUpdate || _isCooldownActive) return;
-            
+
+            bool isSimulated = CheckUpdateSimulationArgs();
+
             // Защита от лимитов GitHub API (60 запросов в час)
-            // При тихой проверке (старт приложения) проверяем не чаще раз в 15 минут
-            if (silent && (DateTime.Now - _lastUpdateCheck).TotalMinutes < 15) return;
+            // При тихой проверке (старт приложения) проверяем не чаще раз в 15 минут (если не симуляция)
+            if (!isSimulated && silent && (DateTime.Now - _lastUpdateCheck).TotalMinutes < 15) return;
             // При ручной проверке обрабатывается через StartCooldownTimer (кнопка заблокирована)
 
             _isCheckingUpdate = true;
@@ -4578,6 +4769,105 @@ namespace ETSOverlay
                         _settingsWindow.UpdateStatusText.Text = "";
                     }
                 });
+
+                if (isSimulated)
+                {
+                    WriteLog("=== UPDATE SIMULATION MODE ACTIVE ===");
+
+                    string? installerPath = _simulationInstallerPath;
+                    if (string.IsNullOrEmpty(installerPath) || !File.Exists(installerPath))
+                    {
+                        installerPath = FindCandidateInstaller();
+                    }
+
+                    if (string.IsNullOrEmpty(installerPath) || !File.Exists(installerPath))
+                    {
+                        // Prompt user with file picker if interactive
+                        Dispatcher.Invoke(() =>
+                        {
+                            var ofd = new Microsoft.Win32.OpenFileDialog
+                            {
+                                Title = uiLanguage == "uk"
+                                    ? "Виберіть інсталятор TruckSimWidgetSetup для симуляції оновлення"
+                                    : "Select TruckSimWidgetSetup installer for update simulation",
+                                Filter = "TruckSimWidgetSetup (*.exe)|*.exe|All Files (*.*)|*.*"
+                            };
+
+                            if (ofd.ShowDialog(this) == true)
+                            {
+                                installerPath = ofd.FileName;
+                            }
+                        });
+                    }
+
+                    if (string.IsNullOrEmpty(installerPath) || !File.Exists(installerPath))
+                    {
+                        WriteLog("[SIMULATE ERROR] No installer file found for update simulation.");
+                        Dispatcher.Invoke(() =>
+                        {
+                            CustomMessageBox.Show(this,
+                                uiLanguage == "uk"
+                                    ? "Режим тестування: файл інсталятора TruckSimWidgetSetup не знайдено.\n\nВкажіть шлях через параметр: --simulate-update \"шлях\\до\\TruckSimWidgetSetup.exe\" або помістіть інсталятор у папку Releases на Робочому столі."
+                                    : "Test mode: TruckSimWidgetSetup installer file was not found.\n\nPlease specify the path: --simulate-update \"path\\to\\TruckSimWidgetSetup.exe\" or place the installer in Desktop\\TruckSim Widget\\Releases.",
+                                "Update Simulation",
+                                "OK",
+                                string.Empty);
+
+                            if (_settingsWindow != null)
+                            {
+                                _settingsWindow.UpdateStatusText.Foreground = Brushes.Red;
+                                _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                                    ? "❌ Інсталятор не знайдено"
+                                    : "❌ Installer not found";
+                            }
+                        });
+                        _isCheckingUpdate = false;
+                        return;
+                    }
+
+                    string simCurrentVersion = GetCurrentVersion();
+                    string simRemoteVersion = !string.IsNullOrEmpty(_simulationVersion)
+                        ? _simulationVersion
+                        : "1.6.5-beta.1";
+
+                    if (!IsNewerVersion(simRemoteVersion, simCurrentVersion))
+                    {
+                        simRemoteVersion = "9.9.9-test";
+                    }
+
+                    string simReleaseName = $"TruckSim Widget v{simRemoteVersion} (Test Simulation)";
+                    string assetName = Path.GetFileName(installerPath);
+                    string expectedSha256 = ComputeFileSha256(installerPath);
+                    string simHtmlUrl = "https://github.com/TheVarmax/TruckSim-Widget/releases";
+                    string simBody = uiLanguage == "uk"
+                        ? "## 🚀 Тестова симуляція оновлення\n\n- Перевірка передачі управління від віджета до апдейтера.\n- Перевірка верифікації хешу SHA-256.\n- Перевірка автономного оновлення через інсталятор."
+                        : "## 🚀 Test Update Simulation\n\n- Verified handover from widget to updater.\n- Verified SHA-256 checksum integrity verification.\n- Verified autonomous installer execution.";
+
+                    WriteLog($"[SIMULATE] Using installer: {installerPath}");
+                    WriteLog($"[SIMULATE] Computed SHA-256: {expectedSha256}");
+                    WriteLog($"[SIMULATE] Triggering update confirmation dialog for {simReleaseName}...");
+
+                    Dispatcher.Invoke(() =>
+                    {
+                        if (_settingsWindow != null)
+                        {
+                            _settingsWindow.UpdateStatusText.Foreground = new SolidColorBrush(Color.FromRgb(82, 193, 79));
+                            _settingsWindow.UpdateStatusText.Text = uiLanguage == "uk"
+                                ? $"🆕 Доступне оновлення: {simReleaseName}"
+                                : $"🆕 Update available: {simReleaseName}";
+                        }
+                    });
+
+                    // Small delay on startup so main window finishes rendering before modal popup
+                    if (silent)
+                    {
+                        await Task.Delay(400);
+                    }
+
+                    ShowUpdateConfirmDialog(simReleaseName, installerPath, assetName, simHtmlUrl, simBody, expectedSha256, isBeta: false);
+                    _isCheckingUpdate = false;
+                    return;
+                }
 
                 WriteLog("Checking for updates...");
 
@@ -4943,6 +5233,27 @@ namespace ETSOverlay
                     string? exeDir = Path.GetDirectoryName(Environment.ProcessPath);
                     if (exeDir != null)
                         updaterPath = Path.Combine(exeDir, "updater.exe");
+                }
+
+                if (!File.Exists(updaterPath))
+                {
+                    // Fallback search in development output directories
+                    string[] devPaths = new[]
+                    {
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Updater", "bin", "Release", "net8.0-windows", "win-x64", "publish", "updater.exe"),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Updater", "bin", "Debug", "net8.0-windows", "win-x64", "publish", "updater.exe"),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Updater", "bin", "Release", "net8.0-windows", "win-x64", "publish", "updater.exe"),
+                        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "..", "Updater", "bin", "Debug", "net8.0-windows", "win-x64", "publish", "updater.exe")
+                    };
+
+                    foreach (var p in devPaths)
+                    {
+                        if (File.Exists(p))
+                        {
+                            updaterPath = Path.GetFullPath(p);
+                            break;
+                        }
+                    }
                 }
 
                 if (!File.Exists(updaterPath))

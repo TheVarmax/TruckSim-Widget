@@ -70,4 +70,10 @@
     <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
   </Target>
+  <Target Name="BuildInstallerAfterPublish" AfterTargets="BuildAndCopyHelpers" Condition="'$(BuildingInstaller)' != 'true' And '$(PublishDir)' != '' And '$(Configuration)' == 'Release'">
+    <Message Text="================================================================" Importance="high" />
+    <Message Text="[Auto-Build] Packaging and building TruckSimWidgetSetup..." Importance="high" />
+    <Message Text="================================================================" Importance="high" />
+    <Exec Command="powershell -ExecutionPolicy Bypass -NoProfile -File &quot;$(MSBuildProjectDirectory)\scripts\build-installer.ps1&quot; -Version &quot;$(Version)&quot; -Configuration &quot;$(Configuration)&quot; -PublishDir &quot;$(PublishDir.TrimEnd('\'))&quot; -SkipWidgetPublish" />
+  </Target>
 </Project>

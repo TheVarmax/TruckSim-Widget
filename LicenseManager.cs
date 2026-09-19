@@ -56,7 +56,9 @@ namespace ETSOverlay
                 HardwareHash = hardwareHash;
             }
 
-            if (!HasValidToken)
+            bool hasCachedActive = string.Equals(status, "active", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrEmpty(plan);
+
+            if (!HasValidToken && !hasCachedActive)
             {
                 LastValidationTime = DateTime.MinValue;
                 CurrentPlan = "";
@@ -70,7 +72,7 @@ namespace ETSOverlay
                 LastValidationTime = lastValidationTime;
                 CurrentPlan = plan ?? "";
                 Source = source ?? "";
-                Status = string.IsNullOrWhiteSpace(status) ? "inactive" : status;
+                Status = string.IsNullOrWhiteSpace(status) ? (HasValidToken ? "active" : "inactive") : status;
                 ExpiresAt = expiresAt;
 
                 _features.Clear();
@@ -137,6 +139,10 @@ namespace ETSOverlay
 
         public async Task ValidateLicenseAsync(string appVersion)
         {
+            if (!HasValidToken)
+            {
+                LoadDeviceToken();
+            }
             if (!HasValidToken) return;
 
             try

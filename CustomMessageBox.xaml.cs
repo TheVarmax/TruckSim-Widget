@@ -83,22 +83,51 @@ namespace ETSOverlay
             Close();
         }
 
-        public static MessageBoxResult Show(Window owner, string message, string title, string yesText, string noText)
+        private static Window? GetSafeOwner(Window? candidate)
         {
-            var msgBox = new CustomMessageBox(message, title, yesText, noText)
+            if (candidate != null && candidate.IsLoaded && candidate.IsVisible)
+                return candidate;
+
+            if (Application.Current != null)
             {
-                Owner = owner
-            };
+                foreach (Window win in Application.Current.Windows)
+                {
+                    if (win != null && win.IsLoaded && win.IsVisible)
+                        return win;
+                }
+            }
+
+            return null;
+        }
+
+        public static MessageBoxResult Show(Window? owner, string message, string title, string yesText, string noText)
+        {
+            var msgBox = new CustomMessageBox(message, title, yesText, noText);
+            var safeOwner = GetSafeOwner(owner);
+            if (safeOwner != null)
+            {
+                msgBox.Owner = safeOwner;
+            }
+            else
+            {
+                msgBox.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
             msgBox.ShowDialog();
             return msgBox.Result;
         }
 
-        public static (MessageBoxResult result, bool isCheckboxChecked) ShowWithCheckbox(Window owner, string message, string title, string yesText, string noText, string checkboxText)
+        public static (MessageBoxResult result, bool isCheckboxChecked) ShowWithCheckbox(Window? owner, string message, string title, string yesText, string noText, string checkboxText)
         {
-            var msgBox = new CustomMessageBox(message, title, yesText, noText, true, checkboxText)
+            var msgBox = new CustomMessageBox(message, title, yesText, noText, true, checkboxText);
+            var safeOwner = GetSafeOwner(owner);
+            if (safeOwner != null)
             {
-                Owner = owner
-            };
+                msgBox.Owner = safeOwner;
+            }
+            else
+            {
+                msgBox.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
             msgBox.ShowDialog();
             return (msgBox.Result, msgBox.IsDontAskAgainChecked);
         }

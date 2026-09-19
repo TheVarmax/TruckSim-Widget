@@ -173,6 +173,7 @@ namespace ETSOverlay
                 BtnActivate.IsEnabled = true;
                 BtnActivate.Content = _mainWindow.GetUiLanguage() == "uk" ? "Активувати" : "Activate";
                 LicenseKeyInput.Text = string.Empty;
+                _mainWindow.SetAppearance("classic", "teal", "standard", "standard", new Dictionary<string, string>());
                 _mainWindow.SaveStatePublic();
             }
         }
