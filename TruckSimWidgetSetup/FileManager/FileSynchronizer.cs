@@ -1,4 +1,5 @@
 using System.IO;
+using TruckSimWidgetSetup.Common;
 using TruckSimWidgetSetup.Diagnostics;
 using TruckSimWidgetSetup.InstallationState;
 using TruckSimWidgetSetup.TransactionEngine;
@@ -89,6 +90,7 @@ public static class FileSynchronizer
                 string normRel = PackageManifest.NormalizeRelativePath(rel);
 
                 if (seenDiskFiles.Contains(normRel)) continue;
+                if (normRel.Equals(Constants.InstallerExeName, StringComparison.OrdinalIgnoreCase)) continue;
 
                 bool isOwned = OwnershipManager.IsFileOwned(
                     normRel,

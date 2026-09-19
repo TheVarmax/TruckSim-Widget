@@ -28,31 +28,32 @@ public static class TelemetryPluginManager
             return;
         }
 
+        string recordedHash = game.ExistingFileHash;
         string currentHash = PackageManifest.ComputeFileSha256(pluginFile);
-        game.ExistingFileHash = currentHash;
-        InstallerLogger.LogInfo($"[{game.GameId}] Existing telemetry plugin found. SHA-256: {currentHash}");
+        InstallerLogger.LogInfo($"[{game.GameId}] Existing telemetry plugin found. SHA-256: {currentHash}, Recorded: {recordedHash}");
 
         // If already recorded as Owned in install state
         if (string.Equals(game.OwnershipStatus, PluginOwnershipStatus.Owned, StringComparison.OrdinalIgnoreCase))
         {
-            if (!string.IsNullOrEmpty(game.ExistingFileHash) &&
-                string.Equals(currentHash, game.ExistingFileHash, StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrEmpty(recordedHash) &&
+                string.Equals(currentHash, recordedHash, StringComparison.OrdinalIgnoreCase))
             {
                 InstallerLogger.LogInfo($"[{game.GameId}] Plugin is verified owned and unmodified.");
                 game.OwnershipStatus = PluginOwnershipStatus.Owned;
-                return;
             }
             else
             {
                 InstallerLogger.LogWarn($"[{game.GameId}] Plugin was owned by Widget but has been modified since install.");
                 game.OwnershipStatus = PluginOwnershipStatus.ModifiedByUser;
-                return;
             }
+            game.ExistingFileHash = currentHash;
+            return;
         }
 
         if (string.Equals(game.OwnershipStatus, PluginOwnershipStatus.LegacyOwnedUnverified, StringComparison.OrdinalIgnoreCase))
         {
             InstallerLogger.LogWarn($"[{game.GameId}] Legacy unverified plugin ownership preserved.");
+            game.ExistingFileHash = currentHash;
             return;
         }
 
@@ -67,6 +68,7 @@ public static class TelemetryPluginManager
         }
 
         game.OwnershipStatus = PluginOwnershipStatus.None;
+        game.ExistingFileHash = currentHash;
     }
 
     public static bool InstallPluginForGame(

@@ -84,19 +84,28 @@ public class InstallerService
                 InnoTakeoverManager.PurgeLegacyInnoArtifacts(targetDir, journal);
             }
 
-            // 7. Copy installer itself into app directory as uninstaller (if not running from there)
-            CopySelfToAppDir(targetDir, journal);
+            // 7. Install or update installer itself in app directory as an explicitly owned binary
+            statusText?.Report("Installing installer executable...");
+            InstallOrUpdateInstallerExe(targetDir, installInfo, journal, installedRecords);
 
             // 8. Configure telemetry plugins
             statusText?.Report("Configuring telemetry plugins...");
             if (options.Ets2Config.UserSelected && !string.IsNullOrEmpty(options.Ets2Config.SelectedPath))
             {
-                TelemetryPluginManager.InstallPluginForGame(options.Ets2Config, payload, journal);
+                bool success = TelemetryPluginManager.InstallPluginForGame(options.Ets2Config, payload, journal);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Failed to install telemetry plugin for ETS2.");
+                }
             }
 
             if (options.AtsConfig.UserSelected && !string.IsNullOrEmpty(options.AtsConfig.SelectedPath))
             {
-                TelemetryPluginManager.InstallPluginForGame(options.AtsConfig, payload, journal);
+                bool success = TelemetryPluginManager.InstallPluginForGame(options.AtsConfig, payload, journal);
+                if (!success)
+                {
+                    throw new InvalidOperationException("Failed to install telemetry plugin for ATS.");
+                }
             }
 
             // 9. Save canonical v3 install state
@@ -145,20 +154,46 @@ public class InstallerService
             }
 
             string stateBackup = Path.Combine(journal.StagingDir, "state_backup.json");
+            string originalStateHash = string.Empty;
             if (File.Exists(stateFilePath))
             {
                 File.Copy(stateFilePath, stateBackup, overwrite: true);
+                originalStateHash = PackageManifest.ComputeFileSha256(stateFilePath);
             }
 
-            int stateStep = journal.BeginStep("SaveStateFile", string.Empty, stateFilePath, stateBackup, string.Empty);
+            int stateStep = journal.BeginStep("SaveStateFile", string.Empty, stateFilePath, stateBackup, originalStateHash);
             File.WriteAllText(stateFilePath, state.ToJson());
-            journal.CompleteStep(stateStep);
+            journal.CompleteStep(stateStep, PackageManifest.ComputeFileSha256(stateFilePath));
 
-            // Save installed manifest for fast deterministic comparison on next update
+            // Save installed manifest for fast deterministic comparison on next update (TRANSACTIONAL)
+            installedManifestPath = Constants.GetInstalledManifestFilePath();
+            string? manifestDir = Path.GetDirectoryName(installedManifestPath);
+            if (!string.IsNullOrEmpty(manifestDir) && !Directory.Exists(manifestDir))
+            {
+                Directory.CreateDirectory(manifestDir);
+            }
+
+            string manifestBackup = Path.Combine(journal.StagingDir, "manifest_backup.json");
+            string originalManifestHash = string.Empty;
+            if (File.Exists(installedManifestPath))
+            {
+                File.Copy(installedManifestPath, manifestBackup, overwrite: true);
+                originalManifestHash = PackageManifest.ComputeFileSha256(installedManifestPath);
+            }
+
+            int manifestStep = journal.BeginStep("SaveManifestFile", string.Empty, installedManifestPath, manifestBackup, originalManifestHash);
             currentManifest.SaveToFile(installedManifestPath);
+            journal.CompleteStep(manifestStep, PackageManifest.ComputeFileSha256(installedManifestPath));
 
-            // 10. Register in Windows Uninstall registry
-            WindowsRegistration.Register(targetDir, currentManifest.Version);
+            // 10. Register in Windows Uninstall registry (TRANSACTIONAL)
+            statusText?.Report("Registering application...");
+            int regStep = journal.BeginStep("RegisterWindowsUninstall", string.Empty, Constants.UninstallRegSubKey, string.Empty, string.Empty);
+            bool registered = WindowsRegistration.Register(targetDir, currentManifest.Version);
+            if (!registered)
+            {
+                throw new InvalidOperationException("Failed to register application in Windows Uninstall registry.");
+            }
+            journal.CompleteStep(regStep);
 
             // 11. Create Shortcuts
             ShellHelper.CreateAppShortcuts(targetDir, options.CreateDesktopShortcut);
@@ -256,6 +291,13 @@ public class InstallerService
                 }
             }
 
+            // Ensure owned installer executable is included if installed
+            string targetInstallerExe = Path.Combine(appDir, Constants.InstallerExeName);
+            if (installInfo.IsInstalled && File.Exists(targetInstallerExe) && !ownedFiles.Contains(targetInstallerExe, StringComparer.OrdinalIgnoreCase))
+            {
+                ownedFiles.Add(targetInstallerExe);
+            }
+
             // Delete each owned file. NEVER delete unknown/user files!
             for (int i = 0; i < ownedFiles.Count; i++)
             {
@@ -286,7 +328,11 @@ public class InstallerService
             // 5. Clean only empty directories in appDir
             DirectoryCleaner.CleanEmptyDirectories(appDir);
 
-            // 6. User data handling
+            // 6. Commit transaction before destructive user data deletion
+            journal.Commit();
+            InstallerLogger.LogInfo("Uninstallation transaction committed successfully.");
+
+            // 7. User data handling (AFTER transaction commit)
             if (removeUserData)
             {
                 statusText?.Report("Removing user data...");
@@ -318,9 +364,6 @@ public class InstallerService
                 InstallerLogger.LogInfo($"User data preserved at: {Constants.GetUserDataDir()}");
             }
 
-            // 7. Commit transaction
-            journal.Commit();
-            InstallerLogger.LogInfo("Uninstallation completed successfully.");
             statusText?.Report("Uninstall completed!");
 
             // 8. Self-delete schedule if running from app directory
@@ -355,30 +398,81 @@ public class InstallerService
         catch { }
     }
 
-    private static void CopySelfToAppDir(string targetDir, TransactionJournal journal)
+    private static void InstallOrUpdateInstallerExe(
+        string targetDir,
+        InstallationInfo installInfo,
+        TransactionJournal journal,
+        List<InstalledFileRecord> installedRecords)
     {
-        try
+        string currentExe = Environment.ProcessPath ?? AppDomain.CurrentDomain.BaseDirectory;
+        string targetExe = Path.Combine(targetDir, Constants.InstallerExeName);
+
+        // If running directly from destination, already in place
+        if (File.Exists(targetExe) &&
+            string.Equals(Path.GetFullPath(currentExe), Path.GetFullPath(targetExe), StringComparison.OrdinalIgnoreCase))
         {
-            string currentExe = Environment.ProcessPath ?? AppDomain.CurrentDomain.BaseDirectory;
-            string targetExe = Path.Combine(targetDir, Constants.InstallerExeName);
-
-            if (string.Equals(Path.GetFullPath(currentExe), Path.GetFullPath(targetExe), StringComparison.OrdinalIgnoreCase))
+            string hash = PackageManifest.ComputeFileSha256(targetExe);
+            installedRecords.Add(new InstalledFileRecord
             {
-                // Running from target itself, no copy needed
-                return;
-            }
-
-            if (File.Exists(currentExe))
-            {
-                int step = journal.BeginStep("CopyFile", currentExe, targetExe, string.Empty, string.Empty);
-                File.Copy(currentExe, targetExe, overwrite: true);
-                journal.CompleteStep(step);
-                InstallerLogger.LogInfo($"Copied installer to: {targetExe}");
-            }
+                RelativePath = Constants.InstallerExeName,
+                Sha256 = hash
+            });
+            InstallerLogger.LogInfo($"Installer is already running from application directory: {targetExe}");
+            return;
         }
-        catch (Exception ex)
+
+        if (!File.Exists(currentExe))
         {
-            InstallerLogger.LogWarn($"Could not copy self to application directory: {ex.Message}");
+            throw new FileNotFoundException($"Source installer executable not found at: {currentExe}");
+        }
+
+        string stagingDir = journal.StagingDir;
+        if (!Directory.Exists(stagingDir)) Directory.CreateDirectory(stagingDir);
+
+        if (File.Exists(targetExe))
+        {
+            // STRICT RULE: If target exists, verify ownership before overwriting!
+            bool isOwned = OwnershipManager.IsInstallerExeOwned(targetExe, installInfo);
+            if (!isOwned)
+            {
+                InstallerLogger.LogErr($"Target installer executable '{targetExe}' exists and is NOT owned by installer!");
+                throw new InvalidOperationException(
+                    $"Cannot install '{Constants.InstallerExeName}' because an unowned file already exists at '{targetExe}'. Existing user/unknown files cannot be overwritten.");
+            }
+
+            string stagingBackup = Path.Combine(stagingDir, $"replace_installer_{Guid.NewGuid():N}.bak");
+            File.Copy(targetExe, stagingBackup, overwrite: true);
+            string originalHash = PackageManifest.ComputeFileSha256(targetExe);
+
+            int step = journal.BeginStep("ReplaceFile", currentExe, targetExe, stagingBackup, originalHash);
+            File.Copy(currentExe, targetExe, overwrite: true);
+
+            string newHash = PackageManifest.ComputeFileSha256(targetExe);
+            journal.CompleteStep(step, newHash);
+
+            installedRecords.Add(new InstalledFileRecord
+            {
+                RelativePath = Constants.InstallerExeName,
+                Sha256 = newHash
+            });
+
+            InstallerLogger.LogInfo($"Updated owned installer executable: {targetExe} (SHA-256: {newHash})");
+        }
+        else
+        {
+            int step = journal.BeginStep("CopyFile", currentExe, targetExe, string.Empty, string.Empty);
+            File.Copy(currentExe, targetExe, overwrite: false);
+
+            string newHash = PackageManifest.ComputeFileSha256(targetExe);
+            journal.CompleteStep(step, newHash);
+
+            installedRecords.Add(new InstalledFileRecord
+            {
+                RelativePath = Constants.InstallerExeName,
+                Sha256 = newHash
+            });
+
+            InstallerLogger.LogInfo($"Installed owned installer executable: {targetExe} (SHA-256: {newHash})");
         }
     }
 

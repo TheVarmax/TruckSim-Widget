@@ -6,7 +6,7 @@ namespace TruckSimWidgetSetup.InstallerCore;
 
 public static class WindowsRegistration
 {
-    public static void Register(string appDir, string version)
+    public static bool Register(string appDir, string version)
     {
         try
         {
@@ -31,11 +31,18 @@ public static class WindowsRegistration
                 key.SetValue("URLUpdateInfo", Constants.AppUpdatesUrl);
 
                 InstallerLogger.LogInfo($"Registered application in Windows Uninstall registry under: {Constants.UninstallRegSubKey}");
+                return true;
+            }
+            else
+            {
+                InstallerLogger.LogErr($"Failed to create or open registry key: {Constants.UninstallRegSubKey}");
+                return false;
             }
         }
         catch (Exception ex)
         {
             InstallerLogger.LogErr($"Failed to register application in Windows registry: {ex.Message}");
+            return false;
         }
     }
 

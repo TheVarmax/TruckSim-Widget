@@ -1,4 +1,6 @@
+using TruckSimWidgetSetup.Common;
 using TruckSimWidgetSetup.Compatibility;
+using TruckSimWidgetSetup.InstallationState;
 
 namespace TruckSimWidgetSetup.FileManager;
 
@@ -48,4 +50,26 @@ public static class OwnershipManager
         // Any other file is Unknown / User created
         return false;
     }
+
+    /// <summary>
+    /// Evaluates whether an existing TruckSimWidgetSetup.exe in the application directory
+    /// is owned by an existing installation.
+    /// Returns false if target directory is an unmanaged/stale directory without valid installation state.
+    /// </summary>
+    public static bool IsInstallerExeOwned(string fullPath, InstallationInfo installInfo)
+    {
+        if (installInfo.ExistingState != null &&
+            installInfo.ExistingState.InstalledFiles.Any(f => string.Equals(f.RelativePath, Constants.InstallerExeName, StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        if (installInfo.IsInstalled)
+        {
+            return true;
+        }
+
+        return false;
+    }
 }
+

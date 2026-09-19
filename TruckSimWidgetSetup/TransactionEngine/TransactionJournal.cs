@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using TruckSimWidgetSetup.Common;
 using TruckSimWidgetSetup.Diagnostics;
 using TruckSimWidgetSetup.FileManager;
+using TruckSimWidgetSetup.InstallerCore;
 
 namespace TruckSimWidgetSetup.TransactionEngine;
 
@@ -281,6 +282,7 @@ public class TransactionJournal
                 return true;
 
             case "SaveStateFile":
+            case "SaveManifestFile":
                 if (!string.IsNullOrEmpty(step.BackupPath) && File.Exists(step.BackupPath))
                 {
                     File.Copy(step.BackupPath, step.TargetPath, overwrite: true);
@@ -298,6 +300,10 @@ public class TransactionJournal
                     // No prior state existed, remove created file
                     File.Delete(step.TargetPath);
                 }
+                return true;
+
+            case "RegisterWindowsUninstall":
+                WindowsRegistration.Unregister();
                 return true;
 
             case "CreateThirdPartyBackup":
