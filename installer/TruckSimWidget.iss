@@ -8,7 +8,7 @@
 #define MyAppExeName "TruckSim Widget.exe"
 
 #ifndef PublishDir
-  #define PublishDir "..\bin\Release\net8.0-windows\win-x64\publish"
+  #define PublishDir "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget (" + MyAppVersion + ")"
 #endif
 #define ElevatedHelperFile AddBackslash(PublishDir) + "ElevatedHelper.exe"
 #define ElevatedHelperSha256 LowerCase(GetSHA256OfFile(ElevatedHelperFile))
