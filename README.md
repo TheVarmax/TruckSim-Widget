@@ -233,6 +233,7 @@ TruckSim Widget automatically checks for updates on launch. When a new version i
 ### Need help or found an issue?
 
 - Report bugs or request features: [GitHub Issues](https://github.com/TheVarmax/TruckSim-Widget/issues)
+- Website report: fill out the report form directly on the project website at [trucksim.uk](https://trucksim.uk)
 - Direct contact: [Telegram @thevarmax](https://t.me/thevarmax)
 - Support email: `support@trucksim.uk`
 

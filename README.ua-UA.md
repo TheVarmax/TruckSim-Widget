@@ -233,6 +233,7 @@ TruckSim Widget автоматично перевіряє наявність о�
 ### Допомога та підтримка
 
 - Повідомити про проблему або запропонувати ідею: [GitHub Issues](https://github.com/TheVarmax/TruckSim-Widget/issues)
+- Форма на сайті: заповніть форму репорту безпосередньо на сайті проекту [trucksim.uk](https://trucksim.uk)
 - Прямий зв'язок у Telegram: [@thevarmax](https://t.me/thevarmax)
 - Електронна пошта: `support@trucksim.uk`
 
