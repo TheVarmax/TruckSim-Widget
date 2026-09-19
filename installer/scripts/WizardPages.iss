@@ -23,11 +23,13 @@ var
   ConflictDescLabel: TNewStaticText;
 
   ETS2ConflictHeader: TNewStaticText;
+  ETS2ConflictPanel: TPanel;
   ETS2ConflictOptionBackup: TNewRadioButton;
   ETS2ConflictOptionKeep: TNewRadioButton;
   ETS2ConflictOptionOverwrite: TNewRadioButton;
 
   ATSConflictHeader: TNewStaticText;
+  ATSConflictPanel: TPanel;
   ATSConflictOptionBackup: TNewRadioButton;
   ATSConflictOptionKeep: TNewRadioButton;
   ATSConflictOptionOverwrite: TNewRadioButton;
@@ -233,79 +235,108 @@ begin
   ETS2ConflictHeader.Top := TopPos;
   ETS2ConflictHeader.Left := ScaleX(5);
   ETS2ConflictHeader.Font.Style := [fsBold];
-  ETS2ConflictHeader.Caption := 'Euro Truck Simulator 2:';
+  ETS2ConflictHeader.Caption := CustomMessage('GameNameETS2') + ':';
 
   TopPos := TopPos + ScaleY(18);
+  ETS2ConflictPanel := TPanel.Create(WizardForm);
+  ETS2ConflictPanel.Parent := ConflictPage.Surface;
+  ETS2ConflictPanel.Left := ScaleX(5);
+  ETS2ConflictPanel.Top := TopPos;
+  ETS2ConflictPanel.Width := ScaleX(420);
+  ETS2ConflictPanel.Height := ScaleY(68);
+  ETS2ConflictPanel.BevelOuter := bvNone;
+  ETS2ConflictPanel.ParentBackground := True;
+
   ETS2ConflictOptionBackup := TNewRadioButton.Create(WizardForm);
-  ETS2ConflictOptionBackup.Parent := ConflictPage.Surface;
-  ETS2ConflictOptionBackup.Top := TopPos;
-  ETS2ConflictOptionBackup.Left := ScaleX(15);
-  ETS2ConflictOptionBackup.Width := ScaleX(390);
+  ETS2ConflictOptionBackup.Parent := ETS2ConflictPanel;
+  ETS2ConflictOptionBackup.Top := ScaleY(0);
+  ETS2ConflictOptionBackup.Left := ScaleX(10);
+  ETS2ConflictOptionBackup.Width := ScaleX(400);
   ETS2ConflictOptionBackup.Caption := CustomMessage('ConflictOptionBackup');
   ETS2ConflictOptionBackup.Checked := True;
 
-  TopPos := TopPos + ScaleY(20);
   ETS2ConflictOptionKeep := TNewRadioButton.Create(WizardForm);
-  ETS2ConflictOptionKeep.Parent := ConflictPage.Surface;
-  ETS2ConflictOptionKeep.Top := TopPos;
-  ETS2ConflictOptionKeep.Left := ScaleX(15);
-  ETS2ConflictOptionKeep.Width := ScaleX(390);
+  ETS2ConflictOptionKeep.Parent := ETS2ConflictPanel;
+  ETS2ConflictOptionKeep.Top := ScaleY(22);
+  ETS2ConflictOptionKeep.Left := ScaleX(10);
+  ETS2ConflictOptionKeep.Width := ScaleX(400);
   ETS2ConflictOptionKeep.Caption := CustomMessage('ConflictOptionKeep');
 
-  TopPos := TopPos + ScaleY(20);
   ETS2ConflictOptionOverwrite := TNewRadioButton.Create(WizardForm);
-  ETS2ConflictOptionOverwrite.Parent := ConflictPage.Surface;
-  ETS2ConflictOptionOverwrite.Top := TopPos;
-  ETS2ConflictOptionOverwrite.Left := ScaleX(15);
-  ETS2ConflictOptionOverwrite.Width := ScaleX(390);
+  ETS2ConflictOptionOverwrite.Parent := ETS2ConflictPanel;
+  ETS2ConflictOptionOverwrite.Top := ScaleY(44);
+  ETS2ConflictOptionOverwrite.Left := ScaleX(10);
+  ETS2ConflictOptionOverwrite.Width := ScaleX(400);
   ETS2ConflictOptionOverwrite.Caption := CustomMessage('ConflictOptionOverwrite');
 
   // ATS Conflict Section
-  TopPos := TopPos + ScaleY(26);
+  TopPos := TopPos + ScaleY(74);
   ATSConflictHeader := TNewStaticText.Create(WizardForm);
   ATSConflictHeader.Parent := ConflictPage.Surface;
   ATSConflictHeader.Top := TopPos;
   ATSConflictHeader.Left := ScaleX(5);
   ATSConflictHeader.Font.Style := [fsBold];
-  ATSConflictHeader.Caption := 'American Truck Simulator:';
+  ATSConflictHeader.Caption := CustomMessage('GameNameATS') + ':';
 
   TopPos := TopPos + ScaleY(18);
+  ATSConflictPanel := TPanel.Create(WizardForm);
+  ATSConflictPanel.Parent := ConflictPage.Surface;
+  ATSConflictPanel.Left := ScaleX(5);
+  ATSConflictPanel.Top := TopPos;
+  ATSConflictPanel.Width := ScaleX(420);
+  ATSConflictPanel.Height := ScaleY(68);
+  ATSConflictPanel.BevelOuter := bvNone;
+  ATSConflictPanel.ParentBackground := True;
+
   ATSConflictOptionBackup := TNewRadioButton.Create(WizardForm);
-  ATSConflictOptionBackup.Parent := ConflictPage.Surface;
-  ATSConflictOptionBackup.Top := TopPos;
-  ATSConflictOptionBackup.Left := ScaleX(15);
-  ATSConflictOptionBackup.Width := ScaleX(390);
+  ATSConflictOptionBackup.Parent := ATSConflictPanel;
+  ATSConflictOptionBackup.Top := ScaleY(0);
+  ATSConflictOptionBackup.Left := ScaleX(10);
+  ATSConflictOptionBackup.Width := ScaleX(400);
   ATSConflictOptionBackup.Caption := CustomMessage('ConflictOptionBackup');
   ATSConflictOptionBackup.Checked := True;
 
-  TopPos := TopPos + ScaleY(20);
   ATSConflictOptionKeep := TNewRadioButton.Create(WizardForm);
-  ATSConflictOptionKeep.Parent := ConflictPage.Surface;
-  ATSConflictOptionKeep.Top := TopPos;
-  ATSConflictOptionKeep.Left := ScaleX(15);
-  ATSConflictOptionKeep.Width := ScaleX(390);
+  ATSConflictOptionKeep.Parent := ATSConflictPanel;
+  ATSConflictOptionKeep.Top := ScaleY(22);
+  ATSConflictOptionKeep.Left := ScaleX(10);
+  ATSConflictOptionKeep.Width := ScaleX(400);
   ATSConflictOptionKeep.Caption := CustomMessage('ConflictOptionKeep');
 
-  TopPos := TopPos + ScaleY(20);
   ATSConflictOptionOverwrite := TNewRadioButton.Create(WizardForm);
-  ATSConflictOptionOverwrite.Parent := ConflictPage.Surface;
-  ATSConflictOptionOverwrite.Top := TopPos;
-  ATSConflictOptionOverwrite.Left := ScaleX(15);
-  ATSConflictOptionOverwrite.Width := ScaleX(390);
+  ATSConflictOptionOverwrite.Parent := ATSConflictPanel;
+  ATSConflictOptionOverwrite.Top := ScaleY(44);
+  ATSConflictOptionOverwrite.Left := ScaleX(10);
+  ATSConflictOptionOverwrite.Width := ScaleX(400);
   ATSConflictOptionOverwrite.Caption := CustomMessage('ConflictOptionOverwrite');
 end;
 
 procedure UpdateConflictPageVisibility();
+var
+  CurTop: Integer;
 begin
+  CurTop := ScaleY(55);
+
   ETS2ConflictHeader.Visible := HasETS2Conflict;
-  ETS2ConflictOptionBackup.Visible := HasETS2Conflict;
-  ETS2ConflictOptionKeep.Visible := HasETS2Conflict;
-  ETS2ConflictOptionOverwrite.Visible := HasETS2Conflict;
+  ETS2ConflictPanel.Visible := HasETS2Conflict;
+
+  if HasETS2Conflict then
+  begin
+    ETS2ConflictHeader.Top := CurTop;
+    CurTop := CurTop + ScaleY(18);
+    ETS2ConflictPanel.Top := CurTop;
+    CurTop := CurTop + ScaleY(72);
+  end;
 
   ATSConflictHeader.Visible := HasATSConflict;
-  ATSConflictOptionBackup.Visible := HasATSConflict;
-  ATSConflictOptionKeep.Visible := HasATSConflict;
-  ATSConflictOptionOverwrite.Visible := HasATSConflict;
+  ATSConflictPanel.Visible := HasATSConflict;
+
+  if HasATSConflict then
+  begin
+    ATSConflictHeader.Top := CurTop;
+    CurTop := CurTop + ScaleY(18);
+    ATSConflictPanel.Top := CurTop;
+  end;
 end;
 
 function ValidateGameWithRunningCheck(var Game: TGameConfig; const PathEditVal: String): Boolean;
