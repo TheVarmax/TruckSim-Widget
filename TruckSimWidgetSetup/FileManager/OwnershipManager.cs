@@ -54,17 +54,13 @@ public static class OwnershipManager
     /// <summary>
     /// Evaluates whether an existing TruckSimWidgetSetup.exe in the application directory
     /// is owned by an existing installation.
-    /// Returns false if target directory is an unmanaged/stale directory without valid installation state.
+    /// STRICT RULE: Only returns true if install-state.json explicitly records it in InstalledFiles.
+    /// Being a valid installation alone is not enough to treat an unrecorded executable as owned.
     /// </summary>
     public static bool IsInstallerExeOwned(string fullPath, InstallationInfo installInfo)
     {
         if (installInfo.ExistingState != null &&
             installInfo.ExistingState.InstalledFiles.Any(f => string.Equals(f.RelativePath, Constants.InstallerExeName, StringComparison.OrdinalIgnoreCase)))
-        {
-            return true;
-        }
-
-        if (installInfo.IsInstalled)
         {
             return true;
         }

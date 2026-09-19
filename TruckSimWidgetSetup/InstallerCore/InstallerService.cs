@@ -291,13 +291,6 @@ public class InstallerService
                 }
             }
 
-            // Ensure owned installer executable is included if installed
-            string targetInstallerExe = Path.Combine(appDir, Constants.InstallerExeName);
-            if (installInfo.IsInstalled && File.Exists(targetInstallerExe) && !ownedFiles.Contains(targetInstallerExe, StringComparer.OrdinalIgnoreCase))
-            {
-                ownedFiles.Add(targetInstallerExe);
-            }
-
             // Delete each owned file. NEVER delete unknown/user files!
             for (int i = 0; i < ownedFiles.Count; i++)
             {
@@ -366,8 +359,10 @@ public class InstallerService
 
             statusText?.Report("Uninstall completed!");
 
-            // 8. Self-delete schedule if running from app directory
-            ScheduleSelfDeleteIfInAppDir(appDir);
+            // 8. Self-delete schedule if running from app directory and verified owned
+            bool isSelfOwned = !string.IsNullOrEmpty(Environment.ProcessPath) &&
+                ownedFiles.Contains(Path.GetFullPath(Environment.ProcessPath), StringComparer.OrdinalIgnoreCase);
+            ScheduleSelfDeleteIfInAppDir(appDir, isSelfOwned);
 
             return true;
         }
@@ -476,8 +471,9 @@ public class InstallerService
         }
     }
 
-    private static void ScheduleSelfDeleteIfInAppDir(string appDir)
+    private static void ScheduleSelfDeleteIfInAppDir(string appDir, bool isOwned)
     {
+        if (!isOwned) return;
         try
         {
             string currentExe = Environment.ProcessPath ?? string.Empty;
