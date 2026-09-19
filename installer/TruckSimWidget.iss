@@ -1,7 +1,18 @@
+// TruckSim Widget Installer Script
+// Overhauled Architecture with Modular Lifecycle, Steam Discovery, and Plugin Ownership
+
 #define MyAppName "TruckSim Widget"
-#define MyAppVersion "1.6.4-beta.1"
+#ifndef MyAppVersion
+  #define MyAppVersion "1.6.4-beta.1"
+#endif
 #define MyAppExeName "TruckSim Widget.exe"
-#define PublishDir "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget (1.6.4-beta.1)"
+
+#ifndef PublishDir
+  #define PublishDir "..\bin\Release\net8.0-windows\win-x64\publish"
+#endif
+#ifndef OutputDir
+  #define OutputDir "..\dist"
+#endif
 
 [Setup]
 AppId={{8F4E6E2C-7F11-4F7D-BD7D-TRUCKSIMWIDGET}
@@ -14,7 +25,7 @@ AppUpdatesURL=https://github.com/TheVarmax/TruckSim-Widget/releases
 DefaultDirName={localappdata}\Programs\TruckSim Widget
 DefaultGroupName=TruckSim Widget
 DisableProgramGroupPage=yes
-OutputDir=C:\Users\mrpry\Desktop\TruckSim Widget\Releases
+OutputDir={#OutputDir}
 OutputBaseFilename=TruckSimWidgetSetup-{#MyAppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -23,6 +34,10 @@ PrivilegesRequired=lowest
 SetupIconFile=..\favicon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 LZMANumBlockThreads=8
+AppMutex=TruckSim_Widget_SingleInstance_Mutex
+SetupMutex=TruckSim_Widget_Installer_Mutex
+SetupLogging=yes
+CloseApplications=no
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -36,28 +51,42 @@ english.OpenPluginFolder=Open telemetry plugin folder
 
 english.TelemetryPageTitle=Telemetry Plugin Setup
 english.TelemetryPageSub=Configure ETS2 and ATS telemetry automatically.
-english.TelemetryPageDesc=TruckSim Widget needs scs-telemetry.dll inside each game's plugins folder. Select the games you want the installer to configure. You can skip this step and install the plugin manually later.
-english.InstallETS2Plugin=Install telemetry plugin for Euro Truck Simulator 2
-english.InstallATSPlugin=Install telemetry plugin for American Truck Simulator
-english.SkipTelemetryPlugin=Skip
+english.TelemetryPageDesc=TruckSim Widget requires scs-telemetry.dll inside each game's plugins folder. Select the games you want the installer to configure:
+english.InstallETS2Plugin=Configure telemetry plugin for Euro Truck Simulator 2
+english.InstallATSPlugin=Configure telemetry plugin for American Truck Simulator
 
-english.GameDirPageTitle=Game folders
-english.GameDirPageSub=Choose the root folders of your installed games.
-english.GameDirPageDesc=Select the game folder that contains bin\win_x64. The installer will create bin\win_x64\plugins if needed and copy scs-telemetry.dll there.
+english.GameDirPageTitle=Game Folders
+english.GameDirPageSub=Verify or choose the root folders of your installed games.
 english.ETS2DirPrompt=Euro Truck Simulator 2 folder:
 english.ATSDirPrompt=American Truck Simulator folder:
-english.PathRequired=Please choose a game folder, or go back and untick this game.
-english.PathLooksWrong=This folder does not look like the selected game folder:%n%n%1%n%nExpected file:%n%2%n%nContinue anyway?
-english.PluginInstallFailed=Could not install the telemetry plugin for %1.%n%nYou can still copy scs-telemetry.dll manually from:%n%2
-english.PluginInstalled=Telemetry plugin installed for %1.
+english.BrowseBtn=Browse...
+english.BrowseETS2Title=Select Euro Truck Simulator 2 Installation Folder
+english.BrowseATSTitle=Select American Truck Simulator Installation Folder
 
-english.CancelSetupTitle=Cancel setup?
-english.CancelSetupMessage=TruckSim Widget has not been fully installed yet.%n%nDo you want to cancel setup?
-english.CancelSetupYes=Cancel setup
-english.CancelSetupNo=Continue installation
+english.ConflictPageTitle=Telemetry Plugin Conflict Resolution
+english.ConflictPageSub=A telemetry plugin is already present in one or more game folders.
+english.ConflictHeader=Attention: Existing Plugin Detected
+english.ConflictDesc=An existing or third-party telemetry plugin was found. Choose how you want the installer to handle it:
+english.ConflictOptionBackup=Backup existing plugin and install TruckSim Widget plugin (Recommended)
+english.ConflictOptionKeep=Keep existing plugin (skip installing Widget plugin for that game)
+english.ConflictOptionOverwrite=Overwrite existing plugin without backup
+
+english.ErrPathEmpty=Please select a game folder, or uncheck this game in the previous step.
+english.ErrDirNotExist=The specified folder does not exist:%n%n%1
+english.ErrBinDirMissing=This folder does not contain bin\win_x64:%n%n%1
+english.ErrExeMissing=Expected game executable was not found in bin\win_x64:%n%n%1\%2
+english.ErrGameRunningPrompt=%1 is currently running (%2).%n%nPlease save your game and close it so the telemetry plugin can be installed cleanly.
+english.ErrTargetDirNotWritable=The selected installation directory is not writable. Please choose another location.
+english.ErrPluginInstallRollback=Could not complete telemetry plugin installation. Actions were rolled back to preserve system consistency.
+
+english.SummaryDestDir=Destination folder:
+english.SummaryPlugins=Telemetry plugin setup:
+english.SummarySkipped=Skipped by user
+english.SummaryConflictAction=Conflict resolution:
+english.UninstallPromptUserData=Do you want to completely remove your user data (settings, logs, trip history, and license token)?%n%nClick 'No' to preserve your settings and data for future use.
 
 english.UpdateWelcome1=Welcome to the TruckSim Widget Update Setup
-english.UpdateWelcome2=This will update TruckSim Widget on your computer.%n%nIt is recommended that you close all other applications before continuing.
+english.UpdateWelcome2=This will update TruckSim Widget on your computer.%n%nYour settings, license token, and trip history will be preserved.
 english.UpdateTitle=TruckSim Widget Update
 
 ukrainian.DesktopIcon=Створити ярлик на робочому столі
@@ -66,29 +95,43 @@ ukrainian.LaunchApp=Запустити TruckSim Widget
 ukrainian.OpenPluginFolder=Відкрити папку плагіна телеметрії
 
 ukrainian.TelemetryPageTitle=Налаштування плагіна телеметрії
-ukrainian.TelemetryPageSub=Автоматично налаштуй телеметрію для ETS2 та ATS.
-ukrainian.TelemetryPageDesc=TruckSim Widget потребує файл scs-telemetry.dll у папці plugins кожної гри. Обери ігри, які інсталятор має налаштувати. Цей крок можна пропустити й встановити плагін вручну пізніше.
-ukrainian.InstallETS2Plugin=Встановити плагін телеметрії для Euro Truck Simulator 2
-ukrainian.InstallATSPlugin=Встановити плагін телеметрії для American Truck Simulator
-ukrainian.SkipTelemetryPlugin=Пропустити
+ukrainian.TelemetryPageSub=Автоматичне налаштування телеметрії для ETS2 та ATS.
+ukrainian.TelemetryPageDesc=TruckSim Widget потребує scs-telemetry.dll у папці plugins кожної гри. Обери ігри для налаштування:
+ukrainian.InstallETS2Plugin=Налаштувати плагін телеметрії для Euro Truck Simulator 2
+ukrainian.InstallATSPlugin=Налаштувати плагін телеметрії для American Truck Simulator
 
 ukrainian.GameDirPageTitle=Папки ігор
-ukrainian.GameDirPageSub=Обери кореневі папки встановлених ігор.
-ukrainian.GameDirPageDesc=Обери папку гри, у якій є bin\win_x64. Інсталятор створить bin\win_x64\plugins, якщо потрібно, і скопіює туди scs-telemetry.dll.
+ukrainian.GameDirPageSub=Перевір або обери кореневі папки встановлених ігор.
 ukrainian.ETS2DirPrompt=Папка Euro Truck Simulator 2:
 ukrainian.ATSDirPrompt=Папка American Truck Simulator:
-ukrainian.PathRequired=Обери папку гри або повернися назад і зніми позначку з цієї гри.
-ukrainian.PathLooksWrong=Ця папка не схожа на папку вибраної гри:%n%n%1%n%nОчікуваний файл:%n%2%n%nПродовжити все одно?
-ukrainian.PluginInstallFailed=Не вдалося встановити плагін телеметрії для %1.%n%nТи все ще можеш скопіювати scs-telemetry.dll вручну з:%n%2
-ukrainian.PluginInstalled=Плагін телеметрії встановлено для %1.
+ukrainian.BrowseBtn=Огляд...
+ukrainian.BrowseETS2Title=Оберіть папку Euro Truck Simulator 2
+ukrainian.BrowseATSTitle=Оберіть папку American Truck Simulator
 
-ukrainian.CancelSetupTitle=Скасувати встановлення?
-ukrainian.CancelSetupMessage=TruckSim Widget ще не встановлено повністю.%n%nСкасувати встановлення?
-ukrainian.CancelSetupYes=Скасувати встановлення
-ukrainian.CancelSetupNo=Продовжити встановлення
+ukrainian.ConflictPageTitle=Вирішення конфлікту плагіна телеметрії
+ukrainian.ConflictPageSub=Плагін телеметрії вже присутній у папці гри.
+ukrainian.ConflictHeader=Увага: виявлено існуючий плагін
+ukrainian.ConflictDesc=Виявлено сторонній або раніше встановлений плагін телеметрії. Обери дію інсталятора:
+ukrainian.ConflictOptionBackup=Створити резервну копію та встановити плагін TruckSim Widget (Рекомендовано)
+ukrainian.ConflictOptionKeep=Залишити поточний плагін (пропустити встановлення для цієї гри)
+ukrainian.ConflictOptionOverwrite=Перезаписати поточний плагін без резервної копії
+
+ukrainian.ErrPathEmpty=Будь ласка, оберіть папку гри або поверніться назад і зніміть позначку.
+ukrainian.ErrDirNotExist=Вказана папка не існує:%n%n%1
+ukrainian.ErrBinDirMissing=Ця папка не містить bin\win_x64:%n%n%1
+ukrainian.ErrExeMissing=Очікуваний файл гри не знайдено в bin\win_x64:%n%n%1\%2
+ukrainian.ErrGameRunningPrompt=%1 зараз запущено (%2).%n%nБудь ласка, збережіть гру та закрийте її, щоб коректно встановити плагін телеметрії.
+ukrainian.ErrTargetDirNotWritable=Цільова папка недоступна для запису. Будь ласка, оберіть інше розташування.
+ukrainian.ErrPluginInstallRollback=Не вдалося завершити встановлення плагіна телеметрії. Зміни скасовано для збереження цілісності системи.
+
+ukrainian.SummaryDestDir=Папка встановлення:
+ukrainian.SummaryPlugins=Налаштування плагінів телеметрії:
+ukrainian.SummarySkipped=Пропущено користувачем
+ukrainian.SummaryConflictAction=Вирішення конфліктів:
+ukrainian.UninstallPromptUserData=Ви бажаєте повністю видалити дані користувача (налаштування, логи, історію рейсів та ліцензійний токен)?%n%nНатисніть «Ні», щоб зберегти ваші налаштування для майбутнього використання.
 
 ukrainian.UpdateWelcome1=Ласкаво просимо до оновлення TruckSim Widget
-ukrainian.UpdateWelcome2=Ця програма оновить TruckSim Widget на вашому комп'ютері.%n%nРекомендується закрити всі інші програми перед продовженням.
+ukrainian.UpdateWelcome2=Ця програма оновить TruckSim Widget на вашому комп'ютері.%n%nВаші налаштування, ліцензія та історія рейсів будуть збережені.
 ukrainian.UpdateTitle=Оновлення TruckSim Widget
 
 [Tasks]
@@ -107,99 +150,101 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--updated"; Description: "{cm:La
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchApp}"; Flags: nowait postinstall skipifsilent; Check: not IsUpdateMode
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}\Resources"
-Type: filesandordirs; Name: "{app}"
+Type: dirifempty; Name: "{app}\Resources"
 
 [Code]
-var
-  TelemetryPage: TInputOptionWizardPage;
-  GameDirPage: TInputDirWizardPage;
-  SkipButton: TNewButton;
-  SkipValidation: Boolean;
+#include "scripts\CommonTypes.iss"
+#include "scripts\Diagnostics.iss"
+#include "scripts\SteamDetection.iss"
+#include "scripts\GameValidation.iss"
+#include "scripts\PluginOwnership.iss"
+#include "scripts\WizardPages.iss"
+#include "scripts\UninstallLogic.iss"
 
-function IsUpdateMode(): Boolean;
+function InitializeSetup(): Boolean;
 begin
-  Result := Pos('--update', GetCmdTail) > 0;
+  Result := True;
+  InitInstallerLogging('{#MyAppVersion}');
 end;
-
-function CombinePath(BasePath: String; RelativePath: String): String;
-begin
-  Result := AddBackslash(BasePath) + RelativePath;
-end;
-
-function GetSteamInstallPath(): String;
-begin
-  Result := '';
-
-  if RegQueryStringValue(HKLM, 'SOFTWARE\WOW6432Node\Valve\Steam', 'InstallPath', Result) then exit;
-  if RegQueryStringValue(HKLM, 'SOFTWARE\Valve\Steam', 'InstallPath', Result) then exit;
-  if RegQueryStringValue(HKCU, 'Software\Valve\Steam', 'SteamPath', Result) then exit;
-end;
-
-function IsValidGamePath(GamePath: String; ExpectedExe: String): Boolean;
-begin
-  Result := (GamePath <> '') and FileExists(CombinePath(GamePath, 'bin\win_x64\' + ExpectedExe));
-end;
-
-function TryGameDir(BasePath: String; GameFolderName: String; ExpectedExe: String; var FoundPath: String): Boolean;
-var
-  Candidate: String;
-begin
-  Result := False;
-
-  if BasePath = '' then
-    exit;
-
-  Candidate := CombinePath(BasePath, 'steamapps\common\' + GameFolderName);
-
-  if IsValidGamePath(Candidate, ExpectedExe) then
-  begin
-    FoundPath := Candidate;
-    Result := True;
-  end;
-end;
-
-function DetectGameDir(GameFolderName: String; ExpectedExe: String): String;
-var
-  SteamPath: String;
-begin
-  Result := '';
-
-  SteamPath := GetSteamInstallPath();
-
-  if TryGameDir(SteamPath, GameFolderName, ExpectedExe, Result) then exit;
-  if TryGameDir(ExpandConstant('{pf}\Steam'), GameFolderName, ExpectedExe, Result) then exit;
-  if TryGameDir(ExpandConstant('{pf32}\Steam'), GameFolderName, ExpectedExe, Result) then exit;
-
-  if TryGameDir('D:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
-  if TryGameDir('E:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
-  if TryGameDir('F:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
-  if TryGameDir('G:\SteamLibrary', GameFolderName, ExpectedExe, Result) then exit;
-end;
-
-procedure SkipButtonClick(Sender: TObject);
-begin
-  if WizardForm.CurPageID = TelemetryPage.ID then
-  begin
-    TelemetryPage.Values[0] := False;
-    TelemetryPage.Values[1] := False;
-    WizardForm.NextButton.OnClick(WizardForm.NextButton);
-  end
-  else if WizardForm.CurPageID = GameDirPage.ID then
-  begin
-    SkipValidation := True;
-    WizardForm.NextButton.OnClick(WizardForm.NextButton);
-    SkipValidation := False;
-  end;
-end;
-
-
 
 procedure InitializeWizard();
 var
-  RegPath: String;
+  ETS2Candidates, ATSCandidates: TArrayOfString;
+  RegVal: String;
+  HasSavedState: Boolean;
 begin
-  SkipValidation := False;
+  ApplyWidgetTheme();
+
+  // Initialize Game Config records
+  GlobalETS2Config.GameId := GAME_ETS2;
+  GlobalETS2Config.DisplayName := 'Euro Truck Simulator 2';
+  GlobalETS2Config.ExeName := GAME_EXE_ETS2;
+  GlobalETS2Config.DefaultFolderName := GAME_DIRNAME_ETS2;
+  GlobalETS2Config.SteamAppId := STEAM_APPID_ETS2;
+  GlobalETS2Config.ConflictAction := CONFLICT_ACTION_BACKUP_REPLACE;
+
+  GlobalATSConfig.GameId := GAME_ATS;
+  GlobalATSConfig.DisplayName := 'American Truck Simulator';
+  GlobalATSConfig.ExeName := GAME_EXE_ATS;
+  GlobalATSConfig.DefaultFolderName := GAME_DIRNAME_ATS;
+  GlobalATSConfig.SteamAppId := STEAM_APPID_ATS;
+  GlobalATSConfig.ConflictAction := CONFLICT_ACTION_BACKUP_REPLACE;
+
+  // Detect previous install dir
+  InitialUpdateDir := '';
+  if RegQueryStringValue(HKCU, 'Software\Microsoft\Windows\CurrentVersion\Uninstall\{8F4E6E2C-7F11-4F7D-BD7D-TRUCKSIMWIDGET}_is1', 'InstallLocation', RegVal) then
+    InitialUpdateDir := NormalizePath(RegVal);
+
+  // Read existing canonical state if present
+  HasSavedState := ReadJsonStateFile(GlobalETS2Config, GlobalATSConfig);
+
+  // Auto-detect games via Steam pipeline
+  GlobalETS2Config.DetectedPath := DetectGameInstallation(GAME_ETS2, STEAM_APPID_ETS2, GAME_EXE_ETS2, GAME_DIRNAME_ETS2, ETS2Candidates);
+  GlobalATSConfig.DetectedPath := DetectGameInstallation(GAME_ATS, STEAM_APPID_ATS, GAME_EXE_ATS, GAME_DIRNAME_ATS, ATSCandidates);
+
+  // Preference order: 1) Saved path, 2) Legacy registry path, 3) Auto-detected path
+  if GlobalETS2Config.SelectedPath = '' then
+  begin
+    if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2Path', RegVal) and (RegVal <> '') then
+      GlobalETS2Config.SelectedPath := NormalizePath(RegVal)
+    else
+      GlobalETS2Config.SelectedPath := GlobalETS2Config.DetectedPath;
+  end;
+
+  if GlobalATSConfig.SelectedPath = '' then
+  begin
+    if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPath', RegVal) and (RegVal <> '') then
+      GlobalATSConfig.SelectedPath := NormalizePath(RegVal)
+    else
+      GlobalATSConfig.SelectedPath := GlobalATSConfig.DetectedPath;
+  end;
+
+  // If user hadn't explicitly chosen before, default to true if game detected
+  if not HasSavedState then
+  begin
+    GlobalETS2Config.UserSelected := GlobalETS2Config.SelectedPath <> '';
+    GlobalATSConfig.UserSelected := GlobalATSConfig.SelectedPath <> '';
+  end;
+
+  // Create UI Pages
+  PluginOptionsPage := CreateInputOptionPage(
+    wpSelectDir,
+    CustomMessage('TelemetryPageTitle'),
+    CustomMessage('TelemetryPageSub'),
+    CustomMessage('TelemetryPageDesc'),
+    False,
+    False
+  );
+  PluginOptionsPage.Add(CustomMessage('InstallETS2Plugin'));
+  PluginOptionsPage.Add(CustomMessage('InstallATSPlugin'));
+  PluginOptionsPage.Values[0] := GlobalETS2Config.UserSelected;
+  PluginOptionsPage.Values[1] := GlobalATSConfig.UserSelected;
+
+  CreateGameConfigControls();
+  ETS2PathEdit.Text := GlobalETS2Config.SelectedPath;
+  ATSPathEdit.Text := GlobalATSConfig.SelectedPath;
+
+  CreateConflictResolutionControls();
 
   if IsUpdateMode() then
   begin
@@ -207,263 +252,90 @@ begin
     WizardForm.WelcomeLabel1.Caption := CustomMessage('UpdateWelcome1');
     WizardForm.WelcomeLabel2.Caption := CustomMessage('UpdateWelcome2');
   end;
-
-  TelemetryPage := CreateInputOptionPage(
-    wpSelectTasks,
-    CustomMessage('TelemetryPageTitle'),
-    CustomMessage('TelemetryPageSub'),
-    CustomMessage('TelemetryPageDesc'),
-    False,
-    False
-  );
-
-  TelemetryPage.Add(CustomMessage('InstallETS2Plugin'));
-  TelemetryPage.Add(CustomMessage('InstallATSPlugin'));
-
-  GameDirPage := CreateInputDirPage(
-    TelemetryPage.ID,
-    CustomMessage('GameDirPageTitle'),
-    CustomMessage('GameDirPageSub'),
-    CustomMessage('GameDirPageDesc'),
-    False,
-    ''
-  );
-
-  GameDirPage.Add(CustomMessage('ETS2DirPrompt'));
-  GameDirPage.Add(CustomMessage('ATSDirPrompt'));
-
-  GameDirPage.Values[0] := DetectGameDir('Euro Truck Simulator 2', 'eurotrucks2.exe');
-  if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2Path', RegPath) and IsValidGamePath(RegPath, 'eurotrucks2.exe') then
-    GameDirPage.Values[0] := RegPath;
-
-  GameDirPage.Values[1] := DetectGameDir('American Truck Simulator', 'amtrucks.exe');
-  if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPath', RegPath) and IsValidGamePath(RegPath, 'amtrucks.exe') then
-    GameDirPage.Values[1] := RegPath;
-
-  TelemetryPage.Values[0] := GameDirPage.Values[0] <> '';
-  TelemetryPage.Values[1] := GameDirPage.Values[1] <> '';
-
-  SkipButton := TNewButton.Create(WizardForm);
-  SkipButton.Parent := WizardForm;
-  SkipButton.Caption := CustomMessage('SkipTelemetryPlugin');
-  SkipButton.Width := WizardForm.NextButton.Width;
-  SkipButton.Height := WizardForm.NextButton.Height;
-  SkipButton.Visible := False;
-  SkipButton.OnClick := @SkipButtonClick;
-end;
-
-procedure CurPageChanged(CurPageID: Integer);
-var
-  Gap: Integer;
-begin
-  Gap := ScaleX(8);
-
-  SkipButton.Visible :=
-    (CurPageID = TelemetryPage.ID) or
-    (CurPageID = GameDirPage.ID);
-
-  if SkipButton.Visible then
-  begin
-    SkipButton.Top := WizardForm.NextButton.Top;
-
-    SkipButton.Left :=
-      WizardForm.NextButton.Left -
-      SkipButton.Width -
-      Gap;
-
-    WizardForm.BackButton.Left :=
-      SkipButton.Left -
-      WizardForm.BackButton.Width -
-      Gap;
-  end;
 end;
 
 function ShouldSkipPage(PageID: Integer): Boolean;
 begin
-  Result := False;
-
-  if IsUpdateMode() then
-  begin
-    if (PageID = TelemetryPage.ID) or (PageID = GameDirPage.ID) then
-    begin
-      Result := True;
-      exit;
-    end;
-  end;
-
-  if PageID = GameDirPage.ID then
-    Result :=
-      ((not TelemetryPage.Values[0]) and
-       (not TelemetryPage.Values[1]));
-end;
-
-
-function ValidateGamePath(GamePath: String; ExpectedExe: String): Boolean;
-var
-  ExpectedPath: String;
-begin
-  Result := True;
-
-  if GamePath = '' then
-  begin
-    MsgBox(CustomMessage('PathRequired'), mbError, MB_OK);
-    Result := False;
-    exit;
-  end;
-
-  ExpectedPath := CombinePath(GamePath, 'bin\win_x64\' + ExpectedExe);
-
-  if not FileExists(ExpectedPath) then
-    Result :=
-      MsgBox(
-        Format(CustomMessage('PathLooksWrong'), [GamePath, ExpectedPath]),
-        mbConfirmation,
-        MB_YESNO
-      ) = IDYES;
+  Result := WizardShouldSkipPage(PageID);
 end;
 
 function NextButtonClick(CurPageID: Integer): Boolean;
 begin
-  Result := True;
-
-  if CurPageID = GameDirPage.ID then
-  begin
-    if SkipValidation then
-    begin
-      if TelemetryPage.Values[0] and not IsValidGamePath(GameDirPage.Values[0], 'eurotrucks2.exe') then
-        TelemetryPage.Values[0] := False;
-
-      if TelemetryPage.Values[1] and not IsValidGamePath(GameDirPage.Values[1], 'amtrucks.exe') then
-        TelemetryPage.Values[1] := False;
-
-      Result := True;
-      exit;
-    end;
-
-    if TelemetryPage.Values[0] then
-      Result := ValidateGamePath(GameDirPage.Values[0], 'eurotrucks2.exe');
-
-    if Result and TelemetryPage.Values[1] then
-      Result := ValidateGamePath(GameDirPage.Values[1], 'amtrucks.exe');
-  end;
+  Result := HandleNextButtonClick(CurPageID);
 end;
 
-procedure InstallTelemetryPlugin(GamePrefix: String; GameName: String; GamePath: String);
-var
-  SourceFile: String;
-  TargetDir: String;
-  TargetFile: String;
-  ExistedBefore: Boolean;
-  AlreadyOwned: Boolean;
-  OwnedPath: String;
+function UpdateReadyMemo(Space, NewLine, MemoUserInfoInfo, MemoDirInfo, MemoTypeInfo, MemoComponentsInfo, MemoGroupInfo, MemoTasksInfo: String): String;
 begin
-  SourceFile := ExpandConstant('{app}\plugin\scs-telemetry.dll');
-  TargetDir := CombinePath(GamePath, 'bin\win_x64\plugins');
-  TargetFile := CombinePath(TargetDir, 'scs-telemetry.dll');
-
-  if not ForceDirectories(TargetDir) then
-  begin
-    MsgBox(
-      Format(CustomMessage('PluginInstallFailed'), [GameName, ExpandConstant('{app}\plugin')]),
-      mbError,
-      MB_OK
-    );
-    exit;
-  end;
-
-  ExistedBefore := FileExists(TargetFile);
-  AlreadyOwned := False;
-  
-  if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', GamePrefix + 'PluginOwnedPath', OwnedPath) then
-  begin
-    if CompareText(OwnedPath, TargetFile) = 0 then
-      AlreadyOwned := True;
-  end;
-
-  if ExistedBefore then
-  begin
-    if not AlreadyOwned then
-    begin
-      Log(Format('Skipping unowned plugin for %s: %s', [GameName, TargetFile]));
-      exit;
-    end
-    else
-    begin
-      if not DeleteFile(TargetFile) then
-      begin
-        MsgBox(
-          Format(CustomMessage('PluginInstallFailed'), [GameName, ExpandConstant('{app}\plugin')]),
-          mbError,
-          MB_OK
-        );
-        exit;
-      end;
-    end;
-  end;
-
-  if FileCopy(SourceFile, TargetFile, False) then
-  begin
-    RegWriteStringValue(HKCU, 'Software\TruckSim Widget', GamePrefix + 'PluginOwnedPath', TargetFile);
-    Log(Format(CustomMessage('PluginInstalled'), [GameName]));
-  end
-  else
-  begin
-    MsgBox(
-      Format(CustomMessage('PluginInstallFailed'), [GameName, ExpandConstant('{app}\plugin')]),
-      mbError,
-      MB_OK
-    );
-  end;
+  Result := BuildReadySummary();
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
+var
+  LegacyStateFile: String;
+  CanonicalStateFile: String;
+  SourcePluginFile: String;
+  InstallSuccess: Boolean;
 begin
-  if CurStep = ssPostInstall then
+  if CurStep = ssInstall then
   begin
-    // Install telemetry plugins only if they are checked
-    if TelemetryPage.Values[0] then
+    // Migration: Check legacy {app}\state.dat
+    LegacyStateFile := CombinePath(WizardDirValue(), 'state.dat');
+    CanonicalStateFile := GetCanonicalStateDatPath();
+
+    if SafeFileExists(LegacyStateFile) and not SafeFileExists(CanonicalStateFile) then
     begin
-      InstallTelemetryPlugin('ETS2', 'Euro Truck Simulator 2', GameDirPage.Values[0]);
-      RegWriteStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2Path', GameDirPage.Values[0]);
+      try
+        if not SafeDirExists(GetAppDataWidgetDir()) then
+          ForceDirectories(GetAppDataWidgetDir());
+        if CopyFile(LegacyStateFile, CanonicalStateFile, False) then
+          LogInfo('Migrated legacy state.dat to canonical location: ' + CanonicalStateFile);
+      except
+        LogWarn('Failed to copy legacy state.dat during ssInstall.');
+      end;
+    end;
+  end
+  else if CurStep = ssPostInstall then
+  begin
+    SourcePluginFile := CombinePath(CombinePath(WizardDirValue(), 'plugin'), PLUGIN_FILENAME);
+    BundledPluginHash := GetFileSha256Safe(SourcePluginFile);
+    LogInfo('Bundled plugin SHA-256: ' + BundledPluginHash);
+
+    InitRollbackStack();
+    InstallSuccess := True;
+
+    // ETS2 plugin installation
+    if GlobalETS2Config.UserSelected then
+    begin
+      if not InstallPluginForGame(GlobalETS2Config, SourcePluginFile) then
+        InstallSuccess := False;
     end;
 
-    if TelemetryPage.Values[1] then
+    // ATS plugin installation
+    if InstallSuccess and GlobalATSConfig.UserSelected then
     begin
-      InstallTelemetryPlugin('ATS', 'American Truck Simulator', GameDirPage.Values[1]);
-      RegWriteStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPath', GameDirPage.Values[1]);
+      if not InstallPluginForGame(GlobalATSConfig, SourcePluginFile) then
+        InstallSuccess := False;
+    end;
+
+    if not InstallSuccess then
+    begin
+      LogErr('Plugin installation encountered an error. Initiating rollback.');
+      ExecuteRollback();
+      MsgBox(CustomMessage('ErrPluginInstallRollback'), mbError, MB_OK);
+    end
+    else
+    begin
+      // Save canonical state
+      SaveJsonStateFile('{#MyAppVersion}', WizardDirValue(), GlobalETS2Config, GlobalATSConfig);
+      LogInfo('Installation and plugin setup completed successfully.');
     end;
   end;
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  OwnedPath: String;
-  WidgetLocalAppData: String;
 begin
   if CurUninstallStep = usUninstall then
   begin
-    // Remove ETS2 plugin if owned
-    if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ETS2PluginOwnedPath', OwnedPath) then
-    begin
-      if FileExists(OwnedPath) then
-        DeleteFile(OwnedPath);
-    end;
-
-    // Remove ATS plugin if owned
-    if RegQueryStringValue(HKCU, 'Software\TruckSim Widget', 'ATSPluginOwnedPath', OwnedPath) then
-    begin
-      if FileExists(OwnedPath) then
-        DeleteFile(OwnedPath);
-    end;
-  end
-  else if CurUninstallStep = usPostUninstall then
-  begin
-    // Clean up Registry
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\TruckSim Widget');
-
-    // Clean up LocalAppData
-    WidgetLocalAppData := ExpandConstant('{localappdata}\TruckSimWidget');
-    if DirExists(WidgetLocalAppData) then
-      DelTree(WidgetLocalAppData, True, True, True);
+    ExecuteUninstallCleanup();
   end;
 end;

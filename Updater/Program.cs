@@ -60,6 +60,7 @@ static class Program
             string appExe = args[3];
             logPath = args[4];
             string language = args[5]; // "uk" или "en"
+            string expectedSha256 = args.Length > 6 ? args[6] : "";
 
             WriteLog(logPath, "=== UPDATER STARTED ===");
             WriteLog(logPath, $"Download URL: {downloadUrl}");
@@ -67,9 +68,11 @@ static class Program
             WriteLog(logPath, $"App dir: {appDir}");
             WriteLog(logPath, $"App exe: {appExe}");
             WriteLog(logPath, $"Language: {language}");
+            if (!string.IsNullOrEmpty(expectedSha256))
+                WriteLog(logPath, $"Expected SHA-256: {expectedSha256}");
 
             // Запускаем форму обновления
-            Application.Run(new UpdateForm(downloadUrl, assetName, appDir, appExe, logPath, language));
+            Application.Run(new UpdateForm(downloadUrl, assetName, appDir, appExe, logPath, language, expectedSha256));
         }
         catch (Exception ex)
         {
@@ -90,6 +93,7 @@ static class Program
         private readonly string _appExe;
         private readonly string _logPath;
         private readonly string _lang;
+        private readonly string _expectedSha256;
 
         private Label _titleLabel = null!;
         private Label _statusLabel = null!;
@@ -101,7 +105,7 @@ static class Program
         private int _dotCount = 0;
         private string _currentStatusBase = "";
 
-        public UpdateForm(string downloadUrl, string assetName, string appDir, string appExe, string logPath, string language)
+        public UpdateForm(string downloadUrl, string assetName, string appDir, string appExe, string logPath, string language, string expectedSha256 = "")
         {
             _downloadUrl = downloadUrl;
             _assetName = assetName;
@@ -109,6 +113,7 @@ static class Program
             _appExe = appExe;
             _logPath = logPath;
             _lang = language;
+            _expectedSha256 = expectedSha256;
 
             InitializeUI();
         }
@@ -263,11 +268,11 @@ static class Program
                 SetStatus(_lang == "uk" ? "Очікування закриття програми" : "Waiting for app to close", true);
                 WriteLog(_logPath, "Waiting for main application to close...");
 
-                await Task.Run(() => WaitForProcessToExit("TruckSim Widget", timeoutSeconds: 30));
+                await Task.Run(() => WaitForProcessToExit("TruckSim Widget", timeoutSeconds: 30, _lang));
                 WriteLog(_logPath, "Main application closed.");
 
                 // Шаг 2: Скачиваем
-                SetStep(2, 3);
+                SetStep(2, 4);
                 SetStatus(_lang == "uk" ? "Завантаження оновлення" : "Downloading update", true);
                 WriteLog(_logPath, $"Downloading installer from: {_downloadUrl}");
 
@@ -284,8 +289,41 @@ static class Program
                 await DownloadWithProgressAsync(_downloadUrl, installerPath);
                 WriteLog(_logPath, $"Download complete: {new FileInfo(installerPath).Length} bytes");
 
-                // Шаг 3: Запускаем установщик
-                SetStep(3, 3);
+                // Шаг 3: Проверяем целостность скачанного инсталятора
+                SetStep(3, 4);
+                SetStatus(_lang == "uk" ? "Перевірка цілісності інсталятора" : "Verifying installer integrity", false);
+
+                string downloadedHash = "";
+                using (var sha = System.Security.Cryptography.SHA256.Create())
+                using (var stream = File.OpenRead(installerPath))
+                {
+                    byte[] hashBytes = sha.ComputeHash(stream);
+                    downloadedHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
+                }
+                WriteLog(_logPath, $"Downloaded installer SHA-256: {downloadedHash}");
+
+                if (!string.IsNullOrWhiteSpace(_expectedSha256))
+                {
+                    if (!string.Equals(downloadedHash, _expectedSha256.Trim(), StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            _lang == "uk"
+                                ? $"Помилка цілісності інсталятора (SHA-256 не збігається).\nОчікувано: {_expectedSha256}\nОтримано: {downloadedHash}"
+                                : $"Installer integrity check failed (SHA-256 mismatch).\nExpected: {_expectedSha256}\nActual: {downloadedHash}");
+                    }
+                    WriteLog(_logPath, "SHA-256 integrity check passed.");
+                }
+
+                if (!IsValidExecutable(installerPath))
+                {
+                    throw new InvalidOperationException(
+                        _lang == "uk"
+                            ? "Завантажений файл не є коректним інсталятором Windows або пошкоджений."
+                            : "Downloaded file is not a valid Windows installer or is corrupted.");
+                }
+
+                // Шаг 4: Запускаем установщик
+                SetStep(4, 4);
                 SetStatus(_lang == "uk" ? "Запуск інсталятора" : "Launching installer", true);
                 SetProgress(100);
 
@@ -434,31 +472,73 @@ static class Program
     }
 
     /// <summary>
-    /// Ждёт завершения процесса по имени с таймаутом
+    /// Ждёт завершения процесса по имени с таймаутом без принудительного убийства
     /// </summary>
-    private static void WaitForProcessToExit(string processName, int timeoutSeconds)
+    private static void WaitForProcessToExit(string processName, int timeoutSeconds, string lang)
     {
-        var stopwatch = Stopwatch.StartNew();
-        while (stopwatch.Elapsed.TotalSeconds < timeoutSeconds)
+        bool isUk = lang == "uk";
+        while (true)
         {
-            var processes = Process.GetProcessesByName(processName);
-            if (processes.Length == 0)
-                return;
-
-            foreach (var p in processes)
+            var stopwatch = Stopwatch.StartNew();
+            while (stopwatch.Elapsed.TotalSeconds < timeoutSeconds)
             {
-                try { p.WaitForExit(1000); } catch { }
-                p.Dispose();
+                var processes = Process.GetProcessesByName(processName);
+                if (processes.Length == 0)
+                    return;
+
+                foreach (var p in processes)
+                {
+                    try { p.WaitForExit(1000); } catch { }
+                    p.Dispose();
+                }
+
+                Thread.Sleep(500);
             }
 
-            Thread.Sleep(500);
-        }
+            // Таймаут истек — проверяем, работает ли еще процесс
+            var remaining = Process.GetProcessesByName(processName);
+            if (remaining.Length == 0)
+                return;
 
-        // Если таймаут — пробуем убить процесс
-        foreach (var p in Process.GetProcessesByName(processName))
+            foreach (var p in remaining) p.Dispose();
+
+            string title = isUk ? "Очікування закриття TruckSim Widget" : "Waiting for TruckSim Widget";
+            string msg = isUk
+                ? "TruckSim Widget все ще працює. Будь ласка, закрийте програму перед оновленням.\n\nНатисніть «Повторити» після закриття програми або «Скасувати» для скасування оновлення."
+                : "TruckSim Widget is still running. Please close the application before updating.\n\nClick 'Retry' once the application is closed or 'Cancel' to abort update.";
+
+            var dialogResult = MessageBox.Show(msg, title, MessageBoxButtons.RetryCancel, MessageBoxIcon.Warning);
+            if (dialogResult == DialogResult.Cancel)
+            {
+                throw new OperationCanceledException(isUk
+                    ? "Оновлення скасовано користувачем: програма TruckSim Widget не була закрита."
+                    : "Update cancelled by user: TruckSim Widget application was not closed.");
+            }
+        }
+    }
+
+    /// <summary>
+    /// Проверяет, что скачанный файл является валидным Windows PE-файлом
+    /// </summary>
+    private static bool IsValidExecutable(string path)
+    {
+        try
         {
-            try { p.Kill(); p.WaitForExit(5000); } catch { }
-            p.Dispose();
+            var fi = new FileInfo(path);
+            if (!fi.Exists || fi.Length < 1024 * 1024)
+                return false;
+
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            var buffer = new byte[2];
+            if (fs.Read(buffer, 0, 2) != 2)
+                return false;
+
+            // Проверка сигнатуры 'MZ'
+            return buffer[0] == 0x4D && buffer[1] == 0x5A;
+        }
+        catch
+        {
+            return false;
         }
     }
 

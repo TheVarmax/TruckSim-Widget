@@ -219,7 +219,7 @@ The initial setup takes a minute and only needs to be completed once:
 
 1. Download either the **Installer** or the **Portable ZIP** from the latest release.
 2. Install the app or extract the portable archive to a permanent folder.
-3. **Installer:** on the **Telemetry Plugin Setup** page, choose ETS2 and/or ATS, or skip plugin setup for now. The installer can detect common Steam libraries, including locations such as `D:\SteamLibrary`, and you can choose the game folder manually when needed.
+3. **Installer:** on the **Telemetry Plugin Setup** page, choose ETS2 and/or ATS, or skip plugin setup for now. The installer automatically discovers your games across all Steam libraries and drives (including secondary drives like `D:\SteamLibrary`), validates game directories, detects running game processes, and safely manages existing plugins.
 4. **Portable ZIP:** copy `scs-telemetry.dll` from the included `plugin` folder into your game's `plugins` folder manually.
 5. Start TrucksBook Client and sign in.
 6. Launch ETS2 or ATS, then start TruckSim Widget.
@@ -243,7 +243,7 @@ Open the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/
 
 | Format | Best for | What to do |
 | --- | --- | --- |
-| **Installer (recommended)** `TruckSimWidgetSetup-<version>.exe` | Most users | Run the setup, choose an installation folder, and optionally configure the telemetry plugin for ETS2 and/or ATS during setup. The installer creates Windows shortcuts and an uninstall entry. |
+| **Installer (recommended)** `TruckSimWidgetSetup-<version>.exe` | Most users | Run the setup, choose an installation folder, and optionally configure the telemetry plugin for ETS2 and/or ATS during setup. The installer detects games across all Steam libraries, handles conflicts safely, creates Windows shortcuts, and provides clean uninstallation. |
 | **Portable ZIP** `TruckSimWidget-<version>.zip` | Users who prefer not to install the app | Extract the entire archive to a permanent folder and keep its files together. The telemetry plugin must be copied manually. *(Note: 1.5.9 is the final release to support the Portable format).* |
 
 > **Important:** Do not run the portable version from inside the ZIP archive. Extract it first.
@@ -254,19 +254,20 @@ TruckSim Widget needs `scs-telemetry.dll` inside the `plugins` folder of each ga
 
 #### Installer
 
-The installer includes a **Telemetry Plugin Setup** page. You can:
+The installer provides comprehensive and safe game and plugin management:
 
-- install the plugin for **Euro Truck Simulator 2**;
-- install the plugin for **American Truck Simulator**;
-- skip the plugin step and configure it manually later.
+- **Automatic Multi-Library Discovery**: Searches Steam registry keys, parses all libraries defined in `libraryfolders.vdf`, verifies `appmanifest_*.acf` entries, and scans fixed drives so games on secondary drives (e.g. `D:\SteamLibrary`) are detected automatically.
+- **Game Directory Validation**: Verifies the directory structure (ensuring `bin\win_x64` exists) and checks if the game is currently running before applying changes.
+- **Smart Plugin Ownership & Conflict Resolution**:
+  - Tracks plugin ownership via metadata (`install-state.json`).
+  - If a foreign or unknown plugin is present, prompts you with safe options: **Backup and replace** (saves a `.trucksim_backup` copy), **Keep existing**, or **Overwrite**.
+  - On application updates (`--update`), owned plugins are updated automatically without overwriting third-party telemetry tools.
+- **Clean, Non-Destructive Uninstall**:
+  - Removes only files belonging to TruckSim Widget.
+  - Automatically restores `.trucksim_backup` files if a backup was made during installation.
+  - Asks whether to keep or remove your user data and trip logbook (`%LOCALAPPDATA%\TruckSimWidget`).
 
-The installer first checks common Steam locations, including custom libraries such as:
-
-```text
-D:\SteamLibrary\steamapps\common\American Truck Simulator
-```
-
-If it does not find a game, choose the game's root folder manually. It is the folder containing `bin\win_x64`, for example:
+If the installer does not find a game automatically, you can browse to the game's root folder manually. It is the folder containing `bin\win_x64`, for example:
 
 ```text
 ...\Steam\steamapps\common\Euro Truck Simulator 2

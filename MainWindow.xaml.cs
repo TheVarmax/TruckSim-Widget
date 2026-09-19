@@ -405,7 +405,17 @@ namespace ETSOverlay
             string folder = Path.Combine(appData, "TruckSimWidget");
             if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
 
-            stateFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "state.dat");
+            string canonicalStatePath = Path.Combine(folder, "state.dat");
+            string legacyStatePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "state.dat");
+            if (!File.Exists(canonicalStatePath) && File.Exists(legacyStatePath))
+            {
+                try
+                {
+                    File.Copy(legacyStatePath, canonicalStatePath, overwrite: false);
+                }
+                catch { }
+            }
+            stateFilePath = canonicalStatePath;
             appLogFilePath = Path.Combine(folder, "app_log.txt");
 
             WriteLog("=== OVERLAY STARTED ===");
