@@ -10,6 +10,8 @@
 #ifndef PublishDir
   #define PublishDir "..\bin\Release\net8.0-windows\win-x64\publish"
 #endif
+#define ElevatedHelperFile AddBackslash(PublishDir) + "ElevatedHelper.exe"
+#define ElevatedHelperSha256 LowerCase(GetSHA256OfFile(ElevatedHelperFile))
 #ifndef OutputDir
   #define OutputDir "..\dist"
 #endif
@@ -48,6 +50,8 @@ english.DesktopIcon=Create a desktop shortcut
 english.AdditionalShortcuts=Additional shortcuts:
 english.LaunchApp=Launch TruckSim Widget
 english.OpenPluginFolder=Open telemetry plugin folder
+english.ErrElevatedHelperCorrupt=Security error: ElevatedHelper.exe failed integrity verification. Installation aborted.
+ukrainian.ErrElevatedHelperCorrupt=Помилка безпеки: ElevatedHelper.exe не пройшов перевірку цілісності. Встановлення скасовано.
 
 english.TelemetryPageTitle=Telemetry Plugin Setup
 english.TelemetryPageSub=Configure ETS2 and ATS telemetry automatically.
@@ -164,10 +168,20 @@ Type: dirifempty; Name: "{app}\Resources"
 #include "scripts\UninstallLogic.iss"
 
 function InitializeSetup(): Boolean;
+var
+  TmpHelper: String;
 begin
   Result := True;
   InitInstallerLogging('{#MyAppVersion}');
   ExtractTemporaryFile('ElevatedHelper.exe');
+  TmpHelper := ExpandConstant('{tmp}\ElevatedHelper.exe');
+  if not VerifyElevatedHelperIntegrity(TmpHelper) then
+  begin
+    LogErr('ElevatedHelper.exe failed SHA-256 integrity verification after extraction! Aborting.');
+    MsgBox(CustomMessage('ErrElevatedHelperCorrupt'), mbCriticalError, MB_OK);
+    Result := False;
+    exit;
+  end;
   CheckAndExecuteCrashRecovery();
 end;
 

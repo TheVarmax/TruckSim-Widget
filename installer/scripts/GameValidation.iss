@@ -131,7 +131,17 @@ begin
   Result := True;
 end;
 
-function ExecuteElevatedHelper(const Operation, Path1, Path2: String): Boolean;
+function ExtractGameRootFromPath(const P: String): String;
+var
+  Idx: Integer;
+begin
+  Result := '';
+  Idx := Pos('\bin\win_x64\plugins', LowerCase(P));
+  if Idx > 0 then
+    Result := Copy(P, 1, Idx - 1);
+end;
+
+function ExecuteElevatedHelperWithRoot(const Operation, Path1, Path2, AllowRoot: String): Boolean;
 var
   HelperExe: String;
   CmdParams: String;
@@ -146,10 +156,19 @@ begin
     exit;
   end;
 
+  if not VerifyElevatedHelperIntegrity(HelperExe) then
+  begin
+    LogErr('ElevatedHelper.exe failed SHA-256 integrity verification! Aborting execution.');
+    exit;
+  end;
+
   if Path2 <> '' then
     CmdParams := Operation + ' "' + Path1 + '" "' + Path2 + '"'
   else
     CmdParams := Operation + ' "' + Path1 + '"';
+
+  if AllowRoot <> '' then
+    CmdParams := CmdParams + ' --allow-root "' + AllowRoot + '"';
 
   LogInfo('Executing ElevatedHelper: ' + HelperExe + ' ' + CmdParams);
 
@@ -169,6 +188,16 @@ begin
   begin
     LogWarn('User cancelled UAC prompt or failed to run ElevatedHelper.');
   end;
+end;
+
+function ExecuteElevatedHelper(const Operation, Path1, Path2: String): Boolean;
+var
+  AutoRoot: String;
+begin
+  AutoRoot := ExtractGameRootFromPath(Path2);
+  if AutoRoot = '' then
+    AutoRoot := ExtractGameRootFromPath(Path1);
+  Result := ExecuteElevatedHelperWithRoot(Operation, Path1, Path2, AutoRoot);
 end;
 
 function CopyFileElevated(const SourceFile, TargetFile: String): Boolean;

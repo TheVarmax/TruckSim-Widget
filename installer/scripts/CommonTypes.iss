@@ -56,6 +56,12 @@ const
   // Required disk space in MB
   REQUIRED_FREE_SPACE_MB = 250;
 
+  // Expected ElevatedHelper SHA-256 hash computed at compile time
+  EXPECTED_HELPER_SHA256 = '{#ElevatedHelperSha256}';
+
+var
+  IsUninstallMode: Boolean;
+
 type
   TGameConfig = record
     GameId: String;          // 'ETS2' or 'ATS'
@@ -188,6 +194,59 @@ begin
   Result := (Trim(Path) <> '') and DirExists(Path);
 end;
 
+function GetFileSha256Safe(const FilePath: String): String;
+begin
+  Result := '';
+  if SafeFileExists(FilePath) then
+  begin
+    try
+      Result := LowerCase(GetSHA256OfFile(FilePath));
+    except
+      Result := '';
+    end;
+  end;
+end;
+
+function VerifyElevatedHelperIntegrity(const HelperPath: String): Boolean;
+var
+  ActualHash: String;
+begin
+  Result := False;
+  if not SafeFileExists(HelperPath) then exit;
+  ActualHash := GetFileSha256Safe(HelperPath);
+  Result := (CompareText(ActualHash, EXPECTED_HELPER_SHA256) = 0);
+end;
+
+function AtomicSaveStringToFile(const FilePath, Content: String): Boolean;
+var
+  TempPath: String;
+begin
+  Result := False;
+  TempPath := FilePath + '.tmp';
+  if not SaveStringToFile(TempPath, Content, False) then exit;
+
+  if SafeFileExists(FilePath) then
+  begin
+    if not DeleteFile(FilePath) then
+    begin
+      if CopyFile(TempPath, FilePath, False) then
+      begin
+        DeleteFile(TempPath);
+        Result := True;
+        exit;
+      end;
+      exit;
+    end;
+  end;
+
+  Result := RenameFile(TempPath, FilePath);
+  if not Result then
+  begin
+    Result := CopyFile(TempPath, FilePath, False);
+    if Result then DeleteFile(TempPath);
+  end;
+end;
+
 function GetTransactionJournalFilePath(): String;
 begin
   Result := CombinePath(CombinePath(GetAppDataWidgetDir(), 'installer'), 'transaction_journal.json');
@@ -205,10 +264,16 @@ var
 begin
   TmpHelper := ExpandConstant('{tmp}\ElevatedHelper.exe');
   AppHelper := ExpandConstant('{app}\ElevatedHelper.exe');
+  
   if SafeFileExists(TmpHelper) then
     Result := TmpHelper
-  else if SafeFileExists(AppHelper) then
-    Result := AppHelper
+  else if IsUninstallMode and SafeFileExists(AppHelper) then
+  begin
+    if VerifyElevatedHelperIntegrity(AppHelper) then
+      Result := AppHelper
+    else
+      Result := '';
+  end
   else
     Result := TmpHelper;
 end;

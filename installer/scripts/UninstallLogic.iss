@@ -56,6 +56,12 @@ begin
   end;
 end;
 
+function InitializeUninstall(): Boolean;
+begin
+  IsUninstallMode := True;
+  Result := True;
+end;
+
 procedure ExecuteUninstallCleanup();
 var
   RemoveUserData: Boolean;

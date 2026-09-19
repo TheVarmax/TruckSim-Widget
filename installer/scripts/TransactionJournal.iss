@@ -5,11 +5,12 @@
 type
   TJournalStep = record
     StepIndex: Integer;
-    Operation: String;  // 'StageOwnedBackup', 'CreateThirdPartyBackup', 'CopyPlugin', 'CreateDir'
+    Operation: String;    // 'StageRollbackBackup', 'CreateThirdPartyBackup', 'CopyPlugin', 'CreateDir'
     SourcePath: String;
     TargetPath: String;
     BackupPath: String;
-    Status: String;     // 'STEP_PENDING', 'STEP_COMPLETED'
+    OriginalHash: String; // SHA-256 of target prior to operation
+    Status: String;       // 'STEP_PENDING', 'STEP_COMPLETED'
   end;
 
 var
@@ -47,6 +48,7 @@ begin
       '      "sourcePath": "' + EscapeJson(JournalSteps[I].SourcePath) + '",' + #13#10 +
       '      "targetPath": "' + EscapeJson(JournalSteps[I].TargetPath) + '",' + #13#10 +
       '      "backupPath": "' + EscapeJson(JournalSteps[I].BackupPath) + '",' + #13#10 +
+      '      "originalHash": "' + EscapeJson(JournalSteps[I].OriginalHash) + '",' + #13#10 +
       '      "status": "' + EscapeJson(JournalSteps[I].Status) + '"' + #13#10 +
       '    }';
     if I < GetArrayLength(JournalSteps) - 1 then
@@ -56,11 +58,8 @@ begin
 
   Json := Json + '  ]' + #13#10 + '}' + #13#10;
 
-  try
-    SaveStringToFile(JournalPath, Json, False);
-  except
-    LogErr('Failed to flush transaction journal to disk: ' + JournalPath);
-  end;
+  if not AtomicSaveStringToFile(JournalPath, Json) then
+    LogErr('Failed to atomically flush transaction journal to disk: ' + JournalPath);
 end;
 
 procedure InitTransactionJournal();
@@ -72,7 +71,7 @@ begin
   FlushJournalToDisk();
 end;
 
-function BeginTransactionStep(const Op, Src, Target, Backup: String): Integer;
+function BeginTransactionStep(const Op, Src, Target, Backup, OrigHash: String): Integer;
 var
   Idx: Integer;
 begin
@@ -84,6 +83,7 @@ begin
   JournalSteps[Idx].SourcePath := Src;
   JournalSteps[Idx].TargetPath := Target;
   JournalSteps[Idx].BackupPath := Backup;
+  JournalSteps[Idx].OriginalHash := OrigHash;
   JournalSteps[Idx].Status := STEP_STATUS_PENDING;
 
   FlushJournalToDisk();
@@ -99,62 +99,124 @@ begin
   end;
 end;
 
+function ExecuteStepRollback(const Step: TJournalStep): Boolean;
+var
+  RestoredHash: String;
+  Copied: Boolean;
+  Deleted: Boolean;
+begin
+  Result := True;
+  LogInfo('Executing rollback for step ' + IntToStr(Step.StepIndex) + ' (' + Step.Operation + ')');
+
+  if (Step.Operation = 'CopyPlugin') or (Step.Operation = 'StageRollbackBackup') then
+  begin
+    // 1. If TargetPath exists and was modified or created by CopyPlugin, delete it
+    if Step.Operation = 'CopyPlugin' then
+    begin
+      if SafeFileExists(Step.TargetPath) then
+      begin
+        Deleted := DeleteFile(Step.TargetPath);
+        if not Deleted then
+          Deleted := DeleteFileElevated(Step.TargetPath);
+        if not Deleted then
+          LogWarn('Could not delete target file during rollback: ' + Step.TargetPath);
+      end;
+    end;
+
+    // 2. Restore BackupPath -> TargetPath
+    if (Step.BackupPath <> '') and SafeFileExists(Step.BackupPath) then
+    begin
+      LogInfo('Restoring original file from backup: ' + Step.BackupPath + ' -> ' + Step.TargetPath);
+      Copied := CopyFile(Step.BackupPath, Step.TargetPath, False);
+      if not Copied then
+        Copied := CopyFileElevated(Step.BackupPath, Step.TargetPath);
+
+      if not Copied or not SafeFileExists(Step.TargetPath) then
+      begin
+        LogErr('CRITICAL: Failed to restore file from rollback backup: ' + Step.BackupPath);
+        Result := False;
+        exit;
+      end;
+
+      // 3. Verify restored file SHA-256 against recorded OriginalHash
+      if Step.OriginalHash <> '' then
+      begin
+        RestoredHash := GetFileSha256Safe(Step.TargetPath);
+        if CompareText(RestoredHash, Step.OriginalHash) <> 0 then
+        begin
+          LogErr('CRITICAL: Restored file SHA-256 mismatch! Expected: ' + Step.OriginalHash + ', Actual: ' + RestoredHash);
+          Result := False;
+          exit;
+        end;
+        LogInfo('Restored file SHA-256 integrity verified: ' + RestoredHash);
+      end;
+    end;
+  end
+  else if Step.Operation = 'CreateThirdPartyBackup' then
+  begin
+    // If a persistent backup was created during this aborted transaction, clean it up or restore
+    if (Step.BackupPath <> '') and SafeFileExists(Step.BackupPath) then
+    begin
+      if not SafeFileExists(Step.TargetPath) then
+      begin
+        Copied := CopyFile(Step.BackupPath, Step.TargetPath, False);
+        if not Copied then
+          Copied := CopyFileElevated(Step.BackupPath, Step.TargetPath);
+      end;
+
+      if SafeFileExists(Step.TargetPath) then
+      begin
+        if not DeleteFile(Step.BackupPath) then
+          DeleteFileElevated(Step.BackupPath);
+      end;
+    end;
+  end
+  else if Step.Operation = 'CreateDir' then
+  begin
+    if SafeDirExists(Step.TargetPath) then
+      RemoveDir(Step.TargetPath);
+  end;
+end;
+
 procedure RollbackTransaction();
 var
   I: Integer;
-  Step: TJournalStep;
+  AllSucceeded: Boolean;
 begin
-  JournalStatus := TRANSACTION_STATUS_ROLLED_BACK;
-  FlushJournalToDisk();
-  LogWarn('Executing transactional rollback for: ' + JournalTxId);
+  LogWarn('Executing in-session rollback for: ' + JournalTxId);
+  AllSucceeded := True;
 
   for I := GetArrayLength(JournalSteps) - 1 downto 0 do
   begin
-    Step := JournalSteps[I];
-    if Step.Status = STEP_STATUS_COMPLETED then
+    if JournalSteps[I].Status = STEP_STATUS_COMPLETED then
     begin
-      LogInfo('Rolling back step ' + IntToStr(I) + ' (' + Step.Operation + ')');
-
-      if (Step.Operation = 'CopyPlugin') or (Step.Operation = 'StageOwnedBackup') then
+      if not ExecuteStepRollback(JournalSteps[I]) then
       begin
-        if SafeFileExists(Step.TargetPath) then
-        begin
-          if not DeleteFile(Step.TargetPath) then
-            DeleteFileElevated(Step.TargetPath);
-        end;
-
-        // If a backup was recorded, restore it
-        if (Step.BackupPath <> '') and SafeFileExists(Step.BackupPath) then
-        begin
-          if not CopyFile(Step.BackupPath, Step.TargetPath, False) then
-            CopyFileElevated(Step.BackupPath, Step.TargetPath);
-        end;
-      end
-      else if Step.Operation = 'CreateThirdPartyBackup' then
-      begin
-        // If third party backup was created but install failed, restore original from backup
-        if (Step.BackupPath <> '') and SafeFileExists(Step.BackupPath) and (Step.TargetPath <> '') then
-        begin
-          if not SafeFileExists(Step.TargetPath) then
-          begin
-            if not RenameFile(Step.BackupPath, Step.TargetPath) then
-              MoveFileElevated(Step.BackupPath, Step.TargetPath);
-          end;
-        end;
-      end
-      else if Step.Operation = 'CreateDir' then
-      begin
-        if SafeDirExists(Step.TargetPath) then
-          RemoveDir(Step.TargetPath);
+        AllSucceeded := False;
+        LogErr('Rollback step ' + IntToStr(I) + ' failed verification!');
       end;
     end;
   end;
 
-  // Clean staging directory
-  if SafeDirExists(GetTransactionStagingDir()) then
-    DelTree(GetTransactionStagingDir(), True, True, True);
+  if AllSucceeded then
+  begin
+    JournalStatus := TRANSACTION_STATUS_ROLLED_BACK;
+    FlushJournalToDisk();
+    LogInfo('In-session rollback completed and verified successfully.');
 
-  LogInfo('Transactional rollback finished.');
+    // Clean staging directory
+    if SafeDirExists(GetTransactionStagingDir()) then
+    begin
+      try
+        DelTree(GetTransactionStagingDir(), True, True, True);
+      except
+      end;
+    end;
+  end
+  else
+  begin
+    LogErr('In-session rollback encountered errors! Journal status remains PENDING for diagnostics.');
+  end;
 end;
 
 procedure CommitTransaction();
@@ -185,12 +247,56 @@ begin
   end;
 end;
 
+function ParseJournalSteps(const Json: String; var Steps: array of TJournalStep): Boolean;
+var
+  StepsPos, CurPos, OpenBrace, CloseBrace: Integer;
+  Block: String;
+  Idx: Integer;
+begin
+  Result := False;
+  SetArrayLength(Steps, 0);
+
+  StepsPos := Pos('"steps"', Json);
+  if StepsPos <= 0 then exit;
+
+  CurPos := StepsPos;
+  while True do
+  begin
+    OpenBrace := Pos('{', Copy(Json, CurPos, Length(Json) - CurPos + 1));
+    if OpenBrace <= 0 then Break;
+    OpenBrace := CurPos + OpenBrace - 1;
+
+    CloseBrace := Pos('}', Copy(Json, OpenBrace, Length(Json) - OpenBrace + 1));
+    if CloseBrace <= 0 then Break;
+    CloseBrace := OpenBrace + CloseBrace - 1;
+
+    Block := Copy(Json, OpenBrace, CloseBrace - OpenBrace + 1);
+    CurPos := CloseBrace + 1;
+
+    Idx := GetArrayLength(Steps);
+    SetArrayLength(Steps, Idx + 1);
+
+    Steps[Idx].StepIndex := StrToIntDef(ExtractJsonValue(Block, 'stepIndex'), Idx);
+    Steps[Idx].Operation := ExtractJsonValue(Block, 'operation');
+    Steps[Idx].SourcePath := ExtractJsonValue(Block, 'sourcePath');
+    Steps[Idx].TargetPath := ExtractJsonValue(Block, 'targetPath');
+    Steps[Idx].BackupPath := ExtractJsonValue(Block, 'backupPath');
+    Steps[Idx].OriginalHash := ExtractJsonValue(Block, 'originalHash');
+    Steps[Idx].Status := ExtractJsonValue(Block, 'status');
+  end;
+
+  Result := (GetArrayLength(Steps) > 0);
+end;
+
 function CheckAndExecuteCrashRecovery(): Boolean;
 var
   JournalPath: String;
-  Content: AnsiString;
+  RawContent: AnsiString;
   ContentStr: String;
   StatusVal: String;
+  Steps: array of TJournalStep;
+  I: Integer;
+  RecoveryOk: Boolean;
 begin
   Result := False;
   JournalPath := GetTransactionJournalFilePath();
@@ -199,35 +305,71 @@ begin
     exit;
 
   LogInfo('Found existing transaction journal at: ' + JournalPath);
-  if not LoadStringFromFile(JournalPath, Content) then
+  if not LoadStringFromFile(JournalPath, RawContent) then
   begin
     LogWarn('Could not read transaction journal for recovery check.');
     exit;
   end;
 
-  ContentStr := String(Content);
+  ContentStr := String(RawContent);
+
+  // Validate JSON integrity: must have transactionId, status, and steps
+  if (Pos('"transactionId"', ContentStr) <= 0) or (Pos('"status"', ContentStr) <= 0) then
+  begin
+    LogErr('Transaction journal is corrupted or unparseable! Preserving journal and staging for diagnostics. Automatic recovery halted.');
+    exit;
+  end;
+
   StatusVal := ExtractJsonValue(ContentStr, 'status');
 
   if StatusVal = TRANSACTION_STATUS_PENDING then
   begin
-    LogWarn('Detected incomplete PENDING transaction from prior session! Executing automated crash recovery.');
-    // Incomplete transaction detected: clean up any stale staging files
-    if SafeDirExists(GetTransactionStagingDir()) then
+    LogWarn('Detected incomplete PENDING transaction from prior crashed session! Executing automated crash recovery.');
+
+    if not ParseJournalSteps(ContentStr, Steps) then
     begin
-      try
-        DelTree(GetTransactionStagingDir(), True, True, True);
-      except
+      LogErr('Could not parse transaction steps from journal. Preserving files for diagnostics.');
+      exit;
+    end;
+
+    RecoveryOk := True;
+    // Walk completed steps in reverse order
+    for I := GetArrayLength(Steps) - 1 downto 0 do
+    begin
+      if Steps[I].Status = STEP_STATUS_COMPLETED then
+      begin
+        if not ExecuteStepRollback(Steps[I]) then
+        begin
+          RecoveryOk := False;
+          LogErr('Crash recovery failed on step ' + IntToStr(I) + ' (' + Steps[I].Operation + ')');
+        end;
       end;
     end;
 
-    // Delete or mark recovered
-    DeleteFile(JournalPath);
-    LogInfo('Automated crash recovery completed.');
-    Result := True;
+    if RecoveryOk then
+    begin
+      LogInfo('Crash recovery completed and verified all steps successfully.');
+      // Clean staging files
+      if SafeDirExists(GetTransactionStagingDir()) then
+      begin
+        try
+          DelTree(GetTransactionStagingDir(), True, True, True);
+        except
+        end;
+      end;
+
+      // Delete recovered journal
+      DeleteFile(JournalPath);
+      Result := True;
+    end
+    else
+    begin
+      LogErr('Crash recovery was unable to verify all steps. Preserving journal and staging for manual inspection.');
+    end;
   end
-  else
+  else if (StatusVal = TRANSACTION_STATUS_COMMITTED) or (StatusVal = TRANSACTION_STATUS_ROLLED_BACK) then
   begin
-    // Stale committed or rolled back journal
+    // Stale completed journal
     DeleteFile(JournalPath);
   end;
 end;
