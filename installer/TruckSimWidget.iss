@@ -13,7 +13,7 @@
 #define ElevatedHelperFile AddBackslash(PublishDir) + "ElevatedHelper.exe"
 #define ElevatedHelperSha256 LowerCase(GetSHA256OfFile(ElevatedHelperFile))
 #ifndef OutputDir
-  #define OutputDir "..\dist"
+  #define OutputDir "C:\Users\mrpry\Desktop\TruckSim Widget\Releases"
 #endif
 
 [Setup]
