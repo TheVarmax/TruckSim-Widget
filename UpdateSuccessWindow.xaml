@@ -6,6 +6,12 @@
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         WindowStartupLocation="CenterScreen" Topmost="True" ShowInTaskbar="True">
 
+    <Window.Resources>
+        <SolidColorBrush x:Key="DialogAccentBrush" Color="#43A047"/>
+        <SolidColorBrush x:Key="DialogAccentHoverBrush" Color="#388E3C"/>
+        <SolidColorBrush x:Key="DialogLinkBrush" Color="#58A6FF"/>
+    </Window.Resources>
+
     <Border Background="{DynamicResource WindowBackgroundBrush}" 
             BorderBrush="{DynamicResource CardBorderBrush}" 
             BorderThickness="1" 
@@ -23,7 +29,7 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <TextBlock x:Name="TitleBlock" Text="UPDATE SUCCESSFUL" Foreground="{DynamicResource AccentColorBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,0,12"/>
+            <TextBlock x:Name="TitleBlock" Text="UPDATE SUCCESSFUL" Foreground="{StaticResource DialogAccentBrush}" FontSize="15" FontWeight="Bold" Margin="0,0,0,12"/>
 
             <StackPanel Grid.Row="1" Margin="0,0,0,10">
                 <TextBlock x:Name="ReleaseNameBlock" Foreground="{DynamicResource MainTextBrush}" FontSize="17" FontWeight="Bold" Margin="0,0,0,5" />
@@ -81,7 +87,7 @@
                         <md:Markdown.BlockquoteStyle>
                             <Style TargetType="Section">
                                 <Setter Property="BorderThickness" Value="3,0,0,0" />
-                                <Setter Property="BorderBrush" Value="{DynamicResource AccentColorBrush}" />
+                                <Setter Property="BorderBrush" Value="{StaticResource DialogAccentBrush}" />
                                 <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}" />
                                 <Setter Property="Padding" Value="12,8,12,8" />
                                 <Setter Property="Margin" Value="0,6,0,10" />
@@ -105,7 +111,7 @@
                         </md:Markdown.CodeStyle>
                         <md:Markdown.LinkStyle>
                             <Style TargetType="Hyperlink">
-                                <Setter Property="Foreground" Value="{DynamicResource AccentColorBrush}" />
+                                <Setter Property="Foreground" Value="{StaticResource DialogLinkBrush}" />
                                 <Setter Property="TextDecorations" Value="None" />
                                 <Style.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
@@ -127,7 +133,7 @@
                 <TextBlock x:Name="SupportBlock" Text="Need help? Contact support@trucksim.uk" Foreground="{DynamicResource MutedTextBrush}" FontStyle="Italic" FontSize="12" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0" />
                 
                 <StackPanel Grid.Column="1" x:Name="ButtonsPanel" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="BtnWebsite" Content="Website" Click="BtnWebsite_Click" Padding="14,0" Height="32" Margin="0,0,10,0" Cursor="Hand" Background="{DynamicResource AccentColorBrush}" Foreground="White" BorderThickness="0">
+                    <Button x:Name="BtnWebsite" Content="Website" Click="BtnWebsite_Click" Padding="14,0" Height="32" Margin="0,0,10,0" Cursor="Hand" Background="{StaticResource DialogAccentBrush}" Foreground="White" FontWeight="SemiBold" BorderThickness="0">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
@@ -135,14 +141,14 @@
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
-                                        <Setter TargetName="border" Property="Opacity" Value="0.85"/>
+                                        <Setter TargetName="border" Property="Background" Value="{StaticResource DialogAccentHoverBrush}"/>
                                     </Trigger>
                                 </ControlTemplate.Triggers>
                             </ControlTemplate>
                         </Button.Template>
                     </Button>
 
-                    <Button x:Name="BtnClose" Content="Close" Click="BtnClose_Click" Padding="18,0" Height="32" Cursor="Hand" Background="{DynamicResource CardBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1">
+                    <Button x:Name="BtnClose" Content="Close" Click="BtnClose_Click" Padding="18,0" Height="32" Cursor="Hand" Background="{DynamicResource CardBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" FontWeight="SemiBold">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6">
