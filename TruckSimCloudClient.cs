@@ -233,18 +233,30 @@ namespace ETSOverlay
         {
             try
             {
+                using var cts = System.Threading.CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                cts.CancelAfter(TimeSpan.FromSeconds(15));
+
                 var req = new HttpRequestMessage(HttpMethod.Post, $"{BASE_URL}{endpoint}")
                 {
                     Content = JsonContent.Create(body)
                 };
-                req.Headers.Add("X-Device-Token", deviceToken);
+                req.Headers.TryAddWithoutValidation("X-Device-Token", deviceToken?.Trim() ?? string.Empty);
 
-                var response = await _httpClient.SendAsync(req, cancellationToken);
-                string rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
+                var response = await _httpClient.SendAsync(req, cts.Token);
+                string rawJson = await response.Content.ReadAsStringAsync(cts.Token);
 
                 return System.Text.Json.JsonSerializer.Deserialize<ClientApiResponse>(
                     rawJson,
                     new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            }
+            catch (System.OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                return new ClientApiResponse
+                {
+                    Success = false,
+                    Error = "timeout",
+                    Message = "Request timed out after 15 seconds"
+                };
             }
             catch (System.OperationCanceledException)
             {

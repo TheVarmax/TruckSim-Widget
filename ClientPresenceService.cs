@@ -22,6 +22,7 @@ namespace ETSOverlay
 
         private readonly ITruckSimCloudClient _client;
         private readonly SemaphoreSlim _syncLock = new(1, 1);
+        private readonly SemaphoreSlim _wakeSignal = new(0, 1);
         private readonly List<ClientDiagnosticEvent> _events = new();
         private readonly object _eventLock = new();
         private readonly object _stateLock = new();
@@ -123,9 +124,16 @@ namespace ETSOverlay
 
         #region Hardware & Software Inventory Gathering
 
+        private ClientRegisterRequest? _cachedRegisterPayload;
+
         public ClientRegisterRequest GatherRegisterPayload()
         {
-            return new ClientRegisterRequest
+            if (_cachedRegisterPayload != null)
+            {
+                return _cachedRegisterPayload;
+            }
+
+            _cachedRegisterPayload = new ClientRegisterRequest
             {
                 AppVersion = GetAppVersion(),
                 Os = GetOsInfo(),
@@ -133,6 +141,7 @@ namespace ETSOverlay
                 Display = GetDisplayInfo(),
                 Software = GetSoftwareInfo()
             };
+            return _cachedRegisterPayload;
         }
 
         public string GetAppVersion()
@@ -353,12 +362,26 @@ namespace ETSOverlay
 
         #region Presence Lifecycle & Heartbeat Loop
 
+        public void TriggerImmediateSync()
+        {
+            try
+            {
+                if (_wakeSignal.CurrentCount == 0)
+                {
+                    _wakeSignal.Release();
+                }
+            }
+            catch (ObjectDisposedException) { }
+            catch (SemaphoreFullException) { }
+        }
+
         public void Start()
         {
             lock (_stateLock)
             {
                 if (_heartbeatLoopTask != null && !_heartbeatLoopTask.IsCompleted)
                 {
+                    TriggerImmediateSync();
                     return;
                 }
 
@@ -376,7 +399,7 @@ namespace ETSOverlay
                 string token = DeviceTokenStorage.LoadToken();
                 if (string.IsNullOrWhiteSpace(token))
                 {
-                    try { await Task.Delay(10000, ct); } catch (OperationCanceledException) { break; }
+                    try { await _wakeSignal.WaitAsync(TimeSpan.FromSeconds(5), ct); } catch (OperationCanceledException) { break; }
                     continue;
                 }
 
@@ -392,50 +415,54 @@ namespace ETSOverlay
                     {
                         var registerPayload = GatherRegisterPayload();
                         var regRes = await _client.RegisterClientAsync(token, registerPayload, ct);
-                        if (regRes != null && regRes.Success)
+                        if (regRes != null && (regRes.Success || 
+                            string.Equals(regRes.Error, "already_registered", StringComparison.OrdinalIgnoreCase) || 
+                            regRes.Error?.Contains("registered", StringComparison.OrdinalIgnoreCase) == true))
                         {
                             _isRegistered = true;
                             RecordEvent("widget_started", "TruckSim Widget started");
                         }
                     }
 
-                    if (_isRegistered)
+                    await FlushEventsInternalAsync(token, ct);
+
+                    ClientStateInfo stateSnapshot;
+                    lock (_stateLock)
                     {
-                        await FlushEventsInternalAsync(token, ct);
-
-                        ClientStateInfo stateSnapshot;
-                        lock (_stateLock)
+                        stateSnapshot = new ClientStateInfo
                         {
-                            stateSnapshot = new ClientStateInfo
-                            {
-                                GameRunning = _currentLiveState.GameRunning,
-                                Game = _currentLiveState.Game,
-                                GameVersion = _currentLiveState.GameVersion,
-                                TelemetryConnected = _currentLiveState.TelemetryConnected,
-                                TrucksBookConnected = _currentLiveState.TrucksBookConnected,
-                                TrackingActive = _currentLiveState.TrackingActive,
-                                RecordingActive = _currentLiveState.RecordingActive,
-                                SyncActive = _currentLiveState.SyncActive
-                            };
-                        }
-
-                        var hbReq = new ClientHeartbeatRequest
-                        {
-                            AppVersion = GetAppVersion(),
-                            State = stateSnapshot
+                            GameRunning = _currentLiveState.GameRunning,
+                            Game = _currentLiveState.Game,
+                            GameVersion = _currentLiveState.GameVersion,
+                            TelemetryConnected = _currentLiveState.TelemetryConnected,
+                            TrucksBookConnected = _currentLiveState.TrucksBookConnected,
+                            TrackingActive = _currentLiveState.TrackingActive,
+                            RecordingActive = _currentLiveState.RecordingActive,
+                            SyncActive = _currentLiveState.SyncActive
                         };
+                    }
 
-                        var hbRes = await _client.SendHeartbeatAsync(token, hbReq, ct);
-                        if (hbRes != null)
+                    var hbReq = new ClientHeartbeatRequest
+                    {
+                        AppVersion = GetAppVersion(),
+                        State = stateSnapshot
+                    };
+
+                    var hbRes = await _client.SendHeartbeatAsync(token, hbReq, ct);
+                    if (hbRes != null)
+                    {
+                        if (hbRes.Success)
                         {
-                            if (hbRes.Error == "device_offline")
-                            {
-                                _isRegistered = false;
-                            }
-                            else if (hbRes.Error == "device_inactive" || hbRes.Error == "device_blocked" || hbRes.Error == "license_inactive")
-                            {
-                                _isRegistered = false;
-                            }
+                            _isRegistered = true;
+                        }
+                        else if (hbRes.Error == "device_offline")
+                        {
+                            _isRegistered = false;
+                            TriggerImmediateSync();
+                        }
+                        else if (hbRes.Error == "device_inactive" || hbRes.Error == "device_blocked" || hbRes.Error == "license_inactive")
+                        {
+                            _isRegistered = false;
                         }
                     }
                 }
@@ -454,7 +481,7 @@ namespace ETSOverlay
 
                 try
                 {
-                    await Task.Delay(TimeSpan.FromSeconds(45), ct);
+                    await _wakeSignal.WaitAsync(TimeSpan.FromSeconds(15), ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -470,6 +497,7 @@ namespace ETSOverlay
             try
             {
                 _heartbeatCts?.Cancel();
+                TriggerImmediateSync();
             }
             catch { }
 
@@ -588,6 +616,11 @@ namespace ETSOverlay
                     _events.RemoveAt(0);
                 }
                 _events.Add(evt);
+            }
+
+            if (type != "widget_started")
+            {
+                TriggerImmediateSync();
             }
         }
 

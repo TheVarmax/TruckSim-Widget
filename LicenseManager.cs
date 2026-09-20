@@ -142,6 +142,7 @@ namespace ETSOverlay
                     }
                     
                     UpdateStateFromResponse(response);
+                    ClientPresenceService.Instance.TriggerImmediateSync();
                     return (true, "Activated successfully.");
                 }
                 
@@ -192,6 +193,7 @@ namespace ETSOverlay
                     if (response.Success && response.License != null)
                     {
                         UpdateStateFromResponse(response);
+                        ClientPresenceService.Instance.TriggerImmediateSync();
                     }
                     else
                     {

@@ -5881,6 +5881,8 @@ namespace ETSOverlay
                 {
                     await InitializeCloudSyncAsync();
                 }
+
+                ClientPresenceService.Instance.TriggerImmediateSync();
             }
             catch (Exception ex)
             {
