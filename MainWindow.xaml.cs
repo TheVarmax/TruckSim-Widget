@@ -544,6 +544,8 @@ namespace ETSOverlay
                         _hudWindow.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromSeconds(0.4)));
                     }
 
+                    await ShowUpdateSuccessDialogIfNeededAsync();
+
                     return;
                 }
 
@@ -603,26 +605,7 @@ namespace ETSOverlay
                 }
 
                 // Show update success dialog if applicable
-                var args = Environment.GetCommandLineArgs();
-                if (Array.Exists(args, arg => arg == "--updated"))
-                {
-                    // Fallback: если release body не был сохранён предыдущей версией,
-                    // подтягиваем его из GitHub API
-                    if (string.IsNullOrWhiteSpace(LatestReleaseBody))
-                    {
-                        await FetchLatestReleaseNotesAsync();
-                    }
-
-                    var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
-                    successWindow.Owner = this;
-                    successWindow.ShowDialog();
-                    
-                    // Clear the URL after showing it
-                    LatestReleaseUrl = null;
-                    LatestReleaseName = null;
-                    LatestReleaseBody = null;
-                    SaveState();
-                }
+                await ShowUpdateSuccessDialogIfNeededAsync();
 
                 // 4. Финализация: сброс анимации opacity для чистого idle-перехода
                 MainBorder.BeginAnimation(OpacityProperty, null);
@@ -5313,6 +5296,61 @@ namespace ETSOverlay
             catch (Exception ex)
             {
                 WriteLog($"[WARN] Failed to fetch release notes: {ex.Message}");
+            }
+        }
+
+        private async Task ShowUpdateSuccessDialogIfNeededAsync()
+        {
+            var args = Environment.GetCommandLineArgs();
+            if (!Array.Exists(args, arg => arg == "--updated")) return;
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(LatestReleaseBody))
+                {
+                    await FetchLatestReleaseNotesAsync();
+                }
+
+                var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
+                
+                if (_hudWindow != null && _hudWindow.IsVisible)
+                {
+                    successWindow.Owner = _hudWindow;
+                }
+                else if (this.IsVisible)
+                {
+                    successWindow.Owner = this;
+                }
+                else
+                {
+                    successWindow.ShowInTaskbar = true;
+                }
+
+                try
+                {
+                    successWindow.ShowDialog();
+                }
+                catch (Exception ex)
+                {
+                    WriteLog($"Failed to show update dialog with owner: {ex.Message}");
+                    try
+                    {
+                        successWindow.Owner = null;
+                        successWindow.ShowInTaskbar = true;
+                        successWindow.ShowDialog();
+                    }
+                    catch (Exception ex2)
+                    {
+                        WriteLog($"Failed to show update dialog: {ex2.Message}");
+                    }
+                }
+            }
+            finally
+            {
+                LatestReleaseUrl = null;
+                LatestReleaseName = null;
+                LatestReleaseBody = null;
+                SaveState();
             }
         }
 
