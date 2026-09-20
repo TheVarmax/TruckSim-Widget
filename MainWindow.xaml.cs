@@ -4913,7 +4913,8 @@ namespace ETSOverlay
                                 Filter = "TruckSimWidgetSetup (*.exe)|*.exe|All Files (*.*)|*.*"
                             };
 
-                            if (ofd.ShowDialog(this) == true)
+                            Window? owner = this.IsVisible ? this : null;
+                            if (ofd.ShowDialog(owner) == true)
                             {
                                 installerPath = ofd.FileName;
                             }
@@ -4925,7 +4926,8 @@ namespace ETSOverlay
                         WriteLog("[SIMULATE ERROR] No installer file found for update simulation.");
                         Dispatcher.Invoke(() =>
                         {
-                            CustomMessageBox.Show(this,
+                            Window? owner = this.IsVisible ? this : null;
+                            CustomMessageBox.Show(owner,
                                 uiLanguage == "uk"
                                     ? "Режим тестування: файл інсталятора TruckSimWidgetSetup не знайдено.\n\nВкажіть шлях через параметр: --simulate-update \"шлях\\до\\TruckSimWidgetSetup.exe\" або помістіть інсталятор у папку Releases на Робочому столі."
                                     : "Test mode: TruckSimWidgetSetup installer file was not found.\n\nPlease specify the path: --simulate-update \"path\\to\\TruckSimWidgetSetup.exe\" or place the installer in Desktop\\TruckSim Widget\\Releases.",
@@ -5351,7 +5353,8 @@ namespace ETSOverlay
                 string yesBtn = isBeta ? (uiLanguage == "uk" ? "Встановити" : "Install") : (uiLanguage == "uk" ? "Так" : "Yes");
                 string noBtn = isBeta ? (uiLanguage == "uk" ? "Пропустити" : "Skip") : (uiLanguage == "uk" ? "Ні" : "No");
 
-                var result = CustomMessageBox.Show(this, message, title, yesBtn, noBtn);
+                Window? owner = this.IsVisible ? this : null;
+                var result = CustomMessageBox.Show(owner, message, title, yesBtn, noBtn);
 
                 if (result == MessageBoxResult.Yes)
                 {
@@ -5500,7 +5503,8 @@ namespace ETSOverlay
             string yesBtn = isUk ? "Так" : "Yes";
             string noBtn = isUk ? "Ні" : "No";
 
-            var result = CustomMessageBox.Show(this, body, title, yesBtn, noBtn);
+            Window? owner = this.IsVisible ? this : null;
+            var result = CustomMessageBox.Show(owner, body, title, yesBtn, noBtn);
 
             if (result == MessageBoxResult.Yes)
             {

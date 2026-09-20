@@ -85,16 +85,30 @@ namespace ETSOverlay
 
         private static Window? GetSafeOwner(Window? candidate)
         {
-            if (candidate != null && candidate.IsLoaded && candidate.IsVisible)
-                return candidate;
-
-            if (Application.Current != null)
+            try
             {
-                foreach (Window win in Application.Current.Windows)
+                if (candidate != null && !(candidate is HudWindow) && candidate.IsLoaded && candidate.IsVisible)
                 {
-                    if (win != null && win.IsLoaded && win.IsVisible)
-                        return win;
+                    var handle = new System.Windows.Interop.WindowInteropHelper(candidate).Handle;
+                    if (handle != IntPtr.Zero)
+                        return candidate;
                 }
+
+                if (Application.Current != null)
+                {
+                    foreach (Window win in Application.Current.Windows)
+                    {
+                        if (win != null && !(win is HudWindow) && win.IsLoaded && win.IsVisible)
+                        {
+                            var handle = new System.Windows.Interop.WindowInteropHelper(win).Handle;
+                            if (handle != IntPtr.Zero)
+                                return win;
+                        }
+                    }
+                }
+            }
+            catch
+            {
             }
 
             return null;
@@ -106,12 +120,33 @@ namespace ETSOverlay
             var safeOwner = GetSafeOwner(owner);
             if (safeOwner != null)
             {
-                msgBox.Owner = safeOwner;
+                try
+                {
+                    msgBox.Owner = safeOwner;
+                }
+                catch
+                {
+                    msgBox.Owner = null;
+                    msgBox.ShowInTaskbar = true;
+                }
             }
             else
             {
+                msgBox.Owner = null;
+                msgBox.ShowInTaskbar = true;
                 msgBox.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
+            msgBox.Loaded += (s, e) =>
+            {
+                try
+                {
+                    msgBox.Activate();
+                    msgBox.Focus();
+                }
+                catch
+                {
+                }
+            };
             msgBox.ShowDialog();
             return msgBox.Result;
         }
@@ -122,12 +157,33 @@ namespace ETSOverlay
             var safeOwner = GetSafeOwner(owner);
             if (safeOwner != null)
             {
-                msgBox.Owner = safeOwner;
+                try
+                {
+                    msgBox.Owner = safeOwner;
+                }
+                catch
+                {
+                    msgBox.Owner = null;
+                    msgBox.ShowInTaskbar = true;
+                }
             }
             else
             {
+                msgBox.Owner = null;
+                msgBox.ShowInTaskbar = true;
                 msgBox.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
+            msgBox.Loaded += (s, e) =>
+            {
+                try
+                {
+                    msgBox.Activate();
+                    msgBox.Focus();
+                }
+                catch
+                {
+                }
+            };
             msgBox.ShowDialog();
             return (msgBox.Result, msgBox.IsDontAskAgainChecked);
         }
