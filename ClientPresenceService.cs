@@ -13,7 +13,7 @@ using Microsoft.Win32;
 namespace ETSOverlay
 {
     /// <summary>
-    /// Manages client presence reporting (registration, 45s heartbeat, diagnostics, graceful shutdown).
+    /// Manages client presence reporting (registration, 30s heartbeat, diagnostics, graceful shutdown).
     /// Protects against heartbeat/shutdown race conditions using SemaphoreSlim and cancellation tokens.
     /// </summary>
     public class ClientPresenceService
@@ -481,7 +481,7 @@ namespace ETSOverlay
 
                 try
                 {
-                    await _wakeSignal.WaitAsync(TimeSpan.FromSeconds(15), ct);
+                    await _wakeSignal.WaitAsync(TimeSpan.FromSeconds(30), ct);
                 }
                 catch (OperationCanceledException)
                 {
