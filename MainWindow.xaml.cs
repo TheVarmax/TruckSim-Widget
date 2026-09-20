@@ -512,13 +512,19 @@ namespace ETSOverlay
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
 
-            // Validate license in the background
             _ = ValidateLicenseOnStartupAsync();
             UpdateSupporterVisuals();
 
+            if (Array.Exists(Environment.GetCommandLineArgs(), arg => arg == "--updated"))
+            {
+                _skipStartupAnimation = true;
+                _ = Dispatcher.InvokeAsync(async () => await ShowUpdateSuccessDialogIfNeededAsync());
+            }
+
+            ClientPresenceService.Instance.Start();
+
             Loaded += async (s, e) =>
             {
-                ClientPresenceService.Instance.Start();
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
@@ -543,8 +549,6 @@ namespace ETSOverlay
                         _hudWindow.Opacity = 0;
                         _hudWindow.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromSeconds(0.4)));
                     }
-
-                    await ShowUpdateSuccessDialogIfNeededAsync();
 
                     return;
                 }
@@ -603,9 +607,6 @@ namespace ETSOverlay
                 {
                     IntroOverlay.Visibility = Visibility.Collapsed;
                 }
-
-                // Show update success dialog if applicable
-                await ShowUpdateSuccessDialogIfNeededAsync();
 
                 // 4. Финализация: сброс анимации opacity для чистого idle-перехода
                 MainBorder.BeginAnimation(OpacityProperty, null);
@@ -5311,20 +5312,11 @@ namespace ETSOverlay
                     await FetchLatestReleaseNotesAsync();
                 }
 
-                var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
-                
-                if (_hudWindow != null && _hudWindow.IsVisible)
+                var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody)
                 {
-                    successWindow.Owner = _hudWindow;
-                }
-                else if (this.IsVisible)
-                {
-                    successWindow.Owner = this;
-                }
-                else
-                {
-                    successWindow.ShowInTaskbar = true;
-                }
+                    Owner = null,
+                    ShowInTaskbar = true
+                };
 
                 try
                 {
@@ -5332,17 +5324,7 @@ namespace ETSOverlay
                 }
                 catch (Exception ex)
                 {
-                    WriteLog($"Failed to show update dialog with owner: {ex.Message}");
-                    try
-                    {
-                        successWindow.Owner = null;
-                        successWindow.ShowInTaskbar = true;
-                        successWindow.ShowDialog();
-                    }
-                    catch (Exception ex2)
-                    {
-                        WriteLog($"Failed to show update dialog: {ex2.Message}");
-                    }
+                    WriteLog($"Failed to show update dialog: {ex.Message}");
                 }
             }
             finally
