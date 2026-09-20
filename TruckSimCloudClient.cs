@@ -108,9 +108,9 @@ namespace ETSOverlay
         private const string BASE_URL = "https://api.trucksim.uk";
         private static readonly HttpClient _httpClient = new HttpClient();
 
-        public async Task<LicenseResponse?> ActivateAsync(LicenseActivationRequest request)
+        public async Task<LicenseResponse?> ActivateAsync(LicenseActivationRequest request, System.Threading.CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/activate", request);
+            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/activate", request, cancellationToken);
             
             // Allow reading JSON on 4xx errors if the API returns validation/revocation errors in the same format
             if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
@@ -118,7 +118,7 @@ namespace ETSOverlay
                 response.EnsureSuccessStatusCode();
             }
 
-            string rawJson = await response.Content.ReadAsStringAsync();
+            string rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
             try
             {
                 if (System.Windows.Application.Current?.MainWindow is MainWindow main)
@@ -131,16 +131,16 @@ namespace ETSOverlay
             return System.Text.Json.JsonSerializer.Deserialize<LicenseResponse>(rawJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
 
-        public async Task<LicenseResponse?> CheckAsync(LicenseCheckRequest request)
+        public async Task<LicenseResponse?> CheckAsync(LicenseCheckRequest request, System.Threading.CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/check", request);
+            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/check", request, cancellationToken);
             
             if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
             {
                 response.EnsureSuccessStatusCode();
             }
 
-            string rawJson = await response.Content.ReadAsStringAsync();
+            string rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
             try
             {
                 if (System.Windows.Application.Current?.MainWindow is MainWindow main)
@@ -169,28 +169,28 @@ namespace ETSOverlay
             }
         }
 
-        public async Task<LicenseResponse?> DeactivateAsync(LicenseDeactivationRequest request)
+        public async Task<LicenseResponse?> DeactivateAsync(LicenseDeactivationRequest request, System.Threading.CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/deactivate", request);
+            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/deactivate", request, cancellationToken);
             
             if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
             {
                 response.EnsureSuccessStatusCode();
             }
 
-            return await response.Content.ReadFromJsonAsync<LicenseResponse>();
+            return await response.Content.ReadFromJsonAsync<LicenseResponse>(cancellationToken: cancellationToken);
         }
 
-        public async Task<PortalSessionResponse?> CreatePortalSessionAsync(PortalSessionRequest request)
+        public async Task<PortalSessionResponse?> CreatePortalSessionAsync(PortalSessionRequest request, System.Threading.CancellationToken cancellationToken = default)
         {
-            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/stripe/create-portal-session", request);
+            var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/stripe/create-portal-session", request, cancellationToken);
             
             if (!response.IsSuccessStatusCode && (int)response.StatusCode >= 500)
             {
                 response.EnsureSuccessStatusCode();
             }
 
-            return await response.Content.ReadFromJsonAsync<PortalSessionResponse>();
+            return await response.Content.ReadFromJsonAsync<PortalSessionResponse>(cancellationToken: cancellationToken);
         }
 
         public async Task<CloudSyncResponse?> GetSyncStatusAsync(CloudSyncStatusRequest request)

@@ -92,7 +92,7 @@ namespace ETSOverlay
 
             float currentSpeed = rawSpeedMs * (useMiles ? 2.236936f : 3.6f);
             float threshold = useMiles ? SpeedThresholdMph : SpeedThresholdKmh;
-            float releaseMargin = useMiles ? 2f : 2f; // Reduced margin because physics carry the braking further
+            float releaseMargin = useMiles ? 1.2f : 2f; // Reduced margin because physics carry the braking further
 
             if (currentSpeed >= threshold)
             {

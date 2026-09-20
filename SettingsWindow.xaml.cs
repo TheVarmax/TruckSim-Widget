@@ -23,24 +23,33 @@ namespace ETSOverlay
             _suppressEvents = false;
 
             UpdateLicenseUI();
-            LicenseManager.Instance.OnLicenseChanged += () =>
+            LicenseManager.Instance.OnLicenseChanged += LicenseManager_OnLicenseChanged;
+        }
+
+        private void LicenseManager_OnLicenseChanged()
+        {
+            Dispatcher.Invoke(() => 
             {
-                Dispatcher.Invoke(() => 
+                UpdateLicenseUI();
+                SyncAppearanceValues();
+                UpdateCloudTab();
+                if (TabLogbookContent != null && TabLogbookContent.Visibility == Visibility.Visible)
                 {
-                    UpdateLicenseUI();
-                    SyncAppearanceValues();
-                    UpdateCloudTab();
-                    if (TabLogbookContent != null && TabLogbookContent.Visibility == Visibility.Visible)
-                    {
-                        LoadLogbookTrips();
-                    }
-                });
-            };
+                    LoadLogbookTrips();
+                }
+            });
+        }
+
+        protected override void OnClosed(EventArgs e)
+        {
+            LicenseManager.Instance.OnLicenseChanged -= LicenseManager_OnLicenseChanged;
+            base.OnClosed(e);
         }
 
         protected override async void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             e.Cancel = true;
+            ApplyAppearanceSettings();
             var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
             this.BeginAnimation(Window.OpacityProperty, fadeOut);
             await System.Threading.Tasks.Task.Delay(200);
@@ -100,7 +109,6 @@ namespace ETSOverlay
 
         private async void BtnCloseSettings_Click(object sender, RoutedEventArgs e)
         {
-            ApplyAppearanceSettings();
             var fadeOut = new System.Windows.Media.Animation.DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
             this.BeginAnimation(Window.OpacityProperty, fadeOut);
             await System.Threading.Tasks.Task.Delay(200);
@@ -109,7 +117,8 @@ namespace ETSOverlay
 
         private void UIModeSelector_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (CheckPremiumSelection((ComboBox)sender, e)) return;
+            if (sender is not ComboBox comboBox) return;
+            if (CheckPremiumSelection(comboBox, e)) return;
             if (_suppressEvents || _mainWindow == null) return;
             if (UIModeSelector.SelectedItem is ComboBoxItem item && item.Tag is string tag)
             {
@@ -224,6 +233,11 @@ namespace ETSOverlay
                 _mainWindow.SpeedWarningEts = Math.Max(0, value);
                 _mainWindow.SaveStatePublic();
             }
+            else
+            {
+                _mainWindow.SpeedWarningEts = 0;
+                _mainWindow.SaveStatePublic();
+            }
         }
 
         private void SpeedWarningAtsBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -232,6 +246,11 @@ namespace ETSOverlay
             if (int.TryParse(SpeedWarningAtsBox.Text, out var value))
             {
                 _mainWindow.SpeedWarningAts = Math.Max(0, value);
+                _mainWindow.SaveStatePublic();
+            }
+            else
+            {
+                _mainWindow.SpeedWarningAts = 0;
                 _mainWindow.SaveStatePublic();
             }
         }
@@ -265,6 +284,11 @@ namespace ETSOverlay
                 SpeedLimiterService.Instance.SpeedThresholdKmh = val;
                 _mainWindow.SaveStatePublic();
             }
+            else
+            {
+                SpeedLimiterService.Instance.SpeedThresholdKmh = 0;
+                _mainWindow.SaveStatePublic();
+            }
         }
 
         private void SpeedLimiterAtsBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -275,11 +299,17 @@ namespace ETSOverlay
                 SpeedLimiterService.Instance.SpeedThresholdMph = val;
                 _mainWindow.SaveStatePublic();
             }
+            else
+            {
+                SpeedLimiterService.Instance.SpeedThresholdMph = 0;
+                _mainWindow.SaveStatePublic();
+            }
         }
 
         private bool _isWaitingForKey = false;
         private void BtnSpeedLimiterKey_Click(object sender, RoutedEventArgs e)
         {
+            if (_isWaitingForKey) return;
             _isWaitingForKey = true;
             BtnSpeedLimiterKey.Content = _isUk ? "Натисніть..." : "Press a key...";
             this.KeyDown += SettingsWindow_KeyDown_BrakeKey;
@@ -641,13 +671,15 @@ namespace ETSOverlay
 
         private void AppearanceSetting_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (CheckPremiumSelection((ComboBox)sender, e)) return;
+            if (sender is not ComboBox comboBox) return;
+            if (CheckPremiumSelection(comboBox, e)) return;
             ApplyAppearanceSettings();
         }
 
         private void AccentMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            if (CheckPremiumSelection((ComboBox)sender, e)) return;
+            if (sender is not ComboBox comboBox) return;
+            if (CheckPremiumSelection(comboBox, e)) return;
             UpdateAppearanceVisibility();
             ApplyAppearanceSettings();
         }
@@ -1032,22 +1064,43 @@ namespace ETSOverlay
             UpdateCloudTab();
         }
 
-        private void BtnCloudSyncNow_Click(object sender, RoutedEventArgs e)
+        private async void BtnCloudSyncNow_Click(object sender, RoutedEventArgs e)
         {
             BtnCloudSyncNow.IsEnabled = false;
-            _ = _mainWindow.UploadCloudSyncAsync(false);
+            try
+            {
+                await _mainWindow.UploadCloudSyncAsync(false);
+            }
+            finally
+            {
+                UpdateCloudTab();
+            }
         }
 
-        private void BtnCloudDownload_Click(object sender, RoutedEventArgs e)
+        private async void BtnCloudDownload_Click(object sender, RoutedEventArgs e)
         {
             BtnCloudDownload.IsEnabled = false;
-            _ = _mainWindow.DownloadCloudSyncAsync();
+            try
+            {
+                await _mainWindow.DownloadCloudSyncAsync();
+            }
+            finally
+            {
+                UpdateCloudTab();
+            }
         }
 
-        private void BtnCloudUpload_Click(object sender, RoutedEventArgs e)
+        private async void BtnCloudUpload_Click(object sender, RoutedEventArgs e)
         {
             BtnCloudUpload.IsEnabled = false;
-            _ = _mainWindow.UploadCloudSyncAsync(false);
+            try
+            {
+                await _mainWindow.UploadCloudSyncAsync(false);
+            }
+            finally
+            {
+                UpdateCloudTab();
+            }
         }
 
         private async void BtnCloudDelete_Click(object sender, RoutedEventArgs e)
@@ -1063,7 +1116,14 @@ namespace ETSOverlay
             if (result == MessageBoxResult.Yes)
             {
                 BtnCloudDelete.IsEnabled = false;
-                await _mainWindow.DeleteCloudSyncAsync();
+                try
+                {
+                    await _mainWindow.DeleteCloudSyncAsync();
+                }
+                finally
+                {
+                    UpdateCloudTab();
+                }
             }
         }
 
@@ -1278,7 +1338,7 @@ namespace ETSOverlay
             string volUnit = useMiles ? (_isUk ? "гал" : "gal") : (_isUk ? "л" : "L");
             
             // If UseMiles is true, calculate gal/100mi. Else L/100km.
-            float fuelCons = useMiles ? (fuelVol / (trip.DistanceKm / 1.60934f)) * 100f : trip.AvgFuelConsumptionLPer100Km;
+            float fuelCons = trip.DistanceKm > 0 ? (useMiles ? (fuelVol / (trip.DistanceKm / 1.60934f)) * 100f : trip.AvgFuelConsumptionLPer100Km) : 0f;
             string consUnit = useMiles ? (_isUk ? "гал/100миль" : "gal/100mi") : (_isUk ? "л/100км" : "L/100km");
 
             // Supporter tier details
@@ -1599,8 +1659,15 @@ namespace ETSOverlay
 
             if (sfd.ShowDialog() == true)
             {
-                TripLogbookService.Instance.ExportToCsv(_currentTrips, sfd.FileName);
-                CustomMessageBox.Show(this, _isUk ? "Дані успішно експортовано." : "Data exported successfully.", _isUk ? "Експорт" : "Export", "OK", "");
+                try
+                {
+                    TripLogbookService.Instance.ExportToCsv(_currentTrips, sfd.FileName);
+                    CustomMessageBox.Show(this, _isUk ? "Дані успішно експортовано." : "Data exported successfully.", _isUk ? "Експорт" : "Export", "OK", "");
+                }
+                catch (Exception ex)
+                {
+                    CustomMessageBox.Show(this, _isUk ? $"Помилка експорту: {ex.Message}" : $"Export error: {ex.Message}", _isUk ? "Помилка" : "Error", "OK", "");
+                }
             }
         }
 
@@ -1615,8 +1682,15 @@ namespace ETSOverlay
 
             if (sfd.ShowDialog() == true)
             {
-                TripLogbookService.Instance.ExportToJson(_currentTrips, sfd.FileName);
-                CustomMessageBox.Show(this, _isUk ? "Дані успішно експортовано." : "Data exported successfully.", _isUk ? "Експорт" : "Export", "OK", "");
+                try
+                {
+                    TripLogbookService.Instance.ExportToJson(_currentTrips, sfd.FileName);
+                    CustomMessageBox.Show(this, _isUk ? "Дані успішно експортовано." : "Data exported successfully.", _isUk ? "Експорт" : "Export", "OK", "");
+                }
+                catch (Exception ex)
+                {
+                    CustomMessageBox.Show(this, _isUk ? $"Помилка експорту: {ex.Message}" : $"Export error: {ex.Message}", _isUk ? "Помилка" : "Error", "OK", "");
+                }
             }
         }
     }

@@ -33,6 +33,7 @@ namespace ETSOverlay
 
         private async void BtnClose_Click(object sender, RoutedEventArgs e)
         {
+            this.IsEnabled = false;
             var fadeOut = new DoubleAnimation(0, TimeSpan.FromSeconds(0.2));
             this.BeginAnimation(Window.OpacityProperty, fadeOut);
             await System.Threading.Tasks.Task.Delay(200);

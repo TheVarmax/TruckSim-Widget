@@ -98,12 +98,14 @@ namespace ETSOverlay
             var duration = TimeSpan.FromSeconds(0.3);
             var easing = new System.Windows.Media.Animation.CubicEase { EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut };
 
-            var opacityAnim = new System.Windows.Media.Animation.DoubleAnimation(currentOpacity, show ? 1 : 0, duration) { EasingFunction = easing };
+            var opacityAnim = new System.Windows.Media.Animation.DoubleAnimation(currentOpacity, show ? 1 : 0, duration) { EasingFunction = easing, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop };
 
             if (!show)
             {
                 opacityAnim.Completed += (s, e) =>
                 {
+                    element.BeginAnimation(UIElement.OpacityProperty, null);
+                    element.Opacity = 0;
                     if (element.Opacity < 0.01)
                     {
                         element.Visibility = Visibility.Collapsed;
@@ -119,6 +121,8 @@ namespace ETSOverlay
             {
                 opacityAnim.Completed += (s, e) =>
                 {
+                    element.BeginAnimation(UIElement.OpacityProperty, null);
+                    element.Opacity = 1;
                     if (element.Opacity > 0.99)
                     {
                         element.BeginAnimation(FrameworkElement.WidthProperty, null);
@@ -167,13 +171,25 @@ namespace ETSOverlay
             if (currentWidth == 0 && !show) currentWidth = fullWidth;
             double targetWidth = show ? fullWidth : 0;
 
-            var widthAnim = new System.Windows.Media.Animation.DoubleAnimation(currentWidth, targetWidth, duration) { EasingFunction = easing };
+            var widthAnim = new System.Windows.Media.Animation.DoubleAnimation(currentWidth, targetWidth, duration) { EasingFunction = easing, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop };
+            widthAnim.Completed += (s, e) =>
+            {
+                element.BeginAnimation(FrameworkElement.WidthProperty, null);
+                element.Width = targetWidth;
+            };
             element.BeginAnimation(FrameworkElement.WidthProperty, widthAnim);
 
             if (element.RenderTransform is System.Windows.Media.ScaleTransform rst)
             {
                 double currentScale = rst.ScaleX;
-                var scaleAnim = new System.Windows.Media.Animation.DoubleAnimation(currentScale, show ? 1.0 : 0.6, duration) { EasingFunction = easing };
+                var scaleAnim = new System.Windows.Media.Animation.DoubleAnimation(currentScale, show ? 1.0 : 0.6, duration) { EasingFunction = easing, FillBehavior = System.Windows.Media.Animation.FillBehavior.Stop };
+                scaleAnim.Completed += (s, e) =>
+                {
+                    rst.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, null);
+                    rst.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, null);
+                    rst.ScaleX = show ? 1.0 : 0.6;
+                    rst.ScaleY = show ? 1.0 : 0.6;
+                };
                 rst.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, scaleAnim);
                 rst.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, scaleAnim);
             }
@@ -342,7 +358,7 @@ namespace ETSOverlay
             base.OnClosed(e);
             if (!_isClosingFromMainWindow)
             {
-                _mainWindow.BtnClose_Click(null, null!);
+                _mainWindow.BtnClose_Click(_mainWindow, new RoutedEventArgs());
             }
         }
     }

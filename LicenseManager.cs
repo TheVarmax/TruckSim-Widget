@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
@@ -10,7 +11,7 @@ namespace ETSOverlay
         public static LicenseManager Instance { get; } = new LicenseManager();
 
         private readonly TruckSimCloudClient _client = new TruckSimCloudClient();
-        private readonly HashSet<string> _features = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, byte> _features = new ConcurrentDictionary<string, byte>(StringComparer.OrdinalIgnoreCase);
 
         private string _deviceToken = string.Empty;
         public string DeviceToken => _deviceToken;
@@ -99,7 +100,7 @@ namespace ETSOverlay
                 {
                     foreach (var f in cachedFeatures)
                     {
-                        _features.Add(f);
+                        _features.TryAdd(f, 0);
                     }
                 }
             }
@@ -107,12 +108,12 @@ namespace ETSOverlay
 
         public bool HasFeature(string feature)
         {
-            return _features.Contains(feature);
+            return _features.ContainsKey(feature);
         }
 
         public List<string> GetFeaturesList()
         {
-            return new List<string>(_features);
+            return new List<string>(_features.Keys);
         }
 
         public async Task<(bool success, string message)> ActivateAsync(string key, string appVersion)
@@ -149,8 +150,9 @@ namespace ETSOverlay
                 
                 return (false, response?.Message ?? "Failed to activate. Please check your key.");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                System.Diagnostics.Trace.WriteLine(ex.ToString());
                 LastValidationFailed = true;
                 return (false, "Unable to contact the license server. Please try again later.");
             }
@@ -240,8 +242,9 @@ namespace ETSOverlay
                 ClearLicenseState();
                 return (true, response?.Message ?? "Deactivated locally.");
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                System.Diagnostics.Trace.WriteLine(ex.ToString());
                 ClearLicenseState();
                 return (true, "Deactivated locally (server unreachable).");
             }
@@ -288,7 +291,7 @@ namespace ETSOverlay
             {
                 foreach (var f in response.Features)
                 {
-                    _features.Add(f);
+                    _features.TryAdd(f, 0);
                 }
             }
 

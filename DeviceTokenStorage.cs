@@ -51,7 +51,9 @@ namespace ETSOverlay
                 {
                     var dir = Path.GetDirectoryName(PrimaryStoragePath);
                     if (!Directory.Exists(dir) && dir != null) Directory.CreateDirectory(dir);
-                    File.WriteAllBytes(PrimaryStoragePath, encryptedBytes);
+                    var tempPath = PrimaryStoragePath + ".tmp";
+                    File.WriteAllBytes(tempPath, encryptedBytes);
+                    File.Move(tempPath, PrimaryStoragePath, true);
                 }
                 catch (Exception ex)
                 {
@@ -63,7 +65,9 @@ namespace ETSOverlay
                 {
                     var dir = Path.GetDirectoryName(BackupStoragePath);
                     if (!Directory.Exists(dir) && dir != null) Directory.CreateDirectory(dir);
-                    File.WriteAllBytes(BackupStoragePath, encryptedBytes);
+                    var tempPath = BackupStoragePath + ".tmp";
+                    File.WriteAllBytes(tempPath, encryptedBytes);
+                    File.Move(tempPath, BackupStoragePath, true);
                 }
                 catch (Exception ex)
                 {

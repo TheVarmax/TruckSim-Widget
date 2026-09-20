@@ -94,7 +94,7 @@ namespace ETSOverlay
             AddTile("Type", isUk ? "Тип доставки" : "Delivery Type", initialColors);
 
             ColorItemsControl.ItemsSource = TileColors;
-            MouseLeftButtonDown += (s, e) => { DragMove(); };
+            MouseLeftButtonDown += (s, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
         }
 
         private void TriggerPreview()

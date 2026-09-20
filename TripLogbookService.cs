@@ -60,7 +60,9 @@ namespace ETSOverlay
 
                 var filePath = Path.Combine(_logbookDir, $"{trip.Id}.json");
                 var json = JsonSerializer.Serialize(trip, WriteOptions);
-                File.WriteAllText(filePath, json, Encoding.UTF8);
+                var tempPath = filePath + ".tmp";
+                File.WriteAllText(tempPath, json, Encoding.UTF8);
+                File.Move(tempPath, filePath, true);
             }
             catch (Exception ex)
             {
@@ -150,7 +152,9 @@ namespace ETSOverlay
                         CsvEscape(t.GameType)));
                 }
 
-                File.WriteAllText(filePath, sb.ToString(), Encoding.UTF8);
+                var tempPath = filePath + ".tmp";
+                File.WriteAllText(tempPath, sb.ToString(), Encoding.UTF8);
+                File.Move(tempPath, filePath, true);
             }
             catch (Exception ex)
             {
@@ -163,7 +167,9 @@ namespace ETSOverlay
             try
             {
                 var json = JsonSerializer.Serialize(trips, WriteOptions);
-                File.WriteAllText(filePath, json, Encoding.UTF8);
+                var tempPath = filePath + ".tmp";
+                File.WriteAllText(tempPath, json, Encoding.UTF8);
+                File.Move(tempPath, filePath, true);
             }
             catch (Exception ex)
             {

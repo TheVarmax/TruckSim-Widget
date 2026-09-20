@@ -39,6 +39,14 @@ namespace ETSOverlay
         private const string DonateUrl = "https://trucksim.uk/donate";
         private const string SupportEmail = "support@trucksim.uk";
         public bool _isCheckingUpdate = false;
+        private static readonly HttpClient _sharedHttpClient = CreateSharedHttpClient();
+        private static HttpClient CreateSharedHttpClient()
+        {
+            var client = new HttpClient();
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget");
+            client.Timeout = TimeSpan.FromSeconds(15);
+            return client;
+        }
 
         private bool locked = false;
         private DispatcherTimer? tbTimer;
@@ -132,6 +140,9 @@ namespace ETSOverlay
 
         private DateTime lastTelemetryUpdate = DateTime.Now;
         private bool _isManualMinimize = false;
+        private long _lastLogFileSize = -1;
+        private DateTime _lastLogFileModified = DateTime.MinValue;
+        private string[]? _cachedLogLines = null;
 
         // Состояния для сверки
         private bool _telHasActiveJob = false;
@@ -415,7 +426,7 @@ namespace ETSOverlay
                 {
                     File.Copy(legacyStatePath, canonicalStatePath, overwrite: false);
                 }
-                catch { }
+                catch (Exception ex) { WriteLog(ex.ToString()); }
             }
             stateFilePath = canonicalStatePath;
             appLogFilePath = Path.Combine(folder, "app_log.txt");
@@ -437,7 +448,7 @@ namespace ETSOverlay
                     }
                 }
             }
-            catch { }
+            catch (Exception ex) { WriteLog(ex.ToString()); }
             if (_lastDeliveredTimestamp < DateTime.Now) _lastDeliveredTimestamp = DateTime.Now;
 
             LicenseManager.Instance.OnLicenseChanged += UpdateSupporterVisuals;
@@ -515,12 +526,12 @@ namespace ETSOverlay
 
                 if (_skipStartupAnimation)
                 {
-                    MainUI.Opacity = 1;
                     IntroOverlay.Visibility = Visibility.Collapsed;
                     MainBorder.BeginAnimation(OpacityProperty, null);
                     MainBorder.Opacity = 1.0;
-                    ApplyDualLayerOpacity();
+                    MainUI.BeginAnimation(OpacityProperty, null);
                     _startupComplete = true;
+                    ApplyDualLayerOpacity();
                     if (_autoHideEnabled && !_mainBorderHovered)
                     {
                         _autoHideQuietMs = 0;
@@ -538,7 +549,7 @@ namespace ETSOverlay
 
                 // 1. Подготовка: скрыть MainUI, показать IntroOverlay
                 MainUI.Opacity = 0;
-                double initialBgOpacity = BackgroundsLayer.Opacity;
+                double targetBgOpacity = isSplitOpacityEnabled ? backgroundOpacity : windowOpacity;
                 BackgroundsLayer.Opacity = 0;
                 IntroOverlay.Visibility = Visibility.Visible;
                 IntroOverlay.Opacity = 1;
@@ -553,8 +564,8 @@ namespace ETSOverlay
                 await Task.Delay(1500);
 
                 // 2. Кросс-фейд: исчезает интро, появляется интерфейс
-                var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.3));
-                var bgFadeIn = new DoubleAnimation(initialBgOpacity, TimeSpan.FromSeconds(0.3));
+                var fadeIn = new DoubleAnimation(0, 1, TimeSpan.FromSeconds(0.3));
+                var bgFadeIn = new DoubleAnimation(0, targetBgOpacity, TimeSpan.FromSeconds(0.3));
                 MainUI.BeginAnimation(OpacityProperty, fadeIn);
                 BackgroundsLayer.BeginAnimation(OpacityProperty, bgFadeIn);
 
@@ -616,9 +627,10 @@ namespace ETSOverlay
                 // 4. Финализация: сброс анимации opacity для чистого idle-перехода
                 MainBorder.BeginAnimation(OpacityProperty, null);
                 MainBorder.Opacity = 1.0;
-                ApplyDualLayerOpacity();
-
+                MainUI.BeginAnimation(OpacityProperty, null);
+                BackgroundsLayer.BeginAnimation(OpacityProperty, null);
                 _startupComplete = true;
+                ApplyDualLayerOpacity();
                 if (_autoHideEnabled && !_mainBorderHovered)
                 {
                     _autoHideQuietMs = 0;
@@ -733,7 +745,7 @@ namespace ETSOverlay
             _tripTrailerDamage = 0f;
             _tripCargoDamage = 0f;
             _tripFinesTotal = 0;
-            _tripFines.Clear();
+            lock (_tripFines) { _tripFines.Clear(); }
             _tripOrigin = "";
             _tripDestination = "";
             _tripCargoName = "";
@@ -792,6 +804,8 @@ namespace ETSOverlay
                         activeDuration = TimeSpan.Zero;
                     }
 
+                    List<TripFine> finesCopy;
+                    lock (_tripFines) { finesCopy = new List<TripFine>(_tripFines); }
                     var trip = new TripRecord
                     {
                         StartTimeUtc = _tripStartTimeUtc,
@@ -811,7 +825,7 @@ namespace ETSOverlay
                         CargoDamagePercent = _tripCargoDamage * 100f,
                         Income = _tripIncome,
                         FinesTotal = _tripFinesTotal,
-                        Fines = new List<TripFine>(_tripFines),
+                        Fines = finesCopy,
                         TruckBrand = _tripTruckBrand,
                         TruckName = _tripTruckName,
                         GameType = _currentGame == GameType.Ats ? "ATS" : "ETS",
@@ -849,7 +863,7 @@ namespace ETSOverlay
             _tripTrailerDamage = 0f;
             _tripCargoDamage = 0f;
             _tripFinesTotal = 0;
-            _tripFines.Clear();
+            lock (_tripFines) { _tripFines.Clear(); }
             _tripOrigin = "";
             _tripDestination = "";
             _tripCargoName = "";
@@ -888,7 +902,7 @@ namespace ETSOverlay
                     File.AppendAllText(appLogFilePath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
                 }
             }
-            catch { }
+            catch (Exception ex) { WriteLog(ex.ToString()); }
         }
 
         protected override void OnStateChanged(EventArgs e)
@@ -954,7 +968,7 @@ namespace ETSOverlay
                     if (data.GamePlay.FinedEvent.Amount > 0)
                     {
                         var fine = new TripFine { Amount = data.GamePlay.FinedEvent.Amount, Offence = data.GamePlay.FinedEvent.Offence.ToString() };
-                        _tripFines.Add(fine);
+                        lock (_tripFines) { _tripFines.Add(fine); }
                         _tripFinesTotal += fine.Amount;
                         WriteLog($"[EVENT] Fined processed: {fine.Offence}, amount: {fine.Amount}");
                         if (jobDrivenDistance > 0) SaveJobState();
@@ -971,6 +985,18 @@ namespace ETSOverlay
                     WriteLog("Game telemetry CONNECTED");
                     _needsLocationCheck = true;
                     ClientPresenceService.Instance.RecordEvent("telemetry_connected", "Game telemetry connected");
+                }
+                else if (isGameOnline && !data.SdkActive)
+                {
+                    WriteLog("Game telemetry DISCONNECTED (SdkActive = false)");
+                    if (_cargoWasLoaded || !string.IsNullOrWhiteSpace(CurrentLastJobId) || jobDrivenDistance > 0)
+                    {
+                        SaveJobState();
+                        SaveGameState(_currentGame);
+                    }
+                    ResetDisplay(false);
+                    SpeedLimiterService.Instance.ReleaseBrake();
+                    ClientPresenceService.Instance.RecordEvent("telemetry_disconnected", "Game telemetry disconnected");
                 }
                 isGameOnline = data.SdkActive;
                 isPaused = data.Paused;
@@ -1368,7 +1394,7 @@ namespace ETSOverlay
                                     _tripCargoDamage = 0f;
                                     _tripMaxSpeedKmh = 0f;
                                     _tripFinesTotal = 0;
-                                    _tripFines.Clear();
+                                    lock (_tripFines) { _tripFines.Clear(); }
                                     
                                     // Determine play mode
                                     bool isTruckersMP = false;
@@ -1390,7 +1416,7 @@ namespace ETSOverlay
                                     }
                                     catch { /* Access denied or process exited */ }
 
-                                    if (isTruckersMP || System.Diagnostics.Process.GetProcessesByName("TruckersMP").Length > 0 || System.Diagnostics.Process.GetProcessesByName("TruckersMP-Launcher").Length > 0)
+                                    if (isTruckersMP || Process.GetProcessesByName("TruckersMP").Any() || Process.GetProcessesByName("TruckersMP-Launcher").Any())
                                         _tripPlayMode = "TruckersMP";
                                     else if (data.MultiplayerTimeOffset != 0)
                                         _tripPlayMode = "Convoy";
@@ -1542,7 +1568,12 @@ namespace ETSOverlay
                     }
 
                     // Обновление верхнего текста статуса игры
-                    if (_isDesync)
+                    if (!data.SdkActive)
+                    {
+                        GameStatus.Text = LocalizeStatus("GAME_OFFLINE");
+                        GameStatus.Foreground = Brushes.Gray;
+                    }
+                    else if (_isDesync)
                     {
                         GameStatus.Text = LocalizeStatus("DESYNC");
                         GameStatus.Foreground = Brushes.Red;
@@ -1577,8 +1608,11 @@ namespace ETSOverlay
 
         private void CheckStatusAndProcesses()
         {
+            // Snapshot previous state before update
+            bool wasTbRunning = _isTbRunning;
             isEtsRunning = Process.GetProcessesByName("eurotrucks2").Any();
             isAtsRunning = Process.GetProcessesByName("amtrucks").Any();
+            _isTbRunning = Process.GetProcessesByName("TB Client").Any();
             bool isGameRunning = isEtsRunning || isAtsRunning;
 
             if (isAtsRunning)
@@ -1611,14 +1645,33 @@ namespace ETSOverlay
                 _wasGameRunning = isGameRunning;
             }
 
-            if (isGameRunning && (DateTime.Now - lastTelemetryUpdate).TotalSeconds > 5)
+            if (isGameOnline && (DateTime.Now - lastTelemetryUpdate).TotalSeconds > 1.5)
             {
-                try { telemetry?.Dispose(); telemetry = new SCSSdkTelemetry(); HookTelemetryEvents(telemetry); lastTelemetryUpdate = DateTime.Now; WriteLog("Reinitialized telemetry connection"); } catch { }
+                isGameOnline = false;
             }
 
-            var tbProcesses = Process.GetProcessesByName("TB Client");
-            bool wasTbRunning = _isTbRunning;
-            _isTbRunning = tbProcesses.Length > 0;
+            if (isGameRunning && (DateTime.Now - lastTelemetryUpdate).TotalSeconds > 5)
+            {
+                try
+                {
+                    if (telemetry != null)
+                    {
+                        telemetry.Data -= Telemetry_Data;
+                        telemetry.JobStarted -= Telemetry_JobStarted;
+                        telemetry.JobCancelled -= Telemetry_JobCancelled;
+                        telemetry.JobDelivered -= Telemetry_JobDelivered;
+                        telemetry.Fined -= Telemetry_Fined;
+                    }
+                    telemetry?.Dispose();
+                    telemetry = new SCSSdkTelemetry();
+                    HookTelemetryEvents(telemetry);
+                    lastTelemetryUpdate = DateTime.Now;
+                    WriteLog("Reinitialized telemetry connection");
+                }
+                catch (Exception ex) { WriteLog(ex.ToString()); }
+            }
+
+            // _isTbRunning is already updated in the cache block above
 
             if (_isTbRunning != wasTbRunning)
             {
@@ -1655,7 +1708,7 @@ namespace ETSOverlay
                 s.SyncActive = LicenseManager.Instance.HasFeature("cloud_sync") || CloudSyncStatus == "Available";
             });
 
-            if (!isGameRunning)
+            if (!isGameRunning || !isGameOnline)
             {
                 _deliveryTimer.Update(false);
                 if (isGameOnline || (GameStatus.Text != "OFFLINE" && GameStatus.Text != LocalizeStatus("GAME_OFFLINE")))
@@ -1747,10 +1800,21 @@ namespace ETSOverlay
                     if (File.Exists(logFilePath))
                     {
                         var logInfo = new FileInfo(logFilePath);
-                        using var fs = new FileStream(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                        using var sr = new StreamReader(fs, System.Text.Encoding.UTF8, true);
-                        string content = sr.ReadToEnd();
-                        string[] lines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        // Skip re-reading if file hasn't changed since last check
+                        if (logInfo.Length == _lastLogFileSize && logInfo.LastWriteTimeUtc == _lastLogFileModified && _cachedLogLines != null)
+                        {
+                            // Use cached lines — file hasn't changed
+                        }
+                        else
+                        {
+                            _lastLogFileSize = logInfo.Length;
+                            _lastLogFileModified = logInfo.LastWriteTimeUtc;
+                            using var fs = new FileStream(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                            using var sr = new StreamReader(fs, System.Text.Encoding.UTF8, true);
+                            string content = sr.ReadToEnd();
+                            _cachedLogLines = content.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+                        }
+                        string[] lines = _cachedLogLines ?? Array.Empty<string>();
 
                         if (lines.Length > 0)
                         {
@@ -1916,14 +1980,23 @@ namespace ETSOverlay
                                 }
                             }
 
-                            if (!isRecordingBroken && lastDisconnectIdx > Math.Max(lastTelemetryActivityIdx, lastTbConnectedIdx))
+                            bool isNormalDisconnect = (lastExitGameIdx >= 0 && lastExitGameIdx >= lastDisconnectIdx)
+                                || (lastProfileLeave >= 0 && lastProfileLeave >= lastDisconnectIdx)
+                                || (lastProfileLeave >= 0 && lastProfileLeave > lastProfileLoad)
+                                || (lastExitGameIdx >= 0 && lastExitGameIdx > lastTbConnectedIdx)
+                                || _forceProfileUnloaded
+                                || !isProfileLoaded
+                                || !isGameOnline
+                                || !isGameRunning;
+
+                            if (!isRecordingBroken && !isNormalDisconnect && lastDisconnectIdx > Math.Max(lastTelemetryActivityIdx, lastTbConnectedIdx))
                             {
                                 isRecordingBroken = true;
                                 tbState = LocalizeStatus("TB_ERROR");
                                 tbColor = Brushes.Red;
                             }
 
-                            if (!isRecordingBroken && lastDeliveryNotStartedIdx > Math.Max(lastTelemetryActivityIdx, lastTbConnectedIdx))
+                            if (!isRecordingBroken && !isNormalDisconnect && lastDeliveryNotStartedIdx > Math.Max(lastTelemetryActivityIdx, lastTbConnectedIdx))
                             {
                                 isRecordingBroken = true;
                                 tbState = LocalizeStatus("TB_ERROR");
@@ -2405,7 +2478,7 @@ namespace ETSOverlay
                 _tripFinesTotal = state.TripData.FinesTotal;
                 if (state.TripData.Fines != null)
                 {
-                    _tripFines = new List<TripFine>(state.TripData.Fines);
+                    lock (_tripFines) { _tripFines = new List<TripFine>(state.TripData.Fines); }
                 }
                 _deliveryTimer.Restore(state.TripData.ActiveDurationTicks);
             }
@@ -2498,7 +2571,7 @@ namespace ETSOverlay
             jobState.TripData.MaxSpeedKmh = _cargoWasLoaded ? _tripMaxSpeedKmh : 0f;
             jobState.TripData.PlayMode = _tripPlayMode;
             jobState.TripData.FinesTotal = _tripFinesTotal;
-            jobState.TripData.Fines = new List<TripFine>(_tripFines);
+            lock (_tripFines) { jobState.TripData.Fines = new List<TripFine>(_tripFines); }
             jobState.TripData.ActiveDurationTicks = _deliveryTimer.GetTicks();
 
             _jobStates[stateKey] = jobState;
@@ -2793,7 +2866,9 @@ namespace ETSOverlay
                 var state = GetCurrentAppState();
 
                 var json = JsonSerializer.Serialize(state, StateJsonOptions);
-                File.WriteAllText(stateFilePath, json);
+                var tempPath = stateFilePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, stateFilePath, true);
 
                 SaveGameState(GameType.Ets);
                 SaveGameState(GameType.Ats);
@@ -3612,7 +3687,7 @@ namespace ETSOverlay
 
             double targetBgOpacity = isSplitOpacityEnabled ? backgroundOpacity : windowOpacity;
             
-            if (BackgroundsLayer != null) 
+            if (BackgroundsLayer != null && _startupComplete) 
             {
                 BackgroundsLayer.BeginAnimation(OpacityProperty, null);
                 BackgroundsLayer.Opacity = targetBgOpacity;
@@ -3623,10 +3698,8 @@ namespace ETSOverlay
                 _headerOverlay.AnimateOpacity(targetBgOpacity, 0.1);
             }
 
-            // Icons and decorative lines inside MainUI are part of the interface.
-            // In Split mode, MainUI is 1.0, so these interface elements must fade with targetBgOpacity.
-            // In Normal mode, MainUI fades with windowOpacity, so these elements should be 1.0 relative to MainUI.
-            double interfaceElementsOpacity = isSplitOpacityEnabled ? targetBgOpacity : 1.0;
+            // In both Split mode and Normal mode, interface elements (icons, lines, decorations) scale with background opacity
+            double interfaceElementsOpacity = targetBgOpacity;
             
             if (SimIconBg != null) SimIconBg.Opacity = interfaceElementsOpacity;
             if (StatusIconBg != null) StatusIconBg.Opacity = interfaceElementsOpacity;
@@ -3636,6 +3709,8 @@ namespace ETSOverlay
             if (RouteIconMultiBg != null) RouteIconMultiBg.Opacity = interfaceElementsOpacity;
             if (RouteLine1 != null) RouteLine1.Opacity = interfaceElementsOpacity;
             if (RouteLine2 != null) RouteLine2.Opacity = interfaceElementsOpacity;
+            if (TbStatusDot != null) TbStatusDot.Opacity = interfaceElementsOpacity;
+            if (BrakeIcon != null) BrakeIcon.Opacity = interfaceElementsOpacity;
             
             // Intro overlay elements
             if (IntroOverlayBg != null) IntroOverlayBg.Opacity = targetBgOpacity;
@@ -3673,10 +3748,12 @@ namespace ETSOverlay
                 if (tb != null) tb.Opacity = effectiveTextOpacity;
             }
 
-            // MainUI contains both Text and Interface Elements (Icons, lines).
-            // In Split Mode, MainUI must be 1.0 so text can reach 1.0 opacity.
-            // In Normal Mode, MainUI is set to windowOpacity to smoothly fade everything together.
-            if (MainUI != null) MainUI.Opacity = isSplitOpacityEnabled ? 1.0 : windowOpacity;
+            // MainUI is kept at 1.0 so child elements have exact independent/direct opacities
+            if (MainUI != null && _startupComplete)
+            {
+                MainUI.BeginAnimation(OpacityProperty, null);
+                MainUI.Opacity = 1.0;
+            }
 
             if (_hudWindow != null && _hudWindow.IsVisible)
             {
@@ -4183,7 +4260,10 @@ namespace ETSOverlay
                 };
 
                 var json = JsonSerializer.Serialize(state, StateJsonOptions);
-                File.WriteAllText(GetGameStatePath(game), json);
+                var filePath = GetGameStatePath(game);
+                var tempPath = filePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, filePath, true);
             }
             catch (Exception ex)
             {
@@ -4307,7 +4387,9 @@ namespace ETSOverlay
                 string filePath = Path.Combine(folder, $"job_{safeJobId}.json");
 
                 var json = JsonSerializer.Serialize(jobState, StateJsonOptions);
-                File.WriteAllText(filePath, json);
+                var tempPath = filePath + ".tmp";
+                File.WriteAllText(tempPath, json);
+                File.Move(tempPath, filePath, true);
             }
             catch (Exception ex)
             {
@@ -4416,14 +4498,22 @@ namespace ETSOverlay
                 SaveJobState();
                 SaveState();
                 SpeedLimiterService.Instance.ReleaseBrake();
+                if (telemetry != null)
+                {
+                    telemetry.Data -= Telemetry_Data;
+                    telemetry.JobStarted -= Telemetry_JobStarted;
+                    telemetry.JobCancelled -= Telemetry_JobCancelled;
+                    telemetry.JobDelivered -= Telemetry_JobDelivered;
+                    telemetry.Fined -= Telemetry_Fined;
+                }
                 telemetry?.Dispose();
                 try
                 {
                     Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("user_exit")).Wait(2500);
                 }
-                catch { }
+                catch (Exception ex) { WriteLog(ex.ToString()); }
             }
-            catch { }
+            catch (Exception ex) { WriteLog(ex.ToString()); }
             Environment.Exit(0);
         }
 
@@ -4458,14 +4548,22 @@ namespace ETSOverlay
                 SaveJobState();
                 SaveState(); 
                 SpeedLimiterService.Instance.ReleaseBrake(); 
+                if (telemetry != null)
+                {
+                    telemetry.Data -= Telemetry_Data;
+                    telemetry.JobStarted -= Telemetry_JobStarted;
+                    telemetry.JobCancelled -= Telemetry_JobCancelled;
+                    telemetry.JobDelivered -= Telemetry_JobDelivered;
+                    telemetry.Fined -= Telemetry_Fined;
+                }
                 telemetry?.Dispose(); 
                 try
                 {
                     Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("user_exit")).Wait(2500);
                 }
-                catch { }
+                catch (Exception ex) { WriteLog(ex.ToString()); }
             }
-            catch { }
+            catch (Exception ex) { WriteLog(ex.ToString()); }
             base.OnClosed(e); 
             Environment.Exit(0);
         }
@@ -4478,14 +4576,22 @@ namespace ETSOverlay
                 SaveJobState();
                 SaveState();
                 SpeedLimiterService.Instance.ReleaseBrake();
+                if (telemetry != null)
+                {
+                    telemetry.Data -= Telemetry_Data;
+                    telemetry.JobStarted -= Telemetry_JobStarted;
+                    telemetry.JobCancelled -= Telemetry_JobCancelled;
+                    telemetry.JobDelivered -= Telemetry_JobDelivered;
+                    telemetry.Fined -= Telemetry_Fined;
+                }
                 telemetry?.Dispose();
                 try
                 {
                     Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("system_shutdown")).Wait(2500);
                 }
-                catch { }
+                catch (Exception ex) { WriteLog(ex.ToString()); }
             }
-            catch { }
+            catch (Exception ex) { WriteLog(ex.ToString()); }
         }
 
         // ==================== AUTO-UPDATE ====================
@@ -4639,7 +4745,7 @@ namespace ETSOverlay
                     }
                 });
             }
-            catch { }
+            catch (Exception ex) { WriteLog(ex.ToString()); }
             finally
             {
                 _isCooldownActive = false;
@@ -4753,7 +4859,7 @@ namespace ETSOverlay
                     current = Directory.GetParent(current)?.FullName;
                 }
             }
-            catch { }
+            catch (Exception ex) { System.Diagnostics.Trace.WriteLine(ex.ToString()); }
 
             return candidates
                 .Where(File.Exists)
@@ -4901,9 +5007,7 @@ namespace ETSOverlay
 
                 WriteLog("Checking for updates...");
 
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget/" + GetCurrentVersion());
-                client.Timeout = TimeSpan.FromSeconds(15);
+                var client = _sharedHttpClient;
 
                 var response = await client.GetStringAsync(GitHubApiUrl);
                 using var doc = JsonDocument.Parse(response);
@@ -5179,9 +5283,7 @@ namespace ETSOverlay
                 string currentVersion = GetCurrentVersion();
                 WriteLog($"Fetching release notes for current version {currentVersion}...");
 
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget/" + currentVersion);
-                client.Timeout = TimeSpan.FromSeconds(10);
+                var client = _sharedHttpClient;
 
                 var response = await client.GetStringAsync(GitHubApiUrl);
                 using var doc = JsonDocument.Parse(response);
@@ -5316,12 +5418,20 @@ namespace ETSOverlay
                 SaveJobState();
                 SaveState();
                 SpeedLimiterService.Instance.ReleaseBrake();
+                if (telemetry != null)
+                {
+                    telemetry.Data -= Telemetry_Data;
+                    telemetry.JobStarted -= Telemetry_JobStarted;
+                    telemetry.JobCancelled -= Telemetry_JobCancelled;
+                    telemetry.JobDelivered -= Telemetry_JobDelivered;
+                    telemetry.Fined -= Telemetry_Fined;
+                }
                 telemetry?.Dispose();
                 try
                 {
                     Task.Run(async () => await ClientPresenceService.Instance.ShutdownAsync("update")).Wait(2500);
                 }
-                catch { }
+                catch (Exception ex) { WriteLog(ex.ToString()); }
                 Environment.Exit(0);
             }
             catch (Exception ex)
@@ -5380,7 +5490,7 @@ namespace ETSOverlay
                     string copied = isUk ? "Email скопійовано!" : "Email copied!";
                     if (_settingsWindow != null) _settingsWindow.UpdateStatusText.Text = $"📋 {copied}";
                 }
-                catch { }
+                catch (Exception ex) { WriteLog(ex.ToString()); }
 
                 // Предлагаем сохранить лог
                 try

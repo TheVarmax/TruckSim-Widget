@@ -66,7 +66,7 @@ namespace ETSOverlay
                 BtnNo.Content = noText;
             }
 
-            MouseLeftButtonDown += (s, e) => { DragMove(); };
+            MouseLeftButtonDown += (s, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
         }
 
         private void BtnYes_Click(object sender, RoutedEventArgs e)

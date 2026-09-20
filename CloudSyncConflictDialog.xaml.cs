@@ -24,21 +24,18 @@ namespace ETSOverlay
         {
             Result = ConflictResult.Download;
             DialogResult = true;
-            Close();
         }
 
         private void BtnOverwrite_Click(object sender, RoutedEventArgs e)
         {
             Result = ConflictResult.Overwrite;
             DialogResult = true;
-            Close();
         }
 
         private void BtnCancel_Click(object sender, RoutedEventArgs e)
         {
             Result = ConflictResult.Cancel;
             DialogResult = false;
-            Close();
         }
     }
 }

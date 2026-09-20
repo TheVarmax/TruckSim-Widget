@@ -62,7 +62,7 @@ namespace ETSOverlay.ScsArchive
 
             try
             {
-                using var br = new BinaryReader(File.OpenRead(path));
+                using var br = new BinaryReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
                 if (br.BaseStream.Length < 32)
                 {
                     IsValid = false;
@@ -281,7 +281,7 @@ namespace ETSOverlay.ScsArchive
         {
             try
             {
-                using var br = new BinaryReader(File.OpenRead(_path));
+                using var br = new BinaryReader(new FileStream(_path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite));
                 br.BaseStream.Seek(entry.Offset, SeekOrigin.Begin);
 
                 if (!entry.IsCompressed)

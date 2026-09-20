@@ -97,7 +97,7 @@ namespace ETSOverlay
                 FallbackBlock.Text = language == "uk" ? "Опис оновлення наразі недоступний." : "Release notes are unavailable right now.";
             }
 
-            MouseLeftButtonDown += (s, e) => { DragMove(); };
+            MouseLeftButtonDown += (s, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
 
             CommandBindings.Add(new CommandBinding(NavigationCommands.GoToPage, (sender, e) =>
             {

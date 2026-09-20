@@ -193,8 +193,11 @@ namespace ETSOverlay
             // A slightly lighter brush for hovers
             dict["CardBackgroundHoverBrush"] = LighterBrush(cardBg, 0.05);
 
-            Application.Current.Resources.MergedDictionaries.Clear();
-            Application.Current.Resources.MergedDictionaries.Add(dict);
+            Application.Current.Dispatcher.Invoke(() =>
+            {
+                Application.Current.Resources.MergedDictionaries.Clear();
+                Application.Current.Resources.MergedDictionaries.Add(dict);
+            });
         }
 
         private SolidColorBrush CreateBrush(string hex)

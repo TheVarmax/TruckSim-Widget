@@ -363,6 +363,7 @@ namespace ETSOverlay
                 }
 
                 _isShutDown = false;
+                _heartbeatCts?.Dispose();
                 _heartbeatCts = new CancellationTokenSource();
                 _heartbeatLoopTask = Task.Run(() => HeartbeatLoopAsync(_heartbeatCts.Token));
             }

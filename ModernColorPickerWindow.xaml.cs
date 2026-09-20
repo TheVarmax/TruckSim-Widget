@@ -24,7 +24,7 @@ namespace ETSOverlay
             BtnSave.Content = isUk ? "Вибрати" : "Select";
             TitleBlock.Text = isUk ? "Виберіть колір" : "Choose Color";
 
-            MouseLeftButtonDown += (s, e) => { DragMove(); };
+            MouseLeftButtonDown += (s, e) => { if (e.ButtonState == MouseButtonState.Pressed) DragMove(); };
             Loaded += ModernColorPickerWindow_Loaded;
 
             GenerateSwatches();
@@ -80,7 +80,21 @@ namespace ETSOverlay
                 UpdateCanvasBackground();
                 UpdatePreview();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex);
+                // fallback to white
+                var color = Colors.White;
+                RgbToHsv(color, out _currentHue, out _currentSaturation, out _currentValue);
+                
+                _isUpdating = true;
+                HueSlider.Value = _currentHue;
+                _isUpdating = false;
+
+                UpdateThumbsFromHsv();
+                UpdateCanvasBackground();
+                UpdatePreview();
+            }
         }
 
         private void HueSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)

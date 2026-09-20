@@ -22,6 +22,7 @@ namespace TruckSim_Widget
             {
                 // Another instance is already running
                 MessageBox.Show("TruckSim Widget is already running.", "TruckSim Widget", MessageBoxButton.OK, MessageBoxImage.Information);
+                _mutex?.Dispose();
                 Environment.Exit(0);
                 return;
             }
