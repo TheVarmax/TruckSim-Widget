@@ -512,19 +512,13 @@ namespace ETSOverlay
             // Auto-check for updates on startup (silent mode)
             _ = CheckForUpdatesAsync(silent: true);
 
+            // Validate license in the background
             _ = ValidateLicenseOnStartupAsync();
             UpdateSupporterVisuals();
 
-            if (Array.Exists(Environment.GetCommandLineArgs(), arg => arg == "--updated"))
-            {
-                _skipStartupAnimation = true;
-                _ = Dispatcher.InvokeAsync(async () => await ShowUpdateSuccessDialogIfNeededAsync());
-            }
-
-            ClientPresenceService.Instance.Start();
-
             Loaded += async (s, e) =>
             {
+                ClientPresenceService.Instance.Start();
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
@@ -606,6 +600,28 @@ namespace ETSOverlay
                 else
                 {
                     IntroOverlay.Visibility = Visibility.Collapsed;
+                }
+
+                // Show update success dialog if applicable
+                var args = Environment.GetCommandLineArgs();
+                if (Array.Exists(args, arg => arg == "--updated"))
+                {
+                    // Fallback: если release body не был сохранён предыдущей версией,
+                    // подтягиваем его из GitHub API
+                    if (string.IsNullOrWhiteSpace(LatestReleaseBody))
+                    {
+                        await FetchLatestReleaseNotesAsync();
+                    }
+
+                    var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
+                    successWindow.Owner = this;
+                    successWindow.ShowDialog();
+                    
+                    // Clear the URL after showing it
+                    LatestReleaseUrl = null;
+                    LatestReleaseName = null;
+                    LatestReleaseBody = null;
+                    SaveState();
                 }
 
                 // 4. Финализация: сброс анимации opacity для чистого idle-перехода
@@ -4925,8 +4941,7 @@ namespace ETSOverlay
                                 Filter = "TruckSimWidgetSetup (*.exe)|*.exe|All Files (*.*)|*.*"
                             };
 
-                            Window? owner = this.IsVisible ? this : null;
-                            if (ofd.ShowDialog(owner) == true)
+                            if (ofd.ShowDialog(this) == true)
                             {
                                 installerPath = ofd.FileName;
                             }
@@ -4938,8 +4953,7 @@ namespace ETSOverlay
                         WriteLog("[SIMULATE ERROR] No installer file found for update simulation.");
                         Dispatcher.Invoke(() =>
                         {
-                            Window? owner = this.IsVisible ? this : null;
-                            CustomMessageBox.Show(owner,
+                            CustomMessageBox.Show(this,
                                 uiLanguage == "uk"
                                     ? "Режим тестування: файл інсталятора TruckSimWidgetSetup не знайдено.\n\nВкажіть шлях через параметр: --simulate-update \"шлях\\до\\TruckSimWidgetSetup.exe\" або помістіть інсталятор у папку Releases на Робочому столі."
                                     : "Test mode: TruckSimWidgetSetup installer file was not found.\n\nPlease specify the path: --simulate-update \"path\\to\\TruckSimWidgetSetup.exe\" or place the installer in Desktop\\TruckSim Widget\\Releases.",
@@ -5314,42 +5328,6 @@ namespace ETSOverlay
             }
         }
 
-        private async Task ShowUpdateSuccessDialogIfNeededAsync()
-        {
-            var args = Environment.GetCommandLineArgs();
-            if (!Array.Exists(args, arg => arg == "--updated")) return;
-
-            try
-            {
-                if (string.IsNullOrWhiteSpace(LatestReleaseBody))
-                {
-                    await FetchLatestReleaseNotesAsync();
-                }
-
-                var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody)
-                {
-                    Owner = null,
-                    ShowInTaskbar = true
-                };
-
-                try
-                {
-                    successWindow.ShowDialog();
-                }
-                catch (Exception ex)
-                {
-                    WriteLog($"Failed to show update dialog: {ex.Message}");
-                }
-            }
-            finally
-            {
-                LatestReleaseUrl = null;
-                LatestReleaseName = null;
-                LatestReleaseBody = null;
-                SaveState();
-            }
-        }
-
         /// <summary>
         /// Показывает диалог подтверждения обновления
         /// </summary>
@@ -5365,8 +5343,7 @@ namespace ETSOverlay
                 string yesBtn = isBeta ? (uiLanguage == "uk" ? "Встановити" : "Install") : (uiLanguage == "uk" ? "Так" : "Yes");
                 string noBtn = isBeta ? (uiLanguage == "uk" ? "Пропустити" : "Skip") : (uiLanguage == "uk" ? "Ні" : "No");
 
-                Window? owner = this.IsVisible ? this : null;
-                var result = CustomMessageBox.Show(owner, message, title, yesBtn, noBtn);
+                var result = CustomMessageBox.Show(this, message, title, yesBtn, noBtn);
 
                 if (result == MessageBoxResult.Yes)
                 {
@@ -5515,8 +5492,7 @@ namespace ETSOverlay
             string yesBtn = isUk ? "Так" : "Yes";
             string noBtn = isUk ? "Ні" : "No";
 
-            Window? owner = this.IsVisible ? this : null;
-            var result = CustomMessageBox.Show(owner, body, title, yesBtn, noBtn);
+            var result = CustomMessageBox.Show(this, body, title, yesBtn, noBtn);
 
             if (result == MessageBoxResult.Yes)
             {
@@ -5917,8 +5893,6 @@ namespace ETSOverlay
                 {
                     await InitializeCloudSyncAsync();
                 }
-
-                ClientPresenceService.Instance.TriggerImmediateSync();
             }
             catch (Exception ex)
             {

@@ -24,7 +24,7 @@ namespace ETSOverlay
 
             LocationChanged += (s, e) =>
             {
-                if (!_isUpdatingPosition)
+                if (!_isUpdatingPosition && WindowState != WindowState.Minimized)
                 {
                     _targetCenterLeft = GetTrueCenterLeft();
                 }
@@ -201,6 +201,7 @@ namespace ETSOverlay
         private void DataContainer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (double.IsNaN(_targetCenterLeft)) return;
+            if (WindowState == WindowState.Minimized) return;
 
             if (e.WidthChanged && e.PreviousSize.Width > 0 && !_isUpdatingPosition)
             {
