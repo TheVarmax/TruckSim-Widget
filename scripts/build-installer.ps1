@@ -1,5 +1,5 @@
 param(
-    [string]$Version = "1.6.4-beta.1",
+    [string]$Version = "1.6.4",
     [string]$Configuration = "Release",
     [string]$PublishDir = "C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget ($Version)",
     [string]$OutputDir = "C:\Users\mrpry\Desktop\TruckSim Widget\Releases",
@@ -174,4 +174,3 @@ Write-Host ""
 Write-Host "[6/6] Build Completed Successfully!" -ForegroundColor Green
 Write-Host ("Artifact : " + $FinalExePath) -ForegroundColor Cyan
 Write-Host "================================================================" -ForegroundColor Cyan
-

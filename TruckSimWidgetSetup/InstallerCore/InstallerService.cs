@@ -31,25 +31,28 @@ public class InstallerService
         statusText?.Report($"Preparing {opName}...");
         InstallerLogger.LogInfo($"Beginning {opName} into: {targetDir}");
 
-        // Wait or ensure main app process is closed
-        EnsureAppProcessClosed();
-
-        // 1. Initialize payload provider
-        using var payload = new EmbeddedPayloadProvider(options.CustomSourceDir, options.CustomZipPath);
-        var currentManifest = payload.Manifest;
-
-        // Initialize ElevatedHelper runner with expected hash from manifest if present
-        if (currentManifest.TryGetEntry("ElevatedHelper.exe", out var helperEntry) && helperEntry != null)
-        {
-            string helperPath = Path.Combine(targetDir, "ElevatedHelper.exe");
-            ElevatedHelperRunner.Initialize(helperPath, helperEntry.Sha256);
-        }
-
-        // 2. Initialize transaction journal
-        var journal = TransactionJournal.StartNew(opName, currentManifest.Version);
-
+        TransactionJournal? journal = null;
         try
         {
+            if (!CrashRecoveryEngine.CheckAndExecuteRecovery())
+                throw new InvalidOperationException("A previous installation could not be recovered.");
+
+            // Wait or ensure main app process is closed
+            EnsureAppProcessClosed();
+
+            // 1. Initialize payload provider
+            using var payload = new EmbeddedPayloadProvider(options.CustomSourceDir, options.CustomZipPath);
+            var currentManifest = payload.Manifest;
+
+            // Initialize ElevatedHelper runner with expected hash from manifest if present
+            if (currentManifest.TryGetEntry("ElevatedHelper.exe", out var helperEntry) && helperEntry != null)
+            {
+                string helperPath = Path.Combine(targetDir, "ElevatedHelper.exe");
+                ElevatedHelperRunner.Initialize(helperPath, helperEntry.Sha256);
+            }
+
+            // 2. Initialize transaction journal
+            journal = TransactionJournal.StartNew(opName, currentManifest.Version);
             // 3. Load previous manifest if available
             PackageManifest? previousManifest = null;
             string installedManifestPath = Constants.GetInstalledManifestFilePath();
@@ -216,7 +219,11 @@ public class InstallerService
         {
             InstallerLogger.LogErr($"{opName} failed with error: {ex.Message}\n{ex.StackTrace}");
             statusText?.Report($"Error: {ex.Message}. Rolling back changes...");
-            journal.Rollback();
+            if (journal != null)
+            {
+                try { journal.Rollback(); }
+                catch (Exception rollbackEx) { InstallerLogger.LogErr($"Rollback could not finish: {rollbackEx.Message}"); }
+            }
             return false;
         }
     }
@@ -229,18 +236,21 @@ public class InstallerService
         statusText?.Report("Preparing uninstallation...");
         InstallerLogger.LogInfo($"Beginning uninstallation (RemoveUserData: {removeUserData})");
 
-        // Ensure main app is closed
-        EnsureAppProcessClosed();
-
-        var installInfo = InstallationDetector.Detect();
-        string appDir = !string.IsNullOrEmpty(installInfo.InstallPath)
-            ? installInfo.InstallPath
-            : Constants.GetDefaultAppDir();
-
-        var journal = TransactionJournal.StartNew("Uninstall", installInfo.InstalledVersion);
-
+        TransactionJournal? journal = null;
         try
         {
+            if (!CrashRecoveryEngine.CheckAndExecuteRecovery())
+                throw new InvalidOperationException("A previous installation could not be recovered.");
+
+            // Ensure main app is closed
+            EnsureAppProcessClosed();
+
+            var installInfo = InstallationDetector.Detect();
+            string appDir = !string.IsNullOrEmpty(installInfo.InstallPath)
+                ? installInfo.InstallPath
+                : Constants.GetDefaultAppDir();
+
+            journal = TransactionJournal.StartNew("Uninstall", installInfo.InstalledVersion);
             // 1. Process telemetry plugins uninstall
             statusText?.Report("Restoring telemetry plugins...");
             if (installInfo.ExistingState != null)
@@ -371,7 +381,11 @@ public class InstallerService
         {
             InstallerLogger.LogErr($"Uninstall failed: {ex.Message}\n{ex.StackTrace}");
             statusText?.Report($"Uninstall failed: {ex.Message}");
-            journal.Rollback();
+            if (journal != null)
+            {
+                try { journal.Rollback(); }
+                catch (Exception rollbackEx) { InstallerLogger.LogErr($"Rollback could not finish: {rollbackEx.Message}"); }
+            }
             return false;
         }
     }

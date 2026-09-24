@@ -902,7 +902,7 @@ namespace ETSOverlay
                     File.AppendAllText(appLogFilePath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}\n");
                 }
             }
-            catch (Exception ex) { WriteLog(ex.ToString()); }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LOG] {ex}"); }
         }
 
         protected override void OnStateChanged(EventArgs e)
@@ -1623,11 +1623,6 @@ namespace ETSOverlay
             {
                 SetCurrentGame(GameType.Ets);
             }
-            else
-            {
-                _currentGame = GameType.Unknown;
-            }
-
             if (isGameRunning != _wasGameRunning)
             {
                 if (isGameRunning)
@@ -1739,6 +1734,8 @@ namespace ETSOverlay
                 _awaitingTbResponse = false;
                 _desyncSeconds = 0;
                 _isDesync = false;
+                // Save the stopped game's delivery before losing its ETS/ATS identity.
+                if (!isGameRunning) _currentGame = GameType.Unknown;
                 return;
             }
 
@@ -4285,46 +4282,62 @@ namespace ETSOverlay
 
         private void LoadGameState(GameType game)
         {
+            LoadGameState(game, GetGameStateFolder(game));
+        }
+
+        private void LoadGameState(GameType game, string folder)
+        {
             try
             {
-                string path = GetGameStatePath(game);
-                if (!File.Exists(path)) return;
-
-                string content = File.ReadAllText(path);
-                if (!content.TrimStart().StartsWith("{", StringComparison.Ordinal)) return;
-
-                var state = JsonSerializer.Deserialize<GameState>(content, StateJsonOptions);
-                if (state == null) return;
-
-                if (game == GameType.Ats)
+                string path = Path.Combine(folder, "state.json");
+                DateTime? stateSavedAtUtc = null;
+                if (File.Exists(path))
                 {
-                    _lastJobIdAts = state.LastJobId ?? "";
-                    _tbJobIdAts = state.TbJobId ?? "";
-                    _lastDeliveredJobIdAts = state.LastDeliveredJobId ?? "";
-                    _speedWarningAts = Math.Max(0, state.SpeedWarning);
-                }
-                else
-                {
-                    _lastJobIdEts = state.LastJobId ?? "";
-                    _tbJobIdEts = state.TbJobId ?? "";
-                    _lastDeliveredJobIdEts = state.LastDeliveredJobId ?? "";
-                    _speedWarningEts = Math.Max(0, state.SpeedWarning);
-                }
-
-                if (state.JobStates != null)
-                {
-                    // ВАЖНО: Загружаем только активные заказы
-                    foreach (var kvp in state.JobStates)
+                    try
                     {
-                        if (kvp.Value.CargoWasLoaded || kvp.Value.MaxSpeedKmh > 0 || kvp.Value.DrivenDistance > 0)
+                        string content = File.ReadAllText(path);
+                        var state = content.TrimStart().StartsWith("{", StringComparison.Ordinal)
+                            ? JsonSerializer.Deserialize<GameState>(content, StateJsonOptions)
+                            : null;
+                        if (state != null)
                         {
-                            _jobStates[kvp.Key] = kvp.Value;
+                            stateSavedAtUtc = File.GetLastWriteTimeUtc(path);
+                            if (game == GameType.Ats)
+                            {
+                                _lastJobIdAts = state.LastJobId ?? "";
+                                _tbJobIdAts = state.TbJobId ?? "";
+                                _lastDeliveredJobIdAts = state.LastDeliveredJobId ?? "";
+                                _speedWarningAts = Math.Max(0, state.SpeedWarning);
+                            }
+                            else
+                            {
+                                _lastJobIdEts = state.LastJobId ?? "";
+                                _tbJobIdEts = state.TbJobId ?? "";
+                                _lastDeliveredJobIdEts = state.LastDeliveredJobId ?? "";
+                                _speedWarningEts = Math.Max(0, state.SpeedWarning);
+                            }
+
+                            if (state.JobStates != null)
+                            {
+                                foreach (var kvp in state.JobStates)
+                                {
+                                    if (kvp.Value.CargoWasLoaded || kvp.Value.MaxSpeedKmh > 0 || kvp.Value.DrivenDistance > 0)
+                                    {
+                                        _jobStates[kvp.Key] = kvp.Value;
+                                    }
+                                }
+                            }
                         }
+                    }
+                    catch (Exception ex)
+                    {
+                        WriteLog($"[ERROR] Failed to read game state ({game}); trying job files: {ex.Message}");
                     }
                 }
 
-                // Дополнительно загружаем отдельные файлы заказов из папки игры
-                LoadIndividualJobFiles(game);
+                // Individual job files can recover a missing/corrupt aggregate state, or
+                // a newer save written just before an interrupted aggregate-state write.
+                LoadIndividualJobFiles(game, folder, stateSavedAtUtc);
 
                 // Recover active job ID if empty but present in loaded job states
                 string currentSavedJobId = game == GameType.Ats ? _lastJobIdAts : _lastJobIdEts;
@@ -4350,11 +4363,10 @@ namespace ETSOverlay
         }
 
         // Загружает все отдельные файлы заказов из папки игры
-        private void LoadIndividualJobFiles(GameType game)
+        private void LoadIndividualJobFiles(GameType game, string folder, DateTime? stateSavedAtUtc)
         {
             try
             {
-                string folder = GetGameStateFolder(game);
                 if (!Directory.Exists(folder)) return;
 
                 var jobFiles = Directory.GetFiles(folder, "job_*.json");
@@ -4367,7 +4379,8 @@ namespace ETSOverlay
                         if (jobState != null && (jobState.CargoWasLoaded || jobState.MaxSpeedKmh > 0 || jobState.DrivenDistance > 0))
                         {
                             string stateKey = GetJobStateKey(game, jobState.TelemetryId);
-                            if (!_jobStates.ContainsKey(stateKey))
+                            if (!_jobStates.ContainsKey(stateKey) ||
+                                !stateSavedAtUtc.HasValue || File.GetLastWriteTimeUtc(jobFile) > stateSavedAtUtc.Value)
                             {
                                 _jobStates[stateKey] = jobState;
                                 WriteLog($"Loaded job from individual file: {jobState.TelemetryId}");

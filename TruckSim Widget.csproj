@@ -4,10 +4,10 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>TruckSim_Widget</RootNamespace>
     <AssemblyName>TruckSim Widget</AssemblyName>
-    <Version>1.6.4-rc.1</Version>
+    <Version>1.6.4</Version>
     <AssemblyVersion>1.6.4.0</AssemblyVersion>
     <FileVersion>1.6.4.0</FileVersion>
-    <InformationalVersion>1.6.4-rc.1</InformationalVersion>
+    <InformationalVersion>1.6.4</InformationalVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -70,7 +70,9 @@
     <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
     <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
   </Target>
-  <Target Name="BuildInstallerAfterPublish" AfterTargets="BuildAndCopyHelpers" Condition="'$(BuildingInstaller)' != 'true' And '$(PublishDir)' != '' And '$(Configuration)' == 'Release'">
+  <Target Name="BuildInstallerAfterPublish" AfterTargets="Publish" Condition="'$(BuildingInstaller)' != 'true' And '$(PublishDir)' != '' And '$(Configuration)' == 'Release'">
+    <Error Condition="!Exists('$(PublishDir)updater.exe')" Text="Cannot package release: updater.exe is missing from the publish directory." />
+    <Error Condition="!Exists('$(PublishDir)ElevatedHelper.exe')" Text="Cannot package release: ElevatedHelper.exe is missing from the publish directory." />
     <Message Text="================================================================" Importance="high" />
     <Message Text="[Auto-Build] Packaging and building TruckSimWidgetSetup..." Importance="high" />
     <Message Text="================================================================" Importance="high" />

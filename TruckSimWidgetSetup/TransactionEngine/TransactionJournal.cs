@@ -62,6 +62,11 @@ public class TransactionJournal
             journal.StagingDir = stagingDir;
         }
 
+        if (File.Exists(journal.JournalFilePath))
+        {
+            throw new InvalidOperationException($"An unresolved transaction journal already exists: {journal.JournalFilePath}");
+        }
+
         journal.FlushToDisk();
         InstallerLogger.LogInfo($"Initialized transaction: {journal.TransactionId} ({operation} v{version})");
         return journal;
@@ -127,6 +132,8 @@ public class TransactionJournal
             catch (Exception ex)
             {
                 InstallerLogger.LogErr($"Failed to atomically write transaction journal: {ex.Message}");
+                // A file mutation must never proceed without a durable rollback record.
+                throw;
             }
         }
     }
@@ -141,7 +148,11 @@ public class TransactionJournal
             for (int i = Steps.Count - 1; i >= 0; i--)
             {
                 var step = Steps[i];
-                if (step.Status != "STEP_COMPLETED") continue;
+                if (step.Status != "STEP_COMPLETED" &&
+                    !(step.Status == "STEP_PENDING" && step.Operation is
+                        "CopyFile" or "CopyPlugin" or "ReplaceFile" or "DeleteFile" or
+                        "CreateDir" or "SaveStateFile" or "SaveManifestFile" or "CreateThirdPartyBackup"))
+                    continue;
 
                 try
                 {
@@ -219,6 +230,12 @@ public class TransactionJournal
         {
             case "CopyFile":
             case "CopyPlugin":
+                if (!string.IsNullOrEmpty(step.BackupPath) && !File.Exists(step.BackupPath))
+                {
+                    InstallerLogger.LogErr($"Rollback backup is missing: {step.BackupPath}");
+                    return false;
+                }
+
                 // If target was created, delete it
                 if (File.Exists(step.TargetPath))
                 {
@@ -292,6 +309,13 @@ public class TransactionJournal
 
             case "SaveStateFile":
             case "SaveManifestFile":
+                if (!string.IsNullOrEmpty(step.OriginalHash) &&
+                    (string.IsNullOrEmpty(step.BackupPath) || !File.Exists(step.BackupPath)))
+                {
+                    InstallerLogger.LogErr($"Rollback backup is missing: {step.BackupPath}");
+                    return false;
+                }
+
                 if (!string.IsNullOrEmpty(step.BackupPath) && File.Exists(step.BackupPath))
                 {
                     File.Copy(step.BackupPath, step.TargetPath, overwrite: true);

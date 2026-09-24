@@ -72,7 +72,10 @@ public partial class App : System.Windows.Application
             }
 
             // 4. Crash recovery check
-            CrashRecoveryEngine.CheckAndExecuteRecovery();
+            if (!CrashRecoveryEngine.CheckAndExecuteRecovery())
+            {
+                throw new InvalidOperationException("A previous installation could not be recovered. Installation has been stopped to preserve its rollback data.");
+            }
 
             // 5. Detect installation state
             var installInfo = InstallationDetector.Detect();
