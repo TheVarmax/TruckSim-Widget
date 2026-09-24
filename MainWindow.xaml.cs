@@ -160,7 +160,7 @@ namespace ETSOverlay
 
         private const float KmToMiles = 0.621371f;
         private GameType _currentGame = GameType.Unknown;
-        private bool _awaitingTelemetryJob = false;
+        private bool _awaitingTelemetryJob = true;
         private bool _needsLocationCheck = true;
 
         // Рассинхрон
@@ -1260,8 +1260,8 @@ namespace ETSOverlay
                             ClearJobUI();
                         }
                         MaxSpeedValue.Text = "0";
-                        maxSpeedKmh = 0;
-                        isRace = false;
+                        // Missing telemetry in menus is not the end of the delivery.
+                        // Keep the counters until the job is restored or explicitly replaced.
                         UpdateDeliveryTypeUI(0);
                         _lastTickOdometer = -1;
                     }
@@ -2300,6 +2300,7 @@ namespace ETSOverlay
 
         private void ResetCurrentGameSessionState()
         {
+            _awaitingTelemetryJob = true;
             jobDrivenDistance = 0;
             maxSpeedKmh = 0;
             isRace = false;
@@ -2479,6 +2480,8 @@ namespace ETSOverlay
 
         private void SaveJobState()
         {
+            if (_awaitingTelemetryJob) return;
+
             if (!string.IsNullOrWhiteSpace(CurrentTbJobId) && _currentTelemetryJobId == CurrentLastJobId)
             {
                 CurrentLastJobId = CurrentTbJobId;
@@ -2934,6 +2937,9 @@ namespace ETSOverlay
 
         private void ResetDisplay(bool clearJobState = true)
         {
+            // Runtime counters below are only a blank offline display. Never persist
+            // them over the saved delivery before telemetry restores the active job.
+            _awaitingTelemetryJob = true;
             SpeedValue.Text = "0"; 
             maxSpeedKmh = 0; 
             MaxSpeedValue.Text = "0"; 
@@ -4053,6 +4059,7 @@ namespace ETSOverlay
 
             if (_currentGame != GameType.Unknown)
             {
+                SaveJobState();
                 SaveGameState(_currentGame);
             }
 
@@ -4207,8 +4214,13 @@ namespace ETSOverlay
 
         private string GetJobStateKey(string jobId)
         {
+            return GetJobStateKey(_currentGame, jobId);
+        }
+
+        private static string GetJobStateKey(GameType game, string jobId)
+        {
             if (string.IsNullOrWhiteSpace(jobId)) return jobId;
-            string prefix = _currentGame == GameType.Ats ? "ats" : "ets";
+            string prefix = game == GameType.Ats ? "ats" : "ets";
             return $"{prefix}:{jobId}";
         }
 
@@ -4338,7 +4350,7 @@ namespace ETSOverlay
                         var jobState = JsonSerializer.Deserialize<JobState>(content, StateJsonOptions);
                         if (jobState != null && (jobState.CargoWasLoaded || jobState.MaxSpeedKmh > 0 || jobState.DrivenDistance > 0))
                         {
-                            string stateKey = GetJobStateKey(jobState.TelemetryId);
+                            string stateKey = GetJobStateKey(game, jobState.TelemetryId);
                             if (!_jobStates.ContainsKey(stateKey))
                             {
                                 _jobStates[stateKey] = jobState;
