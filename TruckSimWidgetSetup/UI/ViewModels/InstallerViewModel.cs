@@ -34,7 +34,7 @@ public class InstallerViewModel : INotifyPropertyChanged
     private bool _launchAppAfter = true;
     private bool _keepUserData = true;
     private string _installedVersion = "None";
-    private string _packageVersion = "1.6.4-beta.1";
+    private string _packageVersion = "1.6.4";
     private string _errorMessage = string.Empty;
 
     public InstallOptions Options { get; }

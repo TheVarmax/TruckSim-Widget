@@ -2,7 +2,6 @@ using System.Diagnostics;
 using System.IO;
 using Microsoft.Win32;
 using TruckSimWidgetSetup.Common;
-using TruckSimWidgetSetup.Compatibility;
 using TruckSimWidgetSetup.Diagnostics;
 using TruckSimWidgetSetup.FileManager;
 using TruckSimWidgetSetup.GameDiscovery;
@@ -65,33 +64,23 @@ public class InstallerService
                 catch { }
             }
 
-            // If legacy Inno takeover and no previous manifest exists
-            bool isLegacyTakeover = installInfo.IsLegacyInno;
-
             // 4. Plan synchronization
             statusText?.Report("Analyzing files...");
             var syncPlan = FileSynchronizer.PlanSynchronization(
                 targetDir,
                 currentManifest,
-                previousManifest,
-                isLegacyTakeover);
+                previousManifest);
 
             // 5. Execute file synchronization
             statusText?.Report("Installing application files...");
             var installedRecords = await Task.Run(() =>
                 FileSynchronizer.ExecuteSynchronization(targetDir, payload, syncPlan, journal, progress));
 
-            // 6. If legacy Inno takeover, safely purge unins000.* artifacts
-            if (isLegacyTakeover)
-            {
-                InnoTakeoverManager.PurgeLegacyInnoArtifacts(targetDir, journal);
-            }
-
-            // 7. Install or update installer itself in app directory as an explicitly owned binary
+            // 6. Install or update installer itself in app directory as an explicitly owned binary
             statusText?.Report("Installing installer executable...");
             InstallOrUpdateInstallerExe(targetDir, installInfo, journal, installedRecords);
 
-            // 8. Configure telemetry plugins
+            // 7. Configure telemetry plugins
             statusText?.Report("Configuring telemetry plugins...");
             if (options.Ets2Config.UserSelected && !string.IsNullOrEmpty(options.Ets2Config.SelectedPath))
             {
@@ -111,7 +100,7 @@ public class InstallerService
                 }
             }
 
-            // 9. Save canonical v3 install state
+            // 8. Save canonical v3 install state
             statusText?.Report("Saving installation state...");
             var state = installInfo.ExistingState ?? new InstallStateModel();
             state.SchemaVersion = 3;
@@ -188,7 +177,7 @@ public class InstallerService
             currentManifest.SaveToFile(installedManifestPath);
             journal.CompleteStep(manifestStep, PackageManifest.ComputeFileSha256(installedManifestPath));
 
-            // 10. Register in Windows Uninstall registry (TRANSACTIONAL)
+            // 9. Register in Windows Uninstall registry (TRANSACTIONAL)
             statusText?.Report("Registering application...");
             int regStep = journal.BeginStep("RegisterWindowsUninstall", string.Empty, Constants.UninstallRegSubKey, string.Empty, string.Empty);
             bool registered = WindowsRegistration.Register(targetDir, currentManifest.Version);
@@ -198,15 +187,15 @@ public class InstallerService
             }
             journal.CompleteStep(regStep);
 
-            // 11. Create Shortcuts
+            // 10. Create Shortcuts
             ShellHelper.CreateAppShortcuts(targetDir, options.CreateDesktopShortcut);
 
-            // 12. Commit transaction!
+            // 11. Commit transaction!
             journal.Commit();
             InstallerLogger.LogInfo($"{opName} completed successfully.");
             statusText?.Report("Completed!");
 
-            // 13. Launch application only in headless silent mode
+            // 12. Launch application only in headless silent mode
             // (In GUI mode, ViewModel/MainWindow handles launching once upon completion)
             if (options.IsSilent && options.LaunchAppAfter)
             {
@@ -285,19 +274,6 @@ public class InstallerService
                     if (!ownedFiles.Contains(full, StringComparer.OrdinalIgnoreCase))
                     {
                         ownedFiles.Add(full);
-                    }
-                }
-            }
-
-            // Fallback for legacy Inno files if manifests were missing
-            if (ownedFiles.Count == 0 && Directory.Exists(appDir))
-            {
-                foreach (var file in Directory.GetFiles(appDir, "*", SearchOption.AllDirectories))
-                {
-                    string rel = Path.GetRelativePath(appDir, file);
-                    if (KnownLegacyFiles.IsLegacyInnoServiceFile(rel) || KnownLegacyFiles.IsLegacyUnambiguousAppBinary(file))
-                    {
-                        ownedFiles.Add(file);
                     }
                 }
             }

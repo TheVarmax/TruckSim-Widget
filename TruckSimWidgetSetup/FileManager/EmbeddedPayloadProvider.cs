@@ -32,7 +32,7 @@ public class EmbeddedPayloadProvider : IDisposable
             }
             else
             {
-                _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.4-beta.1");
+                _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.4");
             }
             return;
         }
@@ -81,7 +81,7 @@ public class EmbeddedPayloadProvider : IDisposable
         {
             InstallerLogger.LogInfo($"Using executing directory as payload: {AppDomain.CurrentDomain.BaseDirectory}");
             _sourceDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.4-beta.1");
+            _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.4");
             return;
         }
 

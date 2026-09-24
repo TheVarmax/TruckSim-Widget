@@ -29,8 +29,7 @@ public static class FileSynchronizer
     public static List<SyncFilePlan> PlanSynchronization(
         string targetAppDir,
         PackageManifest currentManifest,
-        PackageManifest? previousManifest,
-        bool isLegacyTakeover)
+        PackageManifest? previousManifest)
     {
         var plan = new List<SyncFilePlan>();
         var seenDiskFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -94,10 +93,8 @@ public static class FileSynchronizer
 
                 bool isOwned = OwnershipManager.IsFileOwned(
                     normRel,
-                    fullPath,
                     currentManifest,
-                    previousManifest,
-                    isLegacyTakeover);
+                    previousManifest);
 
                 if (isOwned)
                 {

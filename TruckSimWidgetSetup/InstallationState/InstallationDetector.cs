@@ -17,7 +17,6 @@ public static class InstallationDetector
         info.ExistingState = state;
 
         string regDisplayVersion = string.Empty;
-        string regUninstallString = string.Empty;
 
         // 2. Collect candidate directories in order of priority
         var candidates = new List<string>();
@@ -49,7 +48,7 @@ public static class InstallationDetector
                 using var exactKey = baseKey.OpenSubKey(exactSubKey);
                 if (exactKey != null)
                 {
-                    ExtractRegistryCandidate(exactKey, candidates, ref regDisplayVersion, ref regUninstallString);
+                    ExtractRegistryCandidate(exactKey, candidates, ref regDisplayVersion);
                 }
 
                 // Also inspect subkeys for "TruckSim Widget" display name
@@ -66,7 +65,7 @@ public static class InstallationDetector
                         string dispName = subKey.GetValue("DisplayName") as string ?? string.Empty;
                         if (dispName.Contains(Constants.AppName, StringComparison.OrdinalIgnoreCase))
                         {
-                            ExtractRegistryCandidate(subKey, candidates, ref regDisplayVersion, ref regUninstallString);
+                            ExtractRegistryCandidate(subKey, candidates, ref regDisplayVersion);
                         }
                     }
                     catch { }
@@ -116,25 +115,8 @@ public static class InstallationDetector
                     }
                 }
 
-                info.LegacyUninstallString = regUninstallString;
-
-                // Check if legacy Inno
-                bool hasInnoExe = File.Exists(Path.Combine(dir, "unins000.exe"));
-                bool isInnoUninstaller = !string.IsNullOrEmpty(regUninstallString) &&
-                                         regUninstallString.Contains("unins", StringComparison.OrdinalIgnoreCase);
-
-                if (hasInnoExe || isInnoUninstaller || state == null || state.InstalledFiles.Count == 0)
-                {
-                    info.Status = InstallationStatus.LegacyInno;
-                    info.IsLegacyInno = true;
-                    InstallerLogger.LogInfo($"Detected Legacy Inno installation at: {dir} (Version: {info.InstalledVersion})");
-                }
-                else
-                {
-                    info.Status = InstallationStatus.Installed;
-                    info.IsLegacyInno = false;
-                    InstallerLogger.LogInfo($"Detected valid modern installation at: {dir} (Version: {info.InstalledVersion})");
-                }
+                info.Status = InstallationStatus.Installed;
+                InstallerLogger.LogInfo($"Detected installation at: {dir} (Version: {info.InstalledVersion})");
 
                 return info;
             }
@@ -160,8 +142,7 @@ public static class InstallationDetector
     private static void ExtractRegistryCandidate(
         RegistryKey key,
         List<string> candidates,
-        ref string regDisplayVersion,
-        ref string regUninstallString)
+        ref string regDisplayVersion)
     {
         string installLoc = key.GetValue("InstallLocation") as string ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(installLoc))
@@ -169,20 +150,9 @@ public static class InstallationDetector
             candidates.Add(installLoc.Trim().TrimEnd('\\'));
         }
 
-        string innoPath = key.GetValue("Inno Setup: App Path") as string ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(innoPath))
-        {
-            candidates.Add(innoPath.Trim().TrimEnd('\\'));
-        }
-
         string uninst = key.GetValue("UninstallString") as string ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(uninst))
         {
-            if (string.IsNullOrEmpty(regUninstallString))
-            {
-                regUninstallString = uninst;
-            }
-
             // Extract directory from uninstaller path if quoted or unquoted
             string rawPath = uninst.Trim().Trim('"');
             int exeIdx = rawPath.IndexOf(".exe", StringComparison.OrdinalIgnoreCase);

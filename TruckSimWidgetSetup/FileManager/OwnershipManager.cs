@@ -1,5 +1,4 @@
 using TruckSimWidgetSetup.Common;
-using TruckSimWidgetSetup.Compatibility;
 using TruckSimWidgetSetup.InstallationState;
 
 namespace TruckSimWidgetSetup.FileManager;
@@ -12,10 +11,8 @@ public static class OwnershipManager
     /// </summary>
     public static bool IsFileOwned(
         string relativePath,
-        string fullPath,
         PackageManifest currentManifest,
-        PackageManifest? previousManifest,
-        bool isLegacyTakeover)
+        PackageManifest? previousManifest)
     {
         string normRel = PackageManifest.NormalizeRelativePath(relativePath);
 
@@ -29,22 +26,6 @@ public static class OwnershipManager
         if (previousManifest != null && previousManifest.TryGetEntry(normRel, out _))
         {
             return true;
-        }
-
-        // 3. In legacy Inno takeover mode
-        if (isLegacyTakeover)
-        {
-            // Explicit Inno service artifacts (unins000.exe, unins000.dat, unins000.msg)
-            if (KnownLegacyFiles.IsLegacyInnoServiceFile(normRel))
-            {
-                return true;
-            }
-
-            // Unambiguous core binaries belonging to TruckSim Widget
-            if (KnownLegacyFiles.IsLegacyUnambiguousAppBinary(fullPath))
-            {
-                return true;
-            }
         }
 
         // Any other file is Unknown / User created
@@ -68,4 +49,3 @@ public static class OwnershipManager
         return false;
     }
 }
-

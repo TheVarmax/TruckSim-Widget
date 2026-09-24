@@ -19,7 +19,7 @@ public partial class App : System.Windows.Application
         // 1. Parse arguments & initialize logging early
         var options = InstallOptions.Parse(e.Args);
         string cmdArgs = string.Join(" ", e.Args);
-        InstallerLogger.InitSession("1.6.4-beta.1", cmdArgs);
+        InstallerLogger.InitSession("1.6.4", cmdArgs);
 
         // 2. Global unhandled exception handlers
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>
