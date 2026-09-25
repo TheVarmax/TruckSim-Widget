@@ -69,73 +69,24 @@ Know at a glance whether TrucksBook is online and your delivery is being tracked
 
 ### 📦 Delivery tracking
 
-Keep your cargo state, route, driven distance, and current delivery progress visible in one compact overlay.
+Keep cargo status, route, distance, and current delivery progress visible in one compact overlay. Active delivery progress is preserved across widget or game restarts when possible.
 
 > **What do "REAL" and "RACE" mean?**  
-> The widget frequently displays the current delivery type (often without a "TYPE:" label in HUD Mode to save space). This indicates the TrucksBook category your delivery falls into, which is based on **TrucksBook's official rules**. Your category is determined entirely by your maximum speed during the job:
-> - **REAL**: Maximum speed has not exceeded 100 km/h (ETS2) or 80 mph (ATS). This is the standard realism category.
-> - **RACE**: Maximum speed reached between 100-180 km/h (ETS2) or 80-112 mph (ATS).
+> The widget displays the current delivery category according to **TrucksBook's official rules** based on your maximum speed:
+> - **REAL**: Maximum speed has not exceeded 100 km/h (ETS2) or 80 mph (ATS). Standard realism category.
+> - **RACE**: Maximum speed reached between 100–180 km/h (ETS2) or 80–112 mph (ATS).
 
 ### 🚛 Live telemetry
 
-See the information that matters during a delivery without filling the screen with another dashboard.
-
-### 🖥️ HUD Mode *(Supporters Exclusive)*
-
-A sleek, focused overlay mode designed to show only the most essential telemetry data without cluttering the screen.
-
-- Displays the exact same core driving metrics as the Full Interface, but omits text labels (like "Distance", "Type", or "Speed") to maximize screen real estate.
-- Features smooth text transition animations.
-- Dynamic color synchronization with the main widget (e.g. speed warnings turn red).
-
-### 🎨 Interface customization *(Supporters Exclusive)*
-
-Personalize the widget to match your setup and preferences.
-
-- Four built-in themes: **Classic**, **Midnight**, **Carbon**, and **OLED Black**.
-- **Custom UI Mode** for creating your own widget layout.
-- Global accent colors and individual colors for each tile.
-- Adjustable opacity and interface scale.
-- Appearance preferences are retained when Supporter access is inactive.
-
-### ☁️ Cloud Sync *(Supporters Exclusive)*
-
-Synchronize supported widget settings between your computers.
-
-- Automatic synchronization through TruckSim Cloud.
-- Manual upload and download.
-- Conflict resolution for settings changed on multiple devices.
-- Cloud backup removal without changing local settings.
-
-### 📖 Trip Logbook
-
-Automatically saves completed deliveries and lets you review your driving history whenever you want.
-
-- Every completed trip is stored locally.
-- Browse previous deliveries directly inside the widget.
-- Quickly review routes, cargo, distance, duration, and other trip information.
-- Free users can access their **5 most recent trips**.
-- Supporters enjoy unlimited trip history and advanced trip statistics.
-
-### ⭐ Supporter Features
-
-Support TruckSim Widget development and unlock additional functionality.
-
-- ☁️ Cloud Sync
-- 🖥️ HUD Mode
-- 🎨 Custom UI Mode
-- 📖 Unlimited Trip Logbook
-- 📊 Advanced trip statistics
-- 🛡️ Smart Braking Assistant
-- Future Supporter-exclusive features
+See essential driving and delivery information at a glance without cluttering your screen:
+- Current speed and speed limit
+- TrucksBook status and telemetry connection
+- Route, distance, and delivery progress
+- Cargo and destination details
 
 ### 🫥 Auto-hide
 
-Reduces the widget's visibility when everything is operating normally.
-
-- Smooth fade transitions.
-- Expands on hover.
-- Automatically becomes visible when attention is required.
+Automatically hides or reduces the interface when TrucksBook status is normal and brings it back when attention is needed. Expands smoothly on mouse hover.
 
 ### 🎛️ Flexible interface
 
@@ -143,50 +94,77 @@ Choose between **Full** and **Minimal** layouts, adjust opacity and scale, and p
 
 ### ⚠️ Speed warnings
 
-Set a speed warning threshold and receive a clear visual indication and a custom looping audio alarm when you reach it.
+Set a custom speed warning threshold and receive clear visual indications and optional looping audio alerts when you reach it.
 
-### 🛡️ Smart Braking Assistant *(Supporters Exclusive)*
+### 📖 Trip Logbook
 
-Automatically helps maintain your TrucksBook **Real** category by reducing speed when the configured braking threshold is reached.
+Automatically saves completed deliveries locally and lets you review your driving history at any time.
 
-- Fully configurable braking threshold.
-- Default threshold: **98 km/h for ETS2** and **78 mph for ATS**.
-- Helps prevent accidental speeding during deliveries.
+- **Trip details:** Route, cargo, distance, duration, start and completion time, game, and play mode (Singleplayer, Convoy, TruckersMP).
+- **Export (Supporter):** Export your trip logbook to CSV and JSON files.
+- **Free tier:** Access your 5 most recent trips with essential trip details.
+- **Supporter tier:** Unlimited history, extended statistics (speed, fuel consumption, vehicle damage), fines, and data export.
 
-### 🌍 English and Ukrainian
+### 🖥️ HUD Mode *(Supporter)*
 
-The interface supports English and Ukrainian. City names can also be translated from English to Ukrainian.
+A sleek, focused overlay mode designed to show only the most essential telemetry data without cluttering the screen.
+- Displays core driving metrics without text labels to maximize screen real estate.
+- Smooth value animations and dynamic color synchronization with alerts.
+
+### 🎨 Interface customization *(Supporter)*
+
+Personalize the widget to match your setup:
+- Four built-in themes: **Classic**, **Midnight**, **Carbon**, and **OLED Black**.
+- **Custom UI Mode** to arrange, resize, and toggle individual tiles.
+- Custom accent colors and individual tile color settings.
+- Adjustable opacity and interface scale.
+
+### ☁️ Cloud Sync *(Supporter)*
+
+Synchronize supported widget settings between your computers via TruckSim Cloud, with automatic sync, manual upload/download, and conflict resolution.
+
+### 🛡️ Smart Braking Assistant *(Supporter)*
+
+Helps maintain your TrucksBook **Real** category by gently braking when approaching the configured speed threshold (default: 98 km/h for ETS2, 78 mph for ATS).
 
 ### 🔄 Automatic updates
 
-Stay up to date without manually checking for every new release. After a successful update, the widget shows an in-app confirmation window with useful links instead of forcing a browser page open.
+TruckSim Widget automatically checks for new releases on startup. When an update is available, confirming it installs the new version automatically, safely preserves your settings and Trip Logbook, and restarts the widget.
 
-> [!WARNING]
-> **Update Notice for Older Versions:**  
-> Starting with version 1.5.9, TruckSim Widget transitioned to a brand new `updater.exe` based system. If you are currently running a version *older* than 1.5.9, **the widget will not notify you about new updates** because the old update logic relied on `.zip` files which are no longer published. To receive the latest updates, please manually download and run the latest installer from the Releases page. Furthermore, version 1.5.9 marks the end of Portable (`.zip`) releases to fully support this new seamless update architecture.
+> [!NOTE]
+> **Legacy versions:** Versions older than 1.5.9 may not detect current updates correctly. Download the latest installer manually from [GitHub Releases](https://github.com/TheVarmax/TruckSim-Widget/releases/latest).
+
+### 🌍 English and Ukrainian
+
+The interface supports English and Ukrainian, including optional translation of in-game city names.
 
 ---
 
 ## Free vs Supporter
 
-TruckSim Widget is **free forever**.
+TruckSim Widget is **free forever**. All core features required to monitor TrucksBook and track deliveries are available to everyone.
 
-Supporter subscriptions unlock additional convenience features while keeping all essential functionality available to everyone.
+Supporter status unlocks additional customization, convenience tools, and extended statistics while directly funding further development.
+
+[![Become a Supporter](https://img.shields.io/badge/Become_a_Supporter-trucksim.uk%2Fdonate-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://trucksim.uk/donate)
+
+> **Become a Supporter:** [https://trucksim.uk/donate](https://trucksim.uk/donate)
 
 | Feature | Free | Supporter |
 | --- | :---: | :---: |
-| TrucksBook monitoring | ✅ | ✅ |
-| Live telemetry | ✅ | ✅ |
-| Delivery tracking | ✅ | ✅ |
+| TrucksBook monitoring & alerts | ✅ | ✅ |
+| Live telemetry & delivery tracking | ✅ | ✅ |
+| Active delivery recovery | ✅ | ✅ |
 | Auto-hide | ✅ | ✅ |
 | Speed warnings | ✅ | ✅ |
 | Automatic updates | ✅ | ✅ |
 | English & Ukrainian | ✅ | ✅ |
 | Trip Logbook | Last 5 trips | Unlimited |
-| Essential trip information | ✅ | ✅ |
+| Essential trip details | ✅ | ✅ |
 | Extended trip statistics | ❌ | ✅ |
+| Trip Logbook export (CSV & JSON) | ❌ | ✅ |
 | HUD Mode | ❌ | ✅ |
-| Custom UI Mode | ❌ | ✅ |
+| Custom UI Mode & themes | ❌ | ✅ |
 | Cloud Sync | ❌ | ✅ |
 | Smart Braking Assistant | ❌ | ✅ |
 
@@ -198,18 +176,15 @@ Supporter subscriptions unlock additional convenience features while keeping all
 | Cargo | ✅ | ✅ |
 | Distance | ✅ | ✅ |
 | Duration | ✅ | ✅ |
-| Started | ✅ | ✅ |
-| Completed | ✅ | ✅ |
-| Game | ✅ | ✅ |
+| Started & Completed time | ✅ | ✅ |
+| Game & Play Mode (Singleplayer / Convoy / TruckersMP) | ✅ | ✅ |
 | Income | ❌ | ✅ |
-| Average Speed | ❌ | ✅ |
-| Maximum Speed | ❌ | ✅ |
-| Fuel Consumed | ❌ | ✅ |
-| Average Fuel Consumption | ❌ | ✅ |
-| Truck Damage | ❌ | ✅ |
-| Trailer Damage | ❌ | ✅ |
-| Cargo Damage | ❌ | ✅ |
-| Truck | ❌ | ✅ |
+| Average & Maximum Speed | ❌ | ✅ |
+| Fuel Consumed & Average Consumption | ❌ | ✅ |
+| Truck, Trailer & Cargo Damage | ❌ | ✅ |
+| Truck (Brand & Model) | ❌ | ✅ |
+| Fines (Total & Breakdown) | ❌ | ✅ |
+| Export to CSV & JSON | ❌ | ✅ |
 
 ---
 
@@ -218,24 +193,29 @@ Supporter subscriptions unlock additional convenience features while keeping all
 > [!NOTE]
 > **System Requirement:** [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0) is required to run the installer and the widget.
 
-1. **Download the installer**: Get `TruckSimWidgetSetup-<version>.exe` from the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/latest).
-2. **Run setup**: Launch the installer and choose your games/settings if prompted. Everything else is handled automatically.
-3. **Start driving**:
-   - Start **TrucksBook Client** and make sure you are signed in.
-   - Launch **ETS2** or **ATS**.
-   - Start **TruckSim Widget**.
-   - Check that TrucksBook and telemetry show online. Drive!
+### Installation
 
-### Updating
+1. **Download:** Get `TruckSimWidgetSetup-<version>.exe` from the [latest release](https://github.com/TheVarmax/TruckSim-Widget/releases/latest).
+2. **Run setup:** Launch the installer. It automatically detects Euro Truck Simulator 2 and American Truck Simulator. If a game is not detected automatically, you can select its folder manually.
+3. **Configure telemetry:** The installer sets up the required `scs-telemetry.dll` for your selected games and safely handles existing telemetry plugins.
+4. **Start driving:**
+   - Launch **TrucksBook Client** and make sure you are signed in.
+   - Start **ETS2** or **ATS**.
+   - Launch **TruckSim Widget** and verify that TrucksBook and telemetry show active. Drive!
 
-TruckSim Widget automatically checks for updates on launch. When a new version is available, click **Install** in the update prompt to update automatically.
+### Existing Installation / Maintenance
+
+If TruckSim Widget is already installed, running the installer again provides three options:
+- **Update:** Upgrades to a newer version while safely preserving all settings, Trip Logbook history, and license state.
+- **Reinstall:** Reinstalls or repairs the current version without touching your user data.
+- **Uninstall:** Removes the widget, allowing you to choose whether to keep or delete your user data.
 
 ### Need help or found an issue?
 
 - Report bugs or request features: [GitHub Issues](https://github.com/TheVarmax/TruckSim-Widget/issues)
-- Website report: fill out the report form directly on the project website at [trucksim.uk](https://trucksim.uk)
-- Direct contact: [Telegram @thevarmax](https://t.me/thevarmax)
-- Support email: `support@trucksim.uk`
+- Website contact form: [trucksim.uk](https://trucksim.uk)
+- Telegram: [@thevarmax](https://t.me/thevarmax)
+- Email: `support@trucksim.uk`
 
 ---
 
@@ -258,7 +238,7 @@ If something behaves unexpectedly, use the project website or the Telegram link 
 
 > [!IMPORTANT]
 > **Minimum Version Requirement: 1.6.1**  
-> All online services (license validation, subscription operations, and cloud sync) now strictly require TruckSim Widget version **1.6.1 or newer**. Older versions are no longer supported and will lose the ability to validate locally saved licenses. If you are using version 1.6.0 or below, you must update to 1.6.1+ to continue using the widget.
+> Online services (license validation, Supporter features, and Cloud Sync) require TruckSim Widget version **1.6.1 or newer**. Older versions cannot validate licenses or sync data. If you are using version 1.6.0 or older, update using the latest installer to continue using online services.
 
 ### Custom truck and trailer mods
 
@@ -304,8 +284,8 @@ TruckSim Widget is free to use. If it helps you keep your deliveries tracked and
 
 ## Third-Party Assets
 
-**Truck icon** by Magnific from Flaticon.
-Used under the Flaticon license with attribution.
+**Truck icon** by Magnific from Flaticon.  
+Used under the Flaticon license with attribution.  
 Source: [https://www.flaticon.com/free-icon/truck_2554978](https://www.flaticon.com/free-icon/truck_2554978)
 
 ---
