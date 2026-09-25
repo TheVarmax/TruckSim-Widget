@@ -115,7 +115,7 @@ A sleek, focused overlay mode designed to show only the most essential telemetry
 
 Personalize the widget to match your setup:
 - Four built-in themes: **Classic**, **Midnight**, **Carbon**, and **OLED Black**.
-- **Custom UI Mode** to arrange, resize, and toggle individual tiles.
+- **Custom UI Mode** to choose which widget sections are displayed.
 - Custom accent colors and individual tile color settings.
 - Adjustable opacity and interface scale.
 
@@ -147,8 +147,6 @@ TruckSim Widget is **free forever**. All core features required to monitor Truck
 Supporter status unlocks additional customization, convenience tools, and extended statistics while directly funding further development.
 
 [![Become a Supporter](https://img.shields.io/badge/Become_a_Supporter-trucksim.uk%2Fdonate-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=000000)](https://trucksim.uk/donate)
-
-> **Become a Supporter:** [https://trucksim.uk/donate](https://trucksim.uk/donate)
 
 | Feature | Free | Supporter |
 | --- | :---: | :---: |
