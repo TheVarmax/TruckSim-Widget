@@ -21,10 +21,15 @@
     <Resource Include="favicon.ico" />
   </ItemGroup>
 
-  <!-- Embed payload.zip and scs-telemetry.dll if present during build -->
+  <!-- Release publish receives generated resources from the Widget publish target. -->
   <ItemGroup>
-    <EmbeddedResource Include="Resources\payload.zip" Condition="Exists('Resources\payload.zip')" />
-    <EmbeddedResource Include="Resources\scs-telemetry.dll" Condition="Exists('Resources\scs-telemetry.dll')" />
+    <EmbeddedResource Include="$(InstallerPayloadPath)" LogicalName="TruckSimWidgetSetup.Resources.payload.zip" Condition="'$(InstallerPayloadPath)' != '' and Exists('$(InstallerPayloadPath)')" />
+    <EmbeddedResource Include="$(InstallerPluginPath)" LogicalName="TruckSimWidgetSetup.Resources.scs-telemetry.dll" Condition="'$(InstallerPluginPath)' != '' and Exists('$(InstallerPluginPath)')" />
   </ItemGroup>
+
+  <Target Name="RequireInstallerPayload" BeforeTargets="PrepareForBuild;Publish">
+    <Error Condition="'$(InstallerPayloadPath)' == '' or !Exists('$(InstallerPayloadPath)')" Text="Installer publish requires a generated payload.zip." />
+    <Error Condition="'$(InstallerPluginPath)' == '' or !Exists('$(InstallerPluginPath)')" Text="Installer publish requires scs-telemetry.dll." />
+  </Target>
 
 </Project>

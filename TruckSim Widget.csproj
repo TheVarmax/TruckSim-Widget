@@ -12,6 +12,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
+    <InstallerOutputDir Condition="'$(InstallerOutputDir)' == ''">$(MSBuildProjectDirectory)\dist\Releases\</InstallerOutputDir>
+    <InstallerPackageDir>$(MSBuildProjectDirectory)\obj\$(Configuration)\installer-package\</InstallerPackageDir>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="Updater\**" />
@@ -63,12 +65,134 @@
   <ItemGroup>
     <PackageReference Include="MdXaml" Version="1.27.0" />
   </ItemGroup>
-  <Target Name="BuildAndCopyHelpers" AfterTargets="Build;Publish">
-    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q" ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
-    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\ElevatedHelper\ElevatedHelper.csproj&quot; -c $(Configuration) -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true --nologo -v q" ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" ContinueOnError="true" />
-    <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(PublishDir)" Condition="'$(PublishDir)' != ''" SkipUnchangedFiles="true" ContinueOnError="true" />
+  <UsingTask TaskName="CreateTruckSimInstallerPayload" TaskFactory="RoslynCodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <PublishDirectory ParameterType="System.String" Required="true" />
+      <PayloadPath ParameterType="System.String" Required="true" />
+      <ManifestPath ParameterType="System.String" Required="true" />
+      <PackageVersion ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System" />
+      <Using Namespace="System.Collections.Generic" />
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.IO.Compression" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Security.Cryptography" />
+      <Using Namespace="System.Text" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        try
+        {
+            var root = Path.GetFullPath(PublishDirectory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var required = new[] { "TruckSim Widget.exe", "updater.exe", "ElevatedHelper.exe", "plugin/scs-telemetry.dll" };
+            foreach (var relative in required)
+            {
+                var path = Path.Combine(root, relative.Replace('/', Path.DirectorySeparatorChar));
+                if (!File.Exists(path) || new FileInfo(path).Length == 0)
+                    throw new FileNotFoundException("Required Widget publish component is missing or empty: " + relative, path);
+            }
+
+            Func<string, string> jsonString = value =>
+            {
+                var escaped = new StringBuilder("\"");
+                foreach (var c in value)
+                {
+                    if (c == '"' || c == '\\') escaped.Append('\\').Append(c);
+                    else if (c < 0x20) escaped.Append("\\u").Append(((int)c).ToString("x4"));
+                    else escaped.Append(c);
+                }
+                return escaped.Append('"').ToString();
+            };
+            var entries = new List<string>();
+            var packageFiles = new List<(string Path, string Relative)>();
+            foreach (var file in Directory.GetFiles(root, "*", SearchOption.AllDirectories).OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+            {
+                var relative = file.Substring(root.Length).Replace('\\', '/');
+                var name = Path.GetFileName(file);
+                if (relative.StartsWith("plugin/", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("scs-telemetry.dll", StringComparison.OrdinalIgnoreCase) ||
+                    name.Equals("manifest.json", StringComparison.OrdinalIgnoreCase) ||
+                    name.EndsWith(".pdb", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith("TruckSimWidgetSetup", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith("unins000", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if ((File.GetAttributes(file) & FileAttributes.ReparsePoint) != 0)
+                    throw new InvalidOperationException("Publish output contains a reparse point: " + relative);
+
+                using (var stream = File.OpenRead(file))
+                using (var sha = SHA256.Create())
+                {
+                    entries.Add("    { \"path\": " + jsonString(relative) +
+                        ", \"size\": " + stream.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) +
+                        ", \"sha256\": " + jsonString(BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", "").ToLowerInvariant()) + " }");
+                }
+                packageFiles.Add((file, relative));
+            }
+
+            foreach (var requiredFile in required.Take(3))
+                if (!packageFiles.Any(item => item.Relative.Equals(requiredFile, StringComparison.OrdinalIgnoreCase)))
+                    throw new InvalidOperationException("Required file is absent from the application manifest: " + requiredFile);
+
+            Directory.CreateDirectory(Path.GetDirectoryName(ManifestPath));
+            File.WriteAllText(ManifestPath,
+                "{\n  \"version\": " + jsonString(PackageVersion) +
+                ",\n  \"createdAt\": " + jsonString(DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ")) +
+                ",\n  \"files\": [\n" + string.Join(",\n", entries) + "\n  ]\n}");
+            if (!File.Exists(ManifestPath) || new FileInfo(ManifestPath).Length == 0)
+                throw new InvalidOperationException("Installer manifest was not generated.");
+
+            Directory.CreateDirectory(Path.GetDirectoryName(PayloadPath));
+            if (File.Exists(PayloadPath)) File.Delete(PayloadPath);
+            using (var zipStream = File.Create(PayloadPath))
+            using (var archive = new ZipArchive(zipStream, ZipArchiveMode.Create))
+            {
+                foreach (var item in packageFiles)
+                {
+                    using (var source = File.OpenRead(item.Path))
+                    using (var destination = archive.CreateEntry(item.Relative, CompressionLevel.Optimal).Open())
+                        source.CopyTo(destination);
+                }
+                using (var source = File.OpenRead(ManifestPath))
+                using (var destination = archive.CreateEntry("manifest.json", CompressionLevel.Optimal).Open())
+                    source.CopyTo(destination);
+            }
+            if (!File.Exists(PayloadPath) || new FileInfo(PayloadPath).Length == 0)
+                throw new InvalidOperationException("Installer payload was not generated.");
+            Log.LogMessage(Microsoft.Build.Framework.MessageImportance.High,
+                "Installer payload contains {0} application files: {1}", entries.Count, PayloadPath);
+        }
+        catch (Exception ex)
+        {
+            Log.LogErrorFromException(ex, true);
+        }
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="BuildAndCopyHelpers" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\Updater\Updater.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true --nologo -v q" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\ElevatedHelper\ElevatedHelper.csproj&quot; -c $(Configuration) -r win-x64 --self-contained true -p:PublishSingleFile=true -p:PublishTrimmed=true --nologo -v q" />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe')" Text="Updater publish did not produce updater.exe." />
+    <Error Condition="!Exists('$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe')" Text="ElevatedHelper publish did not produce ElevatedHelper.exe." />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(OutputPath)" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="PublishFullInstaller" AfterTargets="Publish" DependsOnTargets="BuildAndCopyHelpers" Condition="'$(Configuration)' == 'Release'">
+    <PropertyGroup>
+      <_InstallerPublishDir>$([MSBuild]::EnsureTrailingSlash('$(PublishDir)'))</_InstallerPublishDir>
+      <_InstallerOutputDir>$([MSBuild]::EnsureTrailingSlash('$(InstallerOutputDir)'))</_InstallerOutputDir>
+    </PropertyGroup>
+    <Error Condition="'$(PublishDir)' == ''" Text="Widget PublishDir is required for installer packaging." />
+    <Error Condition="!Exists('$(_InstallerPublishDir)TruckSim Widget.exe')" Text="Widget publish did not produce TruckSim Widget.exe." />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\Updater\bin\$(Configuration)\net8.0-windows\win-x64\publish\updater.exe" DestinationFolder="$(_InstallerPublishDir)" />
+    <Copy SourceFiles="$(MSBuildProjectDirectory)\ElevatedHelper\bin\$(Configuration)\net8.0-windows\win-x64\publish\ElevatedHelper.exe" DestinationFolder="$(_InstallerPublishDir)" />
+    <CreateTruckSimInstallerPayload PublishDirectory="$(_InstallerPublishDir)" PayloadPath="$(InstallerPackageDir)payload.zip" ManifestPath="$(InstallerPackageDir)manifest.json" PackageVersion="$(Version)" />
+    <Exec Command="dotnet publish &quot;$(MSBuildProjectDirectory)\TruckSimWidgetSetup\TruckSimWidgetSetup.csproj&quot; -c $(Configuration) -r win-x64 --self-contained false -p:PublishSingleFile=true -p:InstallerPayloadPath=&quot;$(InstallerPackageDir)payload.zip&quot; -p:InstallerPluginPath=&quot;$(MSBuildProjectDirectory)\plugin\scs-telemetry.dll&quot; -o &quot;$(InstallerPackageDir)setup-publish&quot; --nologo -v q" />
+    <Error Condition="!Exists('$(InstallerPackageDir)setup-publish\TruckSimWidgetSetup.exe')" Text="Installer publish did not produce TruckSimWidgetSetup.exe." />
+    <MakeDir Directories="$(_InstallerOutputDir)" />
+    <Copy SourceFiles="$(InstallerPackageDir)setup-publish\TruckSimWidgetSetup.exe" DestinationFiles="$(_InstallerOutputDir)TruckSimWidgetSetup-$(Version).exe" />
+    <Message Importance="high" Text="Full installer: $(_InstallerOutputDir)TruckSimWidgetSetup-$(Version).exe" />
   </Target>
 </Project>
