@@ -3,11 +3,26 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Runtime.InteropServices;
+using System.Security.AccessControl;
+using System.Security.Principal;
+using Microsoft.Win32.SafeHandles;
 
 namespace TruckSimWidget.ElevatedHelper;
 
 internal static class Program
 {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetDefaultDllDirectories(uint directoryFlags);
+    private const uint LoadLibrarySearchApplicationDir = 0x00000200;
+    private const uint LoadLibrarySearchSystem32 = 0x00000800;
+    private const uint GenericRead = 0x80000000;
+    private const uint FileShareRead = 0x00000001;
+    private const uint OpenExisting = 3;
+    private const uint FileFlagOpenReparsePoint = 0x00200000;
+    private const uint FileFlagSequentialScan = 0x08000000;
+    private const uint FileAttributeReparsePoint = 0x00000400;
+    private const int FileAttributeTagInfoClass = 9;
     private const int EXIT_SUCCESS = 0;
     private const int EXIT_INVALID_ARGS = 1;
     private const int EXIT_PATH_FORBIDDEN = 2;
@@ -16,12 +31,38 @@ internal static class Program
     private const int EXIT_ACCESS_DENIED = 5;
 
     private static readonly Regex GameBackupRegex = new(@"^scs-telemetry\.dll\.backup_\d{8}_\d{6}\.bak$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
-    private static readonly Regex StagingRollbackRegex = new(@"^((ETS2|ATS)_rollback_\d{8}_\d{6}\.dll|state_rollback_\d{8}_\d{6}\.json)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private static readonly Regex StagingRollbackRegex = new(@"^((ETS2|ATS)_(rollback_\d{8}_\d{6}|new_plugin)\.dll|state_rollback_\d{8}_\d{6}\.json)$", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct FileAttributeTagInfo
+    {
+        public uint FileAttributes;
+        public uint ReparseTag;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "CreateFileW")]
+    private static extern SafeFileHandle CreateFileForNoFollowRead(
+        string fileName,
+        uint desiredAccess,
+        uint shareMode,
+        IntPtr securityAttributes,
+        uint creationDisposition,
+        uint flagsAndAttributes,
+        IntPtr templateFile);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandleEx(
+        SafeFileHandle file,
+        int fileInformationClass,
+        out FileAttributeTagInfo fileInformation,
+        uint bufferSize);
 
     public static int Main(string[] args)
     {
         try
         {
+            if (!SetDefaultDllDirectories(LoadLibrarySearchApplicationDir | LoadLibrarySearchSystem32))
+                throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
             if (args.Length < 2)
             {
                 Console.Error.WriteLine("Usage: ElevatedHelper.exe <copy|move|delete|mkdir|rmdir> <path1> [path2] [--allow-root <dir>]");
@@ -36,13 +77,13 @@ internal static class Program
                 string arg = args[i].Trim();
                 if (arg.Equals("--allow-root", StringComparison.OrdinalIgnoreCase))
                 {
-                    if (i + 1 < args.Length)
-                    {
-                        allowedRoots.Add(args[++i].Trim());
-                    }
+                    if (i + 1 >= args.Length || allowedRoots.Count != 0 || string.IsNullOrWhiteSpace(args[i + 1]))
+                        return EXIT_INVALID_ARGS;
+                    allowedRoots.Add(args[++i].Trim());
                 }
                 else if (arg.StartsWith("--allow-root=", StringComparison.OrdinalIgnoreCase))
                 {
+                    if (allowedRoots.Count != 0 || string.IsNullOrWhiteSpace(arg.Substring(13))) return EXIT_INVALID_ARGS;
                     allowedRoots.Add(arg.Substring(13).Trim());
                 }
                 else
@@ -60,6 +101,8 @@ internal static class Program
             string command = positionalArgs[0].ToLowerInvariant();
             string path1 = positionalArgs[1];
             string path2 = positionalArgs.Count > 2 ? positionalArgs[2] : string.Empty;
+            int expectedArguments = command is "copy" or "move" ? 3 : 2;
+            if (positionalArgs.Count != expectedArguments) return EXIT_INVALID_ARGS;
 
             switch (command)
             {
@@ -120,10 +163,17 @@ internal static class Program
                 Console.Error.WriteLine("Security violation: destination directory not allowed.");
                 return EXIT_PATH_FORBIDDEN;
             }
-            Directory.CreateDirectory(destDir);
+            if (!TryPerformMutation(
+                    () => IsAllowedPath(destDir, isDirectory: true, isSourceOnly: false, allowedRoots),
+                    () => Directory.CreateDirectory(destDir)))
+                return EXIT_PATH_FORBIDDEN;
         }
 
-        File.Copy(source, destination, overwrite: true);
+        if (!TryPerformMutation(
+                () => IsAllowedPath(source, isDirectory: false, isSourceOnly: true, allowedRoots) &&
+                      IsAllowedPath(destination, isDirectory: false, isSourceOnly: false, allowedRoots),
+                () => CopySourceWithoutFollowingReparsePoint(source, destination)))
+            return EXIT_PATH_FORBIDDEN;
         return EXIT_SUCCESS;
     }
 
@@ -150,10 +200,17 @@ internal static class Program
                 Console.Error.WriteLine("Security violation: destination directory not allowed.");
                 return EXIT_PATH_FORBIDDEN;
             }
-            Directory.CreateDirectory(destDir);
+            if (!TryPerformMutation(
+                    () => IsAllowedPath(destDir, isDirectory: true, isSourceOnly: false, allowedRoots),
+                    () => Directory.CreateDirectory(destDir)))
+                return EXIT_PATH_FORBIDDEN;
         }
 
-        File.Move(source, destination, overwrite: true);
+        if (!TryPerformMutation(
+                () => IsAllowedPath(source, isDirectory: false, isSourceOnly: false, allowedRoots) &&
+                      IsAllowedPath(destination, isDirectory: false, isSourceOnly: false, allowedRoots),
+                () => File.Move(source, destination, overwrite: true)))
+            return EXIT_PATH_FORBIDDEN;
         return EXIT_SUCCESS;
     }
 
@@ -167,7 +224,10 @@ internal static class Program
 
         if (File.Exists(target))
         {
-            File.Delete(target);
+            if (!TryPerformMutation(
+                    () => IsAllowedPath(target, isDirectory: false, isSourceOnly: false, allowedRoots),
+                    () => File.Delete(target)))
+                return EXIT_PATH_FORBIDDEN;
         }
 
         return EXIT_SUCCESS;
@@ -183,7 +243,10 @@ internal static class Program
 
         if (!Directory.Exists(dir))
         {
-            Directory.CreateDirectory(dir);
+            if (!TryPerformMutation(
+                    () => IsAllowedPath(dir, isDirectory: true, isSourceOnly: false, allowedRoots),
+                    () => Directory.CreateDirectory(dir)))
+                return EXIT_PATH_FORBIDDEN;
         }
 
         return EXIT_SUCCESS;
@@ -208,16 +271,57 @@ internal static class Program
             return EXIT_IO_ERROR;
         }
 
-        Directory.Delete(dir, recursive: false);
+        if (!TryPerformMutation(
+                () => IsAllowedPath(dir, isDirectory: true, isSourceOnly: false, allowedRoots),
+                () => Directory.Delete(dir, recursive: false)))
+            return EXIT_PATH_FORBIDDEN;
         return EXIT_SUCCESS;
     }
 
-    internal static bool IsAllowedPath(string path, bool isDirectory, List<string>? allowedRoots = null)
+    private static bool TryPerformMutation(Func<bool> pathStillAllowed, Action mutation)
+    {
+        // Each operation repeats the complete containment, ACL, and reparse-point
+        // check at the last possible point before touching the filesystem.
+        if (!pathStillAllowed()) return false;
+        mutation();
+        return true;
+    }
+
+    private static void CopySourceWithoutFollowingReparsePoint(string source, string destination)
+    {
+        using SafeFileHandle sourceHandle = CreateFileForNoFollowRead(
+            source,
+            GenericRead,
+            FileShareRead,
+            IntPtr.Zero,
+            OpenExisting,
+            FileFlagOpenReparsePoint | FileFlagSequentialScan,
+            IntPtr.Zero);
+        if (sourceHandle.IsInvalid)
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+
+        if (!GetFileInformationByHandleEx(
+                sourceHandle,
+                FileAttributeTagInfoClass,
+                out FileAttributeTagInfo sourceInfo,
+                (uint)Marshal.SizeOf<FileAttributeTagInfo>()))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
+
+        if ((sourceInfo.FileAttributes & (FileAttributeReparsePoint | (uint)FileAttributes.Directory)) != 0)
+            throw new UnauthorizedAccessException("Elevated copy source must be a regular, non-reparse file.");
+
+        using var sourceStream = new FileStream(sourceHandle, FileAccess.Read);
+        using var destinationStream = new FileStream(destination, FileMode.Create, FileAccess.Write, FileShare.None);
+        sourceStream.CopyTo(destinationStream);
+        destinationStream.Flush(flushToDisk: true);
+    }
+
+    private static bool IsAllowedPath(string path, bool isDirectory, List<string>? allowedRoots = null)
     {
         return IsAllowedPath(path, isDirectory, isSourceOnly: false, allowedRoots);
     }
 
-    internal static bool IsAllowedPath(string path, bool isDirectory, bool isSourceOnly, List<string>? allowedRoots)
+    private static bool IsAllowedPath(string path, bool isDirectory, bool isSourceOnly, List<string>? allowedRoots)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
         if (!Path.IsPathRooted(path)) return false;
@@ -255,14 +359,9 @@ internal static class Program
         if (HasReparsePointInPath(normalized))
             return false;
 
-        // Built-in Widget root: %LOCALAPPDATA%\TruckSimWidget and %LOCALAPPDATA%\Programs\TruckSimWidget
-        string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        string widgetDataDir = Path.Combine(localAppData, "TruckSimWidget").ToLowerInvariant() + Path.DirectorySeparatorChar;
-        string widgetAppDir = Path.Combine(localAppData, "Programs", "TruckSimWidget").ToLowerInvariant() + Path.DirectorySeparatorChar;
         string tempDir = Path.GetTempPath().ToLowerInvariant();
         if (!tempDir.EndsWith(Path.DirectorySeparatorChar.ToString())) tempDir += Path.DirectorySeparatorChar;
 
-        bool isWithinWidgetScope = lower.StartsWith(widgetDataDir) || lower.StartsWith(widgetAppDir);
         bool isWithinTempSource = isSourceOnly && lower.StartsWith(tempDir);
 
         bool isWithinGameScope = false;
@@ -274,6 +373,7 @@ internal static class Program
                 try
                 {
                     string fullRoot = Path.GetFullPath(r).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+                    if (!IsTrustedGameRoot(fullRoot)) continue;
                     string allowedPluginDir = Path.Combine(fullRoot, "bin", "win_x64", "plugins").ToLowerInvariant() + Path.DirectorySeparatorChar;
 
                     if (isDirectory)
@@ -305,7 +405,7 @@ internal static class Program
             }
         }
 
-        if (!isWithinWidgetScope && !isWithinTempSource && !isWithinGameScope)
+        if (!isWithinTempSource && !isWithinGameScope)
         {
             return false;
         }
@@ -321,7 +421,7 @@ internal static class Program
                                          GameBackupRegex.IsMatch(fileName);
                 if (!isAllowedGameFile) return false;
             }
-            else if (isWithinWidgetScope || isWithinTempSource)
+            else if (isWithinTempSource)
             {
                 bool isAllowedWidgetFile = fileName.Equals("scs-telemetry.dll", StringComparison.OrdinalIgnoreCase) ||
                                            fileName.Equals("transaction_journal.json", StringComparison.OrdinalIgnoreCase) ||
@@ -335,6 +435,90 @@ internal static class Program
         }
 
         return true;
+    }
+
+    private static bool IsTrustedGameRoot(string root)
+    {
+        if (!OperatingSystem.IsWindows() || !Directory.Exists(root) || HasReparsePointInPath(root))
+            return false;
+
+        string[] gameExecutables =
+        {
+            Path.Combine(root, "bin", "win_x64", "eurotrucks2.exe"),
+            Path.Combine(root, "bin", "win_x64", "amtrucks.exe")
+        };
+
+        if (!gameExecutables.Any(File.Exists)) return false;
+        if (HasLowPrivilegeWriteAccessInPath(root)) return false;
+        return gameExecutables.Where(File.Exists).All(executable =>
+            !HasReparsePointInPath(executable) && !HasLowPrivilegeWriteAccessInPath(executable));
+    }
+
+    private static bool HasLowPrivilegeWriteAccessInPath(string path)
+    {
+        if (!OperatingSystem.IsWindows()) return true;
+
+        try
+        {
+            using WindowsIdentity identity = WindowsIdentity.GetCurrent();
+            if (identity.User == null) return true;
+
+            var writableSids = new HashSet<SecurityIdentifier>(identity.Groups?.OfType<SecurityIdentifier>() ?? Enumerable.Empty<SecurityIdentifier>())
+            {
+                identity.User,
+                new SecurityIdentifier(WellKnownSidType.WorldSid, null),
+                new SecurityIdentifier(WellKnownSidType.AuthenticatedUserSid, null),
+                new SecurityIdentifier(WellKnownSidType.BuiltinUsersSid, null),
+                new SecurityIdentifier(WellKnownSidType.InteractiveSid, null),
+                new SecurityIdentifier(WellKnownSidType.LocalSid, null)
+            };
+
+            // The elevated helper's Administrators SID is intentionally excluded:
+            // an ordinary process with the same user token cannot use that SID.
+            writableSids.Remove(new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null));
+
+            FileSystemRights writeRights = FileSystemRights.Write | FileSystemRights.Modify |
+                FileSystemRights.FullControl | FileSystemRights.Delete |
+                FileSystemRights.DeleteSubdirectoriesAndFiles | FileSystemRights.ChangePermissions |
+                FileSystemRights.TakeOwnership | FileSystemRights.CreateFiles |
+                FileSystemRights.CreateDirectories | FileSystemRights.WriteAttributes |
+                FileSystemRights.WriteExtendedAttributes;
+
+            string? current = Path.GetFullPath(path);
+            while (!string.IsNullOrEmpty(current))
+            {
+                FileSystemSecurity? security = null;
+                if (Directory.Exists(current))
+                    security = new DirectoryInfo(current).GetAccessControl(AccessControlSections.Access | AccessControlSections.Owner);
+                else if (File.Exists(current))
+                    security = new FileInfo(current).GetAccessControl(AccessControlSections.Access | AccessControlSections.Owner);
+
+                if (security != null)
+                {
+                    if (security.GetOwner(typeof(SecurityIdentifier)) is SecurityIdentifier owner && owner == identity.User)
+                        return true;
+
+                    AuthorizationRuleCollection rules = security.GetAccessRules(true, true, typeof(SecurityIdentifier));
+                    foreach (FileSystemAccessRule rule in rules)
+                    {
+                        if (rule.AccessControlType == AccessControlType.Allow &&
+                            rule.IdentityReference is SecurityIdentifier sid && writableSids.Contains(sid) &&
+                            (rule.FileSystemRights & writeRights) != 0)
+                            return true;
+                    }
+                }
+
+                string? parent = Path.GetDirectoryName(current);
+                if (string.Equals(parent, current, StringComparison.OrdinalIgnoreCase)) break;
+                current = parent;
+            }
+
+            return false;
+        }
+        catch
+        {
+            return true; // Fail closed when owner/ACL state cannot be established.
+        }
     }
 
     private static bool HasReparsePointInPath(string path)

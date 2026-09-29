@@ -6,6 +6,10 @@ namespace TruckSimUpdater;
 
 static class Program
 {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetDefaultDllDirectories(uint directoryFlags);
+    private const uint LoadLibrarySearchApplicationDir = 0x00000200;
+    private const uint LoadLibrarySearchSystem32 = 0x00000800;
     private const string SuccessUrl = "https://trucksim.uk/successful";
     private const string SupportEmail = "support@trucksim.uk";
 
@@ -37,6 +41,8 @@ static class Program
     [STAThread]
     static void Main(string[] args)
     {
+        if (!SetDefaultDllDirectories(LoadLibrarySearchApplicationDir | LoadLibrarySearchSystem32))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
 
@@ -44,7 +50,7 @@ static class Program
 
         try
         {
-            if (args.Length < 6)
+            if (args.Length != 7)
             {
                 MessageBox.Show(
                     "Usage: updater.exe <downloadUrl> <assetName> <appDir> <appExe> <logPath> <language>",
@@ -72,13 +78,19 @@ static class Program
             WriteLog(logPath, $"Language: {language}");
             WriteLog(logPath, $"Expected SHA-256: {expectedSha256}");
 
-            if (string.IsNullOrWhiteSpace(expectedSha256))
+            if (!System.Text.RegularExpressions.Regex.IsMatch(expectedSha256, "^[a-fA-F0-9]{64}$"))
             {
                 throw new InvalidOperationException(
                     language == "uk"
                         ? "Помилка безпеки: відсутній обов'язковий SHA-256 хеш для перевірки інсталятора. Оновлення скасовано."
                         : "Security error: Missing required SHA-256 checksum for installer verification. Update aborted.");
             }
+
+            if (assetName != Path.GetFileName(assetName) || !assetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
+                || assetName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+                throw new InvalidOperationException("Invalid installer asset name.");
+            if (!ReleaseAssetPolicy.IsTrustedDownload(downloadUrl, assetName))
+                throw new InvalidOperationException("Installer download must use the official HTTPS GitHub Releases URL.");
 
             // Запускаем форму обновления
             Application.Run(new UpdateForm(downloadUrl, assetName, appDir, appExe, logPath, language, expectedSha256));
@@ -285,16 +297,9 @@ static class Program
                 SetStatus(_lang == "uk" ? "Завантаження оновлення" : "Downloading update", true);
                 WriteLog(_logPath, $"Downloading installer from: {_downloadUrl}");
 
-                string tempDir = Path.Combine(Path.GetTempPath(), "TruckSimWidget_Update");
-                if (!Directory.Exists(tempDir))
-                    Directory.CreateDirectory(tempDir);
+                string tempDir = Directory.CreateTempSubdirectory("TruckSimWidget_Update_").FullName;
 
                 string installerPath = Path.Combine(tempDir, _assetName);
-                if (File.Exists(installerPath))
-                {
-                    try { File.Delete(installerPath); } catch { }
-                }
-
                 await DownloadWithProgressAsync(_downloadUrl, installerPath);
                 WriteLog(_logPath, $"Download complete: {new FileInfo(installerPath).Length} bytes");
 
@@ -303,10 +308,10 @@ static class Program
                 SetStatus(_lang == "uk" ? "Перевірка цілісності інсталятора" : "Verifying installer integrity", false);
 
                 string downloadedHash = "";
+                using var verifiedFile = new FileStream(installerPath, FileMode.Open, FileAccess.Read, FileShare.Read);
                 using (var sha = System.Security.Cryptography.SHA256.Create())
-                using (var stream = File.OpenRead(installerPath))
                 {
-                    byte[] hashBytes = sha.ComputeHash(stream);
+                    byte[] hashBytes = sha.ComputeHash(verifiedFile);
                     downloadedHash = Convert.ToHexString(hashBytes).ToLowerInvariant();
                 }
                 WriteLog(_logPath, $"Downloaded installer SHA-256: {downloadedHash}");
@@ -353,8 +358,9 @@ static class Program
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = installerPath,
-                    Arguments = "--update",
-                    UseShellExecute = true
+                    ArgumentList = { "--update" },
+                    UseShellExecute = true,
+                    WorkingDirectory = tempDir
                 });
 
                 WriteLog(_logPath, "=== UPDATER FINISHED, HANDED OVER TO INSTALLER ===");

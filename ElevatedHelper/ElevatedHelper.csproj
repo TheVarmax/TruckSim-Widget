@@ -8,7 +8,4 @@
     <AssemblyName>ElevatedHelper</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
-  <ItemGroup>
-    <InternalsVisibleTo Include="TruckSimWidget.Tests" />
-  </ItemGroup>
 </Project>

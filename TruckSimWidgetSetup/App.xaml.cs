@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Runtime.InteropServices;
 using TruckSimWidgetSetup.Common;
 using TruckSimWidgetSetup.Diagnostics;
 using TruckSimWidgetSetup.InstallationState;
@@ -10,16 +11,22 @@ namespace TruckSimWidgetSetup;
 
 public partial class App : System.Windows.Application
 {
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetDefaultDllDirectories(uint directoryFlags);
+    private const uint LoadLibrarySearchApplicationDir = 0x00000200;
+    private const uint LoadLibrarySearchSystem32 = 0x00000800;
     private Mutex? _installerMutex;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        if (!SetDefaultDllDirectories(LoadLibrarySearchApplicationDir | LoadLibrarySearchSystem32))
+            throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
         base.OnStartup(e);
 
         // 1. Parse arguments & initialize logging early
         var options = InstallOptions.Parse(e.Args);
         string cmdArgs = string.Join(" ", e.Args);
-        InstallerLogger.InitSession("1.6.4", cmdArgs);
+        InstallerLogger.InitSession("1.6.5", cmdArgs);
 
         // 2. Global unhandled exception handlers
         AppDomain.CurrentDomain.UnhandledException += (s, args) =>

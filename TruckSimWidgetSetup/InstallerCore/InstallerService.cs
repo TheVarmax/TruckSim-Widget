@@ -44,15 +44,14 @@ public class InstallerService
             var currentManifest = payload.Manifest;
 
             // Initialize ElevatedHelper runner with expected hash from manifest if present
+            ElevatedHelperRunner.Reset();
             if (currentManifest.TryGetEntry("ElevatedHelper.exe", out var helperEntry) && helperEntry != null)
             {
                 string helperPath = Path.Combine(targetDir, "ElevatedHelper.exe");
                 ElevatedHelperRunner.Initialize(helperPath, helperEntry.Sha256);
             }
 
-            // 2. Initialize transaction journal
-            journal = TransactionJournal.StartNew(opName, currentManifest.Version);
-            // 3. Load previous manifest if available
+            // Load previous version before creating a journal or modifying installed files.
             PackageManifest? previousManifest = null;
             string installedManifestPath = Constants.GetInstalledManifestFilePath();
             if (File.Exists(installedManifestPath))
@@ -63,6 +62,13 @@ public class InstallerService
                 }
                 catch { }
             }
+
+            if (PackageVersion.IsDowngrade(currentManifest.Version, installInfo.InstalledVersion)
+                || (previousManifest != null && PackageVersion.IsDowngrade(currentManifest.Version, previousManifest.Version)))
+                throw new InvalidOperationException("This package is older than the installed version.");
+
+            // 2. Initialize transaction journal
+            journal = TransactionJournal.StartNew(opName, currentManifest.Version);
 
             // 4. Plan synchronization
             statusText?.Report("Analyzing files...");

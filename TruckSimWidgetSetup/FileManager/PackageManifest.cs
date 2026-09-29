@@ -135,7 +135,36 @@ public class PackageManifest
         if (!canonicalPath.StartsWith(rootPrefix, comparison))
             throw new ArgumentException("Manifest path resolves outside the allowed root directory.", nameof(relativePath));
 
+        EnsureNoReparsePointWithinRoot(canonicalRoot, canonicalPath);
+
         return canonicalPath;
+    }
+
+    private static void EnsureNoReparsePointWithinRoot(string canonicalRoot, string canonicalPath)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        string? current = canonicalRoot;
+        string relative = Path.GetRelativePath(canonicalRoot, canonicalPath);
+        string[] components = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        foreach (string component in new[] { "" }.Concat(components))
+        {
+            if (!string.IsNullOrEmpty(component)) current = Path.Combine(current!, component);
+            if (!File.Exists(current) && !Directory.Exists(current)) continue;
+            try
+            {
+                if ((File.GetAttributes(current!) & FileAttributes.ReparsePoint) != 0)
+                    throw new ArgumentException("Manifest paths cannot pass through reparse points.", nameof(canonicalPath));
+            }
+            catch (ArgumentException) { throw; }
+            catch (IOException ex)
+            {
+                throw new ArgumentException("Unable to inspect an existing manifest path component safely.", nameof(canonicalPath), ex);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                throw new ArgumentException("Unable to inspect an existing manifest path component safely.", nameof(canonicalPath), ex);
+            }
+        }
     }
 
     public static string ComputeFileSha256(string filePath)

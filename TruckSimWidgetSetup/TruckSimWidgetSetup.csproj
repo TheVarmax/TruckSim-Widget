@@ -5,7 +5,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>TruckSimWidgetSetup</RootNamespace>
     <AssemblyName>TruckSimWidgetSetup</AssemblyName>
-    <Version>1.6.4</Version>
+    <Version>1.6.5</Version>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -16,9 +16,6 @@
     <Using Include="System.IO" />
   </ItemGroup>
 
-  <ItemGroup>
-    <InternalsVisibleTo Include="TruckSimWidget.Tests" />
-  </ItemGroup>
 
   <ItemGroup>
     <Resource Include="favicon.ico" />

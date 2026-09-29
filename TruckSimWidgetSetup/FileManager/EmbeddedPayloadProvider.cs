@@ -32,7 +32,7 @@ public class EmbeddedPayloadProvider : IDisposable
             }
             else
             {
-                _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.4");
+                _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.5");
             }
             return;
         }
@@ -47,18 +47,8 @@ public class EmbeddedPayloadProvider : IDisposable
             return;
         }
 
-        // 3. Check for payload.zip next to current executable
-        string adjacentZip = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "payload.zip");
-        if (File.Exists(adjacentZip))
-        {
-            InstallerLogger.LogInfo($"Using adjacent payload.zip: {adjacentZip}");
-            var stream = File.OpenRead(adjacentZip);
-            _zipArchive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: false);
-            _manifest = LoadManifestFromArchive(_zipArchive);
-            return;
-        }
-
-        // 4. Load from embedded resource payload.zip
+        // Normal installs use the payload embedded at build time. External payloads
+        // require an explicit developer/test argument and never override this resource.
         var assembly = Assembly.GetExecutingAssembly();
         string[] resourceNames = assembly.GetManifestResourceNames();
         string? payloadResName = resourceNames.FirstOrDefault(r => r.EndsWith("payload.zip", StringComparison.OrdinalIgnoreCase));
@@ -75,17 +65,7 @@ public class EmbeddedPayloadProvider : IDisposable
             }
         }
 
-        // Fallback: check if running from publish directory itself
-        string appExeInBase = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, Constants.AppExeName);
-        if (File.Exists(appExeInBase))
-        {
-            InstallerLogger.LogInfo($"Using executing directory as payload: {AppDomain.CurrentDomain.BaseDirectory}");
-            _sourceDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.4");
-            return;
-        }
-
-        throw new InvalidOperationException("No valid payload source found (embedded resource, payload.zip, or source directory).");
+        throw new InvalidOperationException("No embedded payload found. Pass an explicit source or zip path only for developer/test installation.");
     }
 
     private static PackageManifest LoadManifestFromArchive(ZipArchive archive)

@@ -5394,7 +5394,9 @@ namespace ETSOverlay
 
                 if (!File.Exists(updaterPath))
                 {
-                    // Fallback search in development output directories
+#if DEBUG
+                    // Development-only fallback. Release builds must use the updater
+                    // shipped beside the application executable.
                     string[] devPaths = new[]
                     {
                         Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "..", "..", "..", "Updater", "bin", "Release", "net8.0-windows", "win-x64", "publish", "updater.exe"),
@@ -5411,6 +5413,7 @@ namespace ETSOverlay
                             break;
                         }
                     }
+#endif
                 }
 
                 if (!File.Exists(updaterPath))
@@ -5429,12 +5432,15 @@ namespace ETSOverlay
                 WriteLog($"Args: \"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\" \"{expectedSha256}\"");
 
                 // Запускаем updater.exe с URL для скачивания и ожидаемым хешем
-                Process.Start(new ProcessStartInfo
+                var updaterStart = new ProcessStartInfo
                 {
                     FileName = updaterPath,
-                    Arguments = $"\"{downloadUrl}\" \"{assetName}\" \"{appDir}\" \"{appExe}\" \"{logPath}\" \"{uiLanguage}\" \"{expectedSha256}\"",
-                    UseShellExecute = true
-                });
+                    UseShellExecute = true,
+                    WorkingDirectory = Path.GetDirectoryName(updaterPath) ?? appDir,
+                };
+                foreach (string argument in new[] { downloadUrl, assetName, appDir, appExe, logPath, uiLanguage, expectedSha256 })
+                    updaterStart.ArgumentList.Add(argument);
+                Process.Start(updaterStart);
 
                 WriteLog("Updater launched, shutting down for update...");
 
