@@ -368,9 +368,13 @@ FodyWeavers.xsd
 [Tt]ests/
 [Tt]est/
 TestResults/
+TruckSimWidget.Tests/
 *.TestRun*
 
 # Build and installer distribution outputs
 dist/
 TruckSimWidgetSetup/Resources/
 
+TruckSimWidget.Tests/
+release-notes/
+scripts/

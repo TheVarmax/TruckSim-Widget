@@ -153,7 +153,7 @@ namespace ETSOverlay
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Trace.WriteLine(ex.ToString());
+                System.Diagnostics.Trace.WriteLine($"[LICENSE] Activation request failed: {ex.GetType().Name}");
                 LastValidationFailed = true;
                 return (false, "Unable to contact the license server. Please try again later.");
             }
@@ -198,7 +198,8 @@ namespace ETSOverlay
                     else
                     {
                         // Explicitly reported invalid by server
-                        LogMessage($"[LICENSE] Server rejected license check: {response.Message ?? "Invalid"}. Deactivating.");
+                        // Server response text is untrusted diagnostic data and must not be able to echo credentials.
+                        LogMessage("[LICENSE] Server rejected license check. Deactivating.");
                         ClearLicenseState();
                     }
                 }
@@ -206,12 +207,12 @@ namespace ETSOverlay
             catch (HttpRequestException ex)
             {
                 LastValidationFailed = true;
-                LogMessage($"[LICENSE] Validation HTTP error (offline mode): {ex.Message}");
+                LogMessage($"[LICENSE] Validation HTTP error (offline mode): {ex.GetType().Name}");
             }
             catch (Exception ex)
             {
                 LastValidationFailed = true;
-                LogMessage($"[LICENSE] Validation error: {ex.Message}");
+                LogMessage($"[LICENSE] Validation error: {ex.GetType().Name}");
             }
         }
 
@@ -246,7 +247,7 @@ namespace ETSOverlay
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Trace.WriteLine(ex.ToString());
+                System.Diagnostics.Trace.WriteLine($"[LICENSE] Deactivation request failed: {ex.GetType().Name}");
                 ClearLicenseState();
                 return (true, "Deactivated locally (server unreachable).");
             }

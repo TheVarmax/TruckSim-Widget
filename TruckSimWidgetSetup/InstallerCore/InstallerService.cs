@@ -261,7 +261,7 @@ public class InstallerService
                 try
                 {
                     var m = PackageManifest.LoadFromFile(installedManifestPath);
-                    ownedFiles.AddRange(m.Files.Select(f => Path.Combine(appDir, f.RelativePath.Replace('/', Path.DirectorySeparatorChar))));
+                    ownedFiles.AddRange(m.Files.Select(f => PackageManifest.ResolveContainedPath(appDir, f.RelativePath)));
                 }
                 catch { }
             }
@@ -270,7 +270,7 @@ public class InstallerService
             {
                 foreach (var f in installInfo.ExistingState.InstalledFiles)
                 {
-                    string full = Path.Combine(appDir, f.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+                    string full = PackageManifest.ResolveContainedPath(appDir, f.RelativePath);
                     if (!ownedFiles.Contains(full, StringComparer.OrdinalIgnoreCase))
                     {
                         ownedFiles.Add(full);

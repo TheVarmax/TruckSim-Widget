@@ -20,6 +20,25 @@ public class ManifestFileEntry
 
 public class PackageManifest
 {
+    private static bool IsWindowsDeviceName(string segment)
+    {
+        string deviceName = segment.Split('.', 2)[0].TrimEnd(' ', '.');
+        if (deviceName.Equals("CON", StringComparison.OrdinalIgnoreCase) ||
+            deviceName.Equals("CONIN$", StringComparison.OrdinalIgnoreCase) ||
+            deviceName.Equals("CONOUT$", StringComparison.OrdinalIgnoreCase) ||
+            deviceName.Equals("PRN", StringComparison.OrdinalIgnoreCase) ||
+            deviceName.Equals("AUX", StringComparison.OrdinalIgnoreCase) ||
+            deviceName.Equals("NUL", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        if (deviceName.Length != 4 ||
+            !(deviceName.StartsWith("COM", StringComparison.OrdinalIgnoreCase) ||
+              deviceName.StartsWith("LPT", StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        return deviceName[3] is >= '1' and <= '9' or '\u00b9' or '\u00b2' or '\u00b3';
+    }
+
     [JsonPropertyName("version")]
     public string Version { get; set; } = string.Empty;
 
@@ -70,6 +89,53 @@ public class PackageManifest
     public static string NormalizeRelativePath(string path)
     {
         return path.Replace('\\', '/').TrimStart('/');
+    }
+
+    /// <summary>
+    /// Resolves a manifest path beneath a trusted root. Manifest paths are untrusted,
+    /// so reject rooted/device paths and parent segments before canonicalizing and
+    /// checking the final path boundary.
+    /// </summary>
+    public static string ResolveContainedPath(string rootDirectory, string relativePath)
+    {
+        if (string.IsNullOrWhiteSpace(rootDirectory))
+            throw new ArgumentException("A root directory is required.", nameof(rootDirectory));
+        if (string.IsNullOrWhiteSpace(relativePath))
+            throw new ArgumentException("A relative manifest path is required.", nameof(relativePath));
+
+        string normalized = relativePath.Replace('\\', '/');
+        if (normalized.StartsWith("/", StringComparison.Ordinal) ||
+            normalized.Contains(':') ||
+            Path.IsPathRooted(normalized))
+        {
+            throw new ArgumentException("Manifest paths must be relative paths.", nameof(relativePath));
+        }
+
+        string[] segments = normalized.Split('/');
+        if (segments.Any(segment =>
+                segment.Length == 0 ||
+                segment == ".." ||
+                (OperatingSystem.IsWindows() && segment != "." &&
+                    (segment.EndsWith(' ') || segment.EndsWith('.') || IsWindowsDeviceName(segment)))))
+            throw new ArgumentException("Manifest paths cannot contain empty or parent path segments.", nameof(relativePath));
+
+        string canonicalRoot = Path.GetFullPath(rootDirectory);
+        string platformRelativePath = Path.Combine(segments.Where(segment => segment != ".").ToArray());
+        if (string.IsNullOrEmpty(platformRelativePath))
+            throw new ArgumentException("Manifest paths must name a file beneath the root directory.", nameof(relativePath));
+
+        string canonicalPath = Path.GetFullPath(platformRelativePath, canonicalRoot);
+        string rootPrefix = Path.EndsInDirectorySeparator(canonicalRoot)
+            ? canonicalRoot
+            : canonicalRoot + Path.DirectorySeparatorChar;
+        StringComparison comparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        if (!canonicalPath.StartsWith(rootPrefix, comparison))
+            throw new ArgumentException("Manifest path resolves outside the allowed root directory.", nameof(relativePath));
+
+        return canonicalPath;
     }
 
     public static string ComputeFileSha256(string filePath)

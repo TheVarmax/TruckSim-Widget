@@ -38,7 +38,7 @@ public static class FileSynchronizer
         foreach (var entry in currentManifest.Files)
         {
             string normRel = PackageManifest.NormalizeRelativePath(entry.RelativePath);
-            string fullPath = Path.Combine(targetAppDir, normRel.Replace('/', Path.DirectorySeparatorChar));
+            string fullPath = PackageManifest.ResolveContainedPath(targetAppDir, entry.RelativePath);
             seenDiskFiles.Add(normRel);
 
             if (!File.Exists(fullPath))
@@ -160,7 +160,7 @@ public static class FileSynchronizer
                         }
 
                         int stepIdx = journal.BeginStep("CopyFile", item.RelativePath, item.TargetFullPath, string.Empty, string.Empty);
-                        payloadProvider.ExtractFile(item.RelativePath, item.TargetFullPath);
+                        payloadProvider.ExtractFile(item.RelativePath, targetAppDir, item.TargetFullPath);
 
                         string actualHash = PackageManifest.ComputeFileSha256(item.TargetFullPath);
                         if (!string.Equals(actualHash, item.ExpectedSha256, StringComparison.OrdinalIgnoreCase))
@@ -186,7 +186,7 @@ public static class FileSynchronizer
                         File.Copy(item.TargetFullPath, stagingBackup, overwrite: true);
 
                         int stepIdx = journal.BeginStep("ReplaceFile", item.RelativePath, item.TargetFullPath, stagingBackup, item.CurrentSha256);
-                        payloadProvider.ExtractFile(item.RelativePath, item.TargetFullPath);
+                        payloadProvider.ExtractFile(item.RelativePath, targetAppDir, item.TargetFullPath);
 
                         string actualHash = PackageManifest.ComputeFileSha256(item.TargetFullPath);
                         if (!string.Equals(actualHash, item.ExpectedSha256, StringComparison.OrdinalIgnoreCase))

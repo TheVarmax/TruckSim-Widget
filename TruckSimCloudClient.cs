@@ -108,6 +108,43 @@ namespace ETSOverlay
         private const string BASE_URL = "https://api.trucksim.uk";
         private static readonly HttpClient _httpClient = new HttpClient();
 
+        private static string CreateSafeLicenseResponseDiagnostic(string endpoint, System.Net.HttpStatusCode statusCode, string rawJson)
+        {
+            try
+            {
+                using var document = System.Text.Json.JsonDocument.Parse(rawJson);
+                var root = document.RootElement;
+                if (root.ValueKind != System.Text.Json.JsonValueKind.Object)
+                    return $"[API] {endpoint} HTTP {(int)statusCode}; response=invalid-json";
+                var success = root.TryGetProperty("success", out var successValue)
+                    && successValue.ValueKind is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False
+                    ? successValue.GetBoolean().ToString().ToLowerInvariant()
+                    : "unknown";
+                var hasLicense = root.TryGetProperty("license", out var licenseValue)
+                    && licenseValue.ValueKind == System.Text.Json.JsonValueKind.Object;
+                var featureCount = root.TryGetProperty("features", out var featuresValue)
+                    && featuresValue.ValueKind == System.Text.Json.JsonValueKind.Array
+                    ? featuresValue.GetArrayLength()
+                    : 0;
+                return $"[API] {endpoint} HTTP {(int)statusCode}; success={success}; licensePresent={hasLicense}; featureCount={featureCount}";
+            }
+            catch (System.Text.Json.JsonException)
+            {
+                return $"[API] {endpoint} HTTP {(int)statusCode}; response=invalid-json";
+            }
+        }
+
+        private void WriteSafeLicenseResponseDiagnostic(string endpoint, System.Net.HttpStatusCode statusCode, string rawJson)
+        {
+            var message = CreateSafeLicenseResponseDiagnostic(endpoint, statusCode, rawJson);
+            try
+            {
+                if (System.Windows.Application.Current?.MainWindow is MainWindow main)
+                    main.Dispatcher.Invoke(() => main.WriteLog(message));
+            }
+            catch { }
+        }
+
         public async Task<LicenseResponse?> ActivateAsync(LicenseActivationRequest request, System.Threading.CancellationToken cancellationToken = default)
         {
             var response = await _httpClient.PostAsJsonAsync($"{BASE_URL}/license/activate", request, cancellationToken);
@@ -119,14 +156,7 @@ namespace ETSOverlay
             }
 
             string rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
-            try
-            {
-                if (System.Windows.Application.Current?.MainWindow is MainWindow main)
-                {
-                    main.Dispatcher.Invoke(() => main.WriteLog($"[API] /license/activate RAW JSON: {rawJson}"));
-                }
-            }
-            catch { }
+            WriteSafeLicenseResponseDiagnostic("/license/activate", response.StatusCode, rawJson);
 
             return System.Text.Json.JsonSerializer.Deserialize<LicenseResponse>(rawJson, new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
         }
@@ -141,14 +171,7 @@ namespace ETSOverlay
             }
 
             string rawJson = await response.Content.ReadAsStringAsync(cancellationToken);
-            try
-            {
-                if (System.Windows.Application.Current?.MainWindow is MainWindow main)
-                {
-                    main.Dispatcher.Invoke(() => main.WriteLog($"[API] /license/check RAW JSON: {rawJson}"));
-                }
-            }
-            catch { }
+            WriteSafeLicenseResponseDiagnostic("/license/check", response.StatusCode, rawJson);
 
             try
             {

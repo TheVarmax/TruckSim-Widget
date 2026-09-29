@@ -99,12 +99,19 @@ public class EmbeddedPayloadProvider : IDisposable
         return PackageManifest.FromJson(json) ?? throw new InvalidOperationException("Failed to parse manifest.json from payload.");
     }
 
-    public void ExtractFile(string relativePath, string destinationPath)
+    public void ExtractFile(string relativePath, string installationRoot, string destinationPath)
     {
         string normRel = PackageManifest.NormalizeRelativePath(relativePath);
+        string containedDestination = PackageManifest.ResolveContainedPath(installationRoot, relativePath);
+        string canonicalDestination = Path.GetFullPath(destinationPath);
+        if (!string.Equals(containedDestination, canonicalDestination,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new ArgumentException("Destination path must match the resolved manifest path beneath the installation root.", nameof(destinationPath));
+        }
 
         // Ensure destination directory exists
-        string? dir = Path.GetDirectoryName(destinationPath);
+        string? dir = Path.GetDirectoryName(containedDestination);
         if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
         {
             Directory.CreateDirectory(dir);
@@ -112,11 +119,11 @@ public class EmbeddedPayloadProvider : IDisposable
 
         if (_sourceDirectory != null)
         {
-            string sourceFile = Path.Combine(_sourceDirectory, normRel.Replace('/', Path.DirectorySeparatorChar));
+            string sourceFile = PackageManifest.ResolveContainedPath(_sourceDirectory, relativePath);
             if (!File.Exists(sourceFile))
                 throw new FileNotFoundException($"Source file not found in payload directory: {sourceFile}");
 
-            File.Copy(sourceFile, destinationPath, overwrite: true);
+            File.Copy(sourceFile, containedDestination, overwrite: true);
             return;
         }
 
@@ -132,7 +139,7 @@ public class EmbeddedPayloadProvider : IDisposable
             if (entry == null)
                 throw new FileNotFoundException($"Entry '{normRel}' not found in payload archive.");
 
-            entry.ExtractToFile(destinationPath, overwrite: true);
+            entry.ExtractToFile(containedDestination, overwrite: true);
             return;
         }
 

@@ -10,8 +10,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <ApplicationIcon>favicon.ico</ApplicationIcon>
-    <WidgetPublishDir Condition="'$(WidgetPublishDir)' == ''">C:\Users\mrpry\Desktop\TruckSim Widget\TruckSim Widget ($(Version))</WidgetPublishDir>
-    <InstallerOutputDir Condition="'$(InstallerOutputDir)' == ''">C:\Users\mrpry\Desktop\TruckSim Widget\Releases</InstallerOutputDir>
   </PropertyGroup>
 
   <ItemGroup>
