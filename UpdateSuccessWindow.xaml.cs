@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -31,10 +30,12 @@ namespace ETSOverlay
         }
 
         private string? _releaseUrl;
+        private readonly string _language;
 
         public UpdateSuccessWindow(string language, string? releaseUrl = null, string? releaseName = null, string? releaseBody = null)
         {
             InitializeComponent();
+            _language = language;
             _releaseUrl = string.IsNullOrWhiteSpace(releaseUrl) ? "https://github.com/TheVarmax/TruckSim-Widget/releases" : releaseUrl;
 
             this.Loaded += (s, e) =>
@@ -105,12 +106,13 @@ namespace ETSOverlay
             {
                 if (e.Parameter is string url)
                 {
-                    OpenUrl(url);
+                    OpenUrl(url, UrlPolicy.Markdown);
                 }
                 else if (e.Parameter is Uri uri)
                 {
-                    OpenUrl(uri.ToString());
+                    OpenUrl(uri.OriginalString, UrlPolicy.Markdown);
                 }
+                e.Handled = true;
             }));
         }
 
@@ -228,8 +230,7 @@ namespace ETSOverlay
 
         private void BtnWebsite_Click(object sender, RoutedEventArgs e)
         {
-            OpenUrl("https://trucksim.uk");
-            Close();
+            if (OpenUrl("https://trucksim.uk", UrlPolicy.OfficialWebsite)) Close();
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e)
@@ -237,20 +238,9 @@ namespace ETSOverlay
             Close();
         }
 
-        private void OpenUrl(string url)
+        private bool OpenUrl(string url, UrlPolicy policy)
         {
-            try
-            {
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = url,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error opening URL: {ex.Message}");
-            }
+            return SafeUrlLauncher.OpenForUser(url, policy, this, _language);
         }
     }
 }

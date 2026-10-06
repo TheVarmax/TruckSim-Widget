@@ -108,15 +108,8 @@ namespace ETSOverlay
 
         private void BtnGetLicense_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "https://trucksim.uk/donate",
-                    UseShellExecute = true
-                });
-            }
-            catch { }
+            if (!SafeUrlLauncher.TryOpen("https://trucksim.uk/donate", UrlPolicy.OfficialWebsite, _mainWindow.WriteLog))
+                ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Не вдалося відкрити посилання." : "Unable to open this link.", true);
         }
 
         private void ShowMessage(string text, bool isError)
@@ -211,14 +204,13 @@ namespace ETSOverlay
             {
                 ShowMessage(message, true);
             }
-            else if (!string.IsNullOrEmpty(url))
+            else
             {
-                try
+                if (SafeUrlLauncher.TryOpen(url, UrlPolicy.StripePortal, _mainWindow.WriteLog))
                 {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
                     ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Відкрито у браузері." : "Opened in browser.", false);
                 }
-                catch (Exception)
+                else
                 {
                     ShowMessage(_mainWindow.GetUiLanguage() == "uk" ? "Не вдалося відкрити браузер." : "Failed to open browser.", true);
                 }

@@ -4,6 +4,7 @@ using TruckSimWidgetSetup.FileManager;
 using TruckSimWidgetSetup.GameDiscovery;
 using TruckSimWidgetSetup.InstallationState;
 using TruckSimWidgetSetup.TransactionEngine;
+using System.Security.Cryptography;
 
 namespace TruckSimWidgetSetup.PluginManager;
 
@@ -76,6 +77,11 @@ public static class TelemetryPluginManager
         EmbeddedPayloadProvider payloadProvider,
         TransactionJournal journal,
         bool isUpdateMode = false)
+        => InstallPluginForGame(game, payloadProvider, journal, isUpdateMode, new PluginFileOperations());
+
+    internal static bool InstallPluginForGame(
+        GameConfig game, EmbeddedPayloadProvider payloadProvider, TransactionJournal journal,
+        bool isUpdateMode, PluginFileOperations files)
     {
         if (!game.UserSelected || string.IsNullOrEmpty(game.SelectedPath))
         {
@@ -129,22 +135,20 @@ public static class TelemetryPluginManager
             }
 
             // Always create temporary staging rollback backup
-            string stagingDir = journal.StagingDir;
-            if (!Directory.Exists(stagingDir)) Directory.CreateDirectory(stagingDir);
+            string stagingDir = journal.GetPluginStagingDir();
             stagingBackupFile = Path.Combine(stagingDir, $"{game.GameId}_rollback_{DateTime.UtcNow:yyyyMMdd_HHmmss}.dll");
 
             int stageStep = journal.BeginStep("StageRollbackBackup", targetFile, targetFile, stagingBackupFile, currentHash);
             try
             {
-                File.Copy(targetFile, stagingBackupFile, overwrite: true);
+                PluginFileOperations.StageVerified(targetFile, stagingBackupFile, currentHash);
             }
             catch
             {
-                if (!ElevatedHelperRunner.CopyFileElevated(targetFile, stagingBackupFile))
-                {
-                    InstallerLogger.LogErr($"[{game.GameId}] Failed to create temporary staging rollback backup.");
-                    return false;
-                }
+                // TEMP is intentionally source-only in ElevatedHelper. Failure
+                // to read the original safely must not proceed with replacement.
+                InstallerLogger.LogErr($"[{game.GameId}] Failed to verify and stage rollback backup.");
+                return false;
             }
             journal.CompleteStep(stageStep);
 
@@ -159,17 +163,10 @@ public static class TelemetryPluginManager
 
                 InstallerLogger.LogInfo($"[{game.GameId}] Creating persistent backup of third-party plugin: {backupTarget}");
                 int backupStep = journal.BeginStep("CreateThirdPartyBackup", targetFile, targetFile, backupTarget, currentHash);
-                try
+                if (files.CopyVerified(stagingBackupFile, backupTarget, currentHash) != PluginCopyResult.Success)
                 {
-                    File.Copy(targetFile, backupTarget, overwrite: true);
-                }
-                catch
-                {
-                    if (!ElevatedHelperRunner.CopyFileElevated(targetFile, backupTarget))
-                    {
-                        InstallerLogger.LogErr($"[{game.GameId}] Failed to create third-party plugin backup.");
-                        return false;
-                    }
+                    InstallerLogger.LogErr($"[{game.GameId}] Failed to create verified third-party plugin backup.");
+                    return false;
                 }
                 journal.CompleteStep(backupStep);
 
@@ -191,31 +188,33 @@ public static class TelemetryPluginManager
             return false;
         }
 
-        // Write to temporary staging file first
-        string tempStagedPlugin = Path.Combine(journal.StagingDir, $"{game.GameId}_new_plugin.dll");
-        using (var fs = File.Create(tempStagedPlugin))
+        // The application manifest deliberately excludes the telemetry DLL.
+        // Its trusted digest comes from the bundled payload stream, never staging.
+        string expectedPluginHash = Convert.ToHexString(SHA256.HashData(pluginStream));
+        using var extractionStream = payloadProvider.OpenTelemetryPluginStream();
+        if (extractionStream == null) return false;
+        string tempStagedPlugin = Path.Combine(journal.GetPluginStagingDir(), $"{game.GameId}_new_plugin.dll");
+        using (var fs = new FileStream(tempStagedPlugin, FileMode.CreateNew, FileAccess.Write, FileShare.None))
         {
-            pluginStream.CopyTo(fs);
+            extractionStream.CopyTo(fs);
+            fs.Flush(flushToDisk: true);
         }
 
         string rollbackRef = !string.IsNullOrEmpty(stagingBackupFile) ? stagingBackupFile : game.BackupPath;
+        // A running game's original DLL may legitimately be in use. Skip only
+        // before mutation; a locked/unreadable destination after copy is failure.
+        if (IsFileLocked(targetFile))
+        {
+            InstallerLogger.LogWarn($"[{game.GameId}] Original plugin is in use; skipping overwrite.");
+            return true;
+        }
         int copyStep = journal.BeginStep("CopyPlugin", tempStagedPlugin, targetFile, rollbackRef, currentHash);
 
-        bool copied = false;
-        try
-        {
-            File.Copy(tempStagedPlugin, targetFile, overwrite: true);
-            copied = true;
-        }
-        catch (Exception ex)
-        {
-            InstallerLogger.LogWarn($"[{game.GameId}] Standard Copy failed ({ex.Message}). Attempting elevated copy.");
-            copied = ElevatedHelperRunner.CopyFileElevated(tempStagedPlugin, targetFile);
-        }
+        PluginCopyResult copied = files.CopyVerified(tempStagedPlugin, targetFile, expectedPluginHash);
 
-        if (copied && File.Exists(targetFile))
+        if (copied == PluginCopyResult.Success)
         {
-            string installedHash = PackageManifest.ComputeFileSha256(targetFile);
+            string installedHash = expectedPluginHash.ToLowerInvariant();
             journal.CompleteStep(copyStep, installedHash);
 
             game.ExistingFileHash = installedHash;
@@ -228,12 +227,6 @@ public static class TelemetryPluginManager
         }
         else
         {
-            if (isUpdateMode || IsFileLocked(targetFile))
-            {
-                InstallerLogger.LogWarn($"[{game.GameId}] Telemetry plugin file '{targetFile}' is locked or in use (likely by running game). Skipping plugin overwrite as requested.");
-                return true;
-            }
-
             InstallerLogger.LogErr($"[{game.GameId}] Failed to copy plugin to: {targetFile}");
             return false;
         }
@@ -258,6 +251,9 @@ public static class TelemetryPluginManager
     }
 
     public static void ProcessGamePluginUninstall(GameInstallState state)
+        => ProcessGamePluginUninstall(state, new PluginFileOperations());
+
+    internal static void ProcessGamePluginUninstall(GameInstallState state, PluginFileOperations files)
     {
         string targetFile = state.PluginPath;
         if (!File.Exists(targetFile))
@@ -282,24 +278,19 @@ public static class TelemetryPluginManager
             File.Exists(state.BackupPath))
         {
             InstallerLogger.LogInfo($"[{state.GameId}] Restoring original third-party plugin from: {state.BackupPath}");
-            try
+            // Legacy install state stores the authorized backup path but no
+            // backup digest. Snapshot the original backup before restaging;
+            // revalidation and the source lease protect both copies thereafter.
+            string backupHash = PackageManifest.ComputeFileSha256(state.BackupPath);
+            if (!files.RestoreVerified(state.BackupPath, targetFile, backupHash))
+                throw new IOException("Could not verify and restore the original telemetry plugin.");
+            try { File.Delete(state.BackupPath); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
-                File.Copy(state.BackupPath, targetFile, overwrite: true);
-                File.Delete(state.BackupPath);
-                InstallerLogger.LogInfo($"[{state.GameId}] Successfully restored original third-party plugin.");
+                if (!ElevatedHelperRunner.DeletePluginFileElevated(state.BackupPath))
+                    throw new IOException("Could not remove the restored telemetry plugin backup.");
             }
-            catch
-            {
-                if (ElevatedHelperRunner.CopyFileElevated(state.BackupPath, targetFile))
-                {
-                    ElevatedHelperRunner.DeleteFileElevated(state.BackupPath);
-                    InstallerLogger.LogInfo($"[{state.GameId}] Successfully restored original third-party plugin elevated.");
-                }
-                else
-                {
-                    InstallerLogger.LogErr($"[{state.GameId}] Failed to restore original plugin backup.");
-                }
-            }
+            InstallerLogger.LogInfo($"[{state.GameId}] Verified original third-party plugin restored.");
             return;
         }
 
@@ -315,7 +306,7 @@ public static class TelemetryPluginManager
             }
             catch
             {
-                if (ElevatedHelperRunner.DeleteFileElevated(targetFile))
+                if (ElevatedHelperRunner.DeletePluginFileElevated(targetFile))
                 {
                     InstallerLogger.LogInfo($"[{state.GameId}] Plugin successfully removed elevated.");
                 }

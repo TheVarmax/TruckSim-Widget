@@ -3815,11 +3815,7 @@ namespace ETSOverlay
 
         public void OnDonate()
         {
-            try
-            {
-                Process.Start(new ProcessStartInfo { FileName = DonateUrl, UseShellExecute = true });
-            }
-            catch (Exception ex) { WriteLog($"Failed to open donate page: {ex.Message}"); }
+            SafeUrlLauncher.OpenForUser(DonateUrl, UrlPolicy.OfficialWebsite, this, GetUiLanguage());
         }
 
 

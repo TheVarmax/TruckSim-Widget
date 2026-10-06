@@ -1,12 +1,16 @@
 using System.Text.Json;
 using TruckSimWidgetSetup.Common;
 using TruckSimWidgetSetup.Diagnostics;
+using TruckSimWidgetSetup.PluginManager;
 
 namespace TruckSimWidgetSetup.TransactionEngine;
 
 public static class CrashRecoveryEngine
 {
     public static bool CheckAndExecuteRecovery(string? customJournalPath = null)
+        => CheckAndExecuteRecovery(customJournalPath, new PluginFileOperations());
+
+    internal static bool CheckAndExecuteRecovery(string? customJournalPath, PluginFileOperations pluginFiles, string? customStagingDir = null)
     {
         string journalPath = customJournalPath ?? Constants.GetTransactionJournalFilePath();
 
@@ -46,11 +50,12 @@ public static class CrashRecoveryEngine
         }
 
         journal.JournalFilePath = journalPath;
+        if (customStagingDir != null) journal.StagingDir = customStagingDir;
 
         if (journal.Status == "PENDING")
         {
             InstallerLogger.LogWarn($"Incomplete PENDING transaction ({journal.TransactionId}) detected! Executing automatic crash recovery.");
-            bool rollbackOk = journal.Rollback();
+            bool rollbackOk = journal.Rollback(pluginFiles);
 
             if (rollbackOk)
             {
@@ -74,11 +79,7 @@ public static class CrashRecoveryEngine
             InstallerLogger.LogInfo($"Cleaning up stale journal with status '{journal.Status}'.");
             try
             {
-                string stagingDir = Constants.GetTransactionStagingDir();
-                if (Directory.Exists(stagingDir))
-                {
-                    Directory.Delete(stagingDir, recursive: true);
-                }
+                journal.CleanupStagingDir();
                 File.Delete(journalPath);
             }
             catch { }

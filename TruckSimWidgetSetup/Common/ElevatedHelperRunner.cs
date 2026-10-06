@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using TruckSimWidgetSetup.Diagnostics;
 using TruckSimWidgetSetup.FileManager;
+using TruckSimWidgetSetup.PluginManager;
 
 namespace TruckSimWidgetSetup.Common;
 
@@ -23,11 +24,13 @@ public static class ElevatedHelperRunner
     }
 
     public static bool Execute(string command, string path1, string path2 = "", string allowRoot = "")
-    {
-        string? helperExe = _helperPath;
+        => ExecuteVerified(command, path1, path2, allowRoot, _helperPath, _expectedSha256);
 
-        if (string.IsNullOrWhiteSpace(helperExe) || string.IsNullOrWhiteSpace(_expectedSha256)
-            || _expectedSha256.Length != 64 || !_expectedSha256.All(Uri.IsHexDigit))
+    private static bool ExecuteVerified(string command, string path1, string path2, string allowRoot,
+        string? helperExe, string? expectedSha256)
+    {
+        if (string.IsNullOrWhiteSpace(helperExe) || string.IsNullOrWhiteSpace(expectedSha256)
+            || expectedSha256.Length != 64 || !expectedSha256.All(Uri.IsHexDigit))
         {
             InstallerLogger.LogErr("ElevatedHelper has no trusted manifest path and SHA-256 digest.");
             return false;
@@ -45,9 +48,9 @@ public static class ElevatedHelperRunner
             // between hashing and ShellExecute must be denied by Windows sharing.
             using var verifiedHelper = new FileStream(helperExe, FileMode.Open, FileAccess.Read, FileShare.Read);
             string actualHash = Convert.ToHexString(SHA256.HashData(verifiedHelper));
-            if (!string.Equals(actualHash, _expectedSha256, StringComparison.OrdinalIgnoreCase))
+            if (!string.Equals(actualHash, expectedSha256, StringComparison.OrdinalIgnoreCase))
             {
-                InstallerLogger.LogErr($"ElevatedHelper.exe integrity verification failed! Expected {_expectedSha256}, got {actualHash}");
+                InstallerLogger.LogErr($"ElevatedHelper.exe integrity verification failed! Expected {expectedSha256}, got {actualHash}");
                 return false;
             }
             InstallerLogger.LogInfo($"Executing ElevatedHelper operation: {command}");
@@ -91,6 +94,44 @@ public static class ElevatedHelperRunner
 
     public static bool CopyFileElevated(string source, string destination, string? allowRoot = null) =>
         Execute("copy", source, destination, allowRoot ?? ExtractGameRoot(destination));
+
+    internal static bool CopyPluginFileElevated(string source, string destination)
+    {
+        return ExecutePluginOperation("copy", source, destination, ExtractGameRoot(destination));
+    }
+
+    internal static bool DeletePluginFileElevated(string target)
+    {
+        return ExecutePluginOperation("delete", target, "", ExtractGameRoot(target));
+    }
+
+    private static bool ExecutePluginOperation(string command, string path1, string path2, string root)
+    {
+        if (_helperPath != null) return Execute(command, path1, path2, root);
+        return WithTrustedRecoveryHelper((helper, digest) => ExecuteVerified(command, path1, path2, root, helper, digest));
+    }
+
+    internal static bool WithTrustedRecoveryHelper(Func<string, string, bool> run)
+    {
+        // Recovery can precede the first saved install-state. Neither the journal
+        // nor the installed manifest is a trust anchor for launching elevated code.
+        // Always extract the helper from this installer's embedded payload.
+        try
+        {
+            using var payload = new EmbeddedPayloadProvider();
+            if (!payload.Manifest.TryGetEntry("ElevatedHelper.exe", out var entry) || entry == null) return false;
+            using var staging = PluginStagingDirectory.Create();
+            string helper = Path.Combine(staging.Path, "ElevatedHelper.exe");
+            payload.ExtractFile("ElevatedHelper.exe", staging.Path, helper);
+            using var verified = VerifiedPluginSource.Open(helper, entry.Sha256);
+            return run(helper, entry.Sha256);
+        }
+        catch (Exception)
+        {
+            InstallerLogger.LogErr("A verified embedded helper could not be prepared for plugin recovery.");
+            return false;
+        }
+    }
 
     public static bool DeleteFileElevated(string target, string? allowRoot = null) =>
         Execute("delete", target, "", allowRoot ?? ExtractGameRoot(target));

@@ -5,6 +5,7 @@ using TruckSimWidgetSetup.Common;
 using TruckSimWidgetSetup.Diagnostics;
 using TruckSimWidgetSetup.FileManager;
 using TruckSimWidgetSetup.InstallerCore;
+using TruckSimWidgetSetup.PluginManager;
 
 namespace TruckSimWidgetSetup.TransactionEngine;
 
@@ -35,6 +36,27 @@ public class TransactionJournal
 
     [JsonIgnore]
     public string StagingDir { get; set; } = Constants.GetTransactionStagingDir();
+
+    // Separate from persistent installer staging; absent in pre-I4 journals.
+    [JsonPropertyName("pluginStagingDir")]
+    public string PluginStagingDir { get; set; } = string.Empty;
+
+    internal string GetPluginStagingDir()
+    {
+        lock (_lock)
+        {
+            if (string.IsNullOrEmpty(PluginStagingDir))
+            {
+                var staging = PluginStagingDirectory.Create();
+                PluginStagingDir = staging.Path;
+                try { FlushToDisk(); }
+                catch { staging.Dispose(); PluginStagingDir = string.Empty; throw; }
+            }
+            if (!PluginStagingDirectory.IsOwnedPath(PluginStagingDir))
+                throw new IOException("Invalid telemetry plugin staging directory.");
+            return PluginStagingDir;
+        }
+    }
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -139,6 +161,9 @@ public class TransactionJournal
     }
 
     public bool Rollback()
+        => Rollback(new PluginFileOperations());
+
+    internal bool Rollback(PluginFileOperations pluginFiles)
     {
         lock (_lock)
         {
@@ -156,16 +181,20 @@ public class TransactionJournal
 
                 try
                 {
-                    if (!ExecuteStepRollback(step))
+                    if (!ExecuteStepRollback(step, pluginFiles))
                     {
                         allSucceeded = false;
                         InstallerLogger.LogErr($"Rollback failed for step {step.StepIndex} ({step.Operation}): {step.TargetPath}");
+                        // Earlier application steps may remove/replace the only
+                        // verified helper needed to retry protected plugin restore.
+                        if (step.Operation is "CopyPlugin" or "CreateThirdPartyBackup") break;
                     }
                 }
                 catch (Exception ex)
                 {
                     allSucceeded = false;
                     InstallerLogger.LogErr($"Exception rolling back step {step.StepIndex}: {ex.Message}");
+                    if (step.Operation is "CopyPlugin" or "CreateThirdPartyBackup") break;
                 }
             }
 
@@ -210,8 +239,9 @@ public class TransactionJournal
         }
     }
 
-    private void CleanupStagingDir()
+    internal void CleanupStagingDir()
     {
+        PluginStagingDirectory.Cleanup(PluginStagingDir);
         try
         {
             if (Directory.Exists(StagingDir))
@@ -222,8 +252,9 @@ public class TransactionJournal
         catch { }
     }
 
-    internal static bool ExecuteStepRollback(TransactionStep step)
+    internal static bool ExecuteStepRollback(TransactionStep step, PluginFileOperations? pluginFiles = null)
     {
+        pluginFiles ??= new PluginFileOperations();
         InstallerLogger.LogInfo($"Rolling back step {step.StepIndex} ({step.Operation}): {step.TargetPath}");
 
         switch (step.Operation)
@@ -234,6 +265,17 @@ public class TransactionJournal
                 {
                     InstallerLogger.LogErr($"Rollback backup is missing: {step.BackupPath}");
                     return false;
+                }
+
+                if (step.Operation == "CopyPlugin")
+                {
+                    // Verify the original before any destructive restore. Both new
+                    // TEMP backups and legacy LocalAppData journals use this flow.
+                    if (!string.IsNullOrEmpty(step.BackupPath))
+                        return pluginFiles.RestoreVerified(step.BackupPath, step.TargetPath, step.OriginalHash);
+                    try { File.Delete(step.TargetPath); return true; }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    { return ElevatedHelperRunner.DeletePluginFileElevated(step.TargetPath); }
                 }
 
                 // If target was created, delete it
@@ -345,7 +387,8 @@ public class TransactionJournal
                     // If target is missing, restore
                     if (!File.Exists(step.TargetPath))
                     {
-                        File.Copy(step.BackupPath, step.TargetPath, overwrite: true);
+                        if (!pluginFiles.RestoreVerified(step.BackupPath, step.TargetPath, step.OriginalHash))
+                            return false;
                     }
 
                     // If target matches original hash, safe to delete redundant persistent backup
@@ -354,7 +397,9 @@ public class TransactionJournal
                         string currentHash = PackageManifest.ComputeFileSha256(step.TargetPath);
                         if (string.Equals(currentHash, step.OriginalHash, StringComparison.OrdinalIgnoreCase))
                         {
-                            File.Delete(step.BackupPath);
+                            try { File.Delete(step.BackupPath); }
+                            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                            { return ElevatedHelperRunner.DeletePluginFileElevated(step.BackupPath); }
                         }
                     }
                 }
