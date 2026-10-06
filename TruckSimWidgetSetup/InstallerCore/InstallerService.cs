@@ -63,9 +63,7 @@ public class InstallerService
                 catch { }
             }
 
-            if (PackageVersion.IsDowngrade(currentManifest.Version, installInfo.InstalledVersion)
-                || (previousManifest != null && PackageVersion.IsDowngrade(currentManifest.Version, previousManifest.Version)))
-                throw new InvalidOperationException("This package is older than the installed version.");
+            EnsurePackageIsNotOlder(currentManifest.Version, installInfo.InstalledVersion, previousManifest);
 
             // 2. Initialize transaction journal
             journal = TransactionJournal.StartNew(opName, currentManifest.Version);
@@ -315,7 +313,7 @@ public class InstallerService
             DirectoryCleaner.CleanEmptyDirectories(appDir);
 
             // 6. Commit transaction before destructive user data deletion
-            journal.Commit();
+            CompleteUninstall(journal, ownedFiles, installedManifestPath, Constants.GetInstallStateFilePath());
             InstallerLogger.LogInfo("Uninstallation transaction committed successfully.");
 
             // 7. User data handling (AFTER transaction commit)
@@ -370,6 +368,29 @@ public class InstallerService
             }
             return false;
         }
+    }
+
+    internal static void EnsurePackageIsNotOlder(string candidate, string installed, PackageManifest? previousManifest)
+    {
+        if (PackageVersion.IsDowngrade(candidate, installed)
+            || (previousManifest != null && PackageVersion.IsDowngrade(candidate, previousManifest.Version)))
+            throw new InvalidOperationException("This package is older than the installed version.");
+    }
+
+    internal static void CompleteUninstall(TransactionJournal journal, IReadOnlyCollection<string> ownedFiles,
+        string installedManifestPath, string stateFilePath)
+    {
+        // A running owned uninstaller is removed by the existing self-delete schedule.
+        // Retain ownership metadata if any other owned file could not be removed.
+        if (ownedFiles.Any(file => File.Exists(file)
+            && !string.Equals(Path.GetFullPath(file), Environment.ProcessPath, StringComparison.OrdinalIgnoreCase)))
+            throw new IOException("Installer-owned application files could not be fully removed.");
+
+        journal.Commit();
+        // Plugin restore and owned-file cleanup have finished. These are installer
+        // metadata, not user data; never delete their containing directory here.
+        File.Delete(installedManifestPath);
+        File.Delete(stateFilePath);
     }
 
     private static void EnsureAppProcessClosed()

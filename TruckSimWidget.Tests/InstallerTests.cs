@@ -552,6 +552,97 @@ public class InstallerTests : IDisposable
         Assert.Equal(originalContent, File.ReadAllText(manifestPath));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Uninstall166AllowsFreshOrStaleInstall165WithoutDeletingUserData(bool preserveUnknownFile)
+    {
+        string source = Path.Combine(_testDir, "source166");
+        string app = Path.Combine(_testDir, "app");
+        string metadata = Path.Combine(_testDir, "installer");
+        Directory.CreateDirectory(source);
+        Directory.CreateDirectory(metadata);
+        File.WriteAllText(Path.Combine(source, Constants.AppExeName), "version 1.6.6");
+        var manifest = PackageManifest.GenerateFromDirectory(source, "1.6.6");
+        manifest.SaveToFile(Path.Combine(source, "manifest.json"));
+        using var payload = new EmbeddedPayloadProvider(source);
+        var install = TransactionJournal.StartNew("Install", "1.6.6",
+            Path.Combine(metadata, "install-journal.json"), Path.Combine(metadata, "install-staging"));
+        var records = FileSynchronizer.ExecuteSynchronization(app, payload,
+            FileSynchronizer.PlanSynchronization(app, manifest, null), install);
+        string manifestPath = Path.Combine(metadata, "installed-manifest.json");
+        string statePath = Path.Combine(metadata, "install-state.json");
+        manifest.SaveToFile(manifestPath);
+        File.WriteAllText(statePath, new InstallStateModel
+        {
+            InstallerVersion = "1.6.6", InstallPath = app, InstalledFiles = records
+        }.ToJson());
+        install.Commit();
+        string log = Path.Combine(metadata, "installer_log.txt");
+        string settings = Path.Combine(_testDir, "settings.json");
+        File.WriteAllText(log, "keep log");
+        File.WriteAllText(settings, "keep settings");
+        string unknown = Path.Combine(app, "user-notes.txt");
+        if (preserveUnknownFile) File.WriteAllText(unknown, "keep unknown");
+
+        Assert.Throws<InvalidOperationException>(() => InstallerService.EnsurePackageIsNotOlder(
+            "1.6.5", "1.6.6", PackageManifest.LoadFromFile(manifestPath)));
+        var owned = records.Select(r => PackageManifest.ResolveContainedPath(app, r.RelativePath)).ToArray();
+        var uninstall = TransactionJournal.StartNew("Uninstall", "1.6.6",
+            Path.Combine(metadata, "uninstall-journal.json"), Path.Combine(metadata, "uninstall-staging"));
+        foreach (string file in owned) File.Delete(file);
+        DirectoryCleaner.CleanEmptyDirectories(app);
+        InstallerService.CompleteUninstall(uninstall, owned, manifestPath, statePath);
+
+        Assert.False(File.Exists(manifestPath));
+        Assert.Null(InstallStateModel.LoadFromFile(statePath));
+        Assert.Equal(preserveUnknownFile, Directory.Exists(app));
+        if (preserveUnknownFile) Assert.Equal("keep unknown", File.ReadAllText(unknown));
+        Assert.Equal("keep log", File.ReadAllText(log));
+        Assert.Equal("keep settings", File.ReadAllText(settings));
+        PackageManifest? previous = File.Exists(manifestPath) ? PackageManifest.LoadFromFile(manifestPath) : null;
+        InstallerService.EnsurePackageIsNotOlder("1.6.5", string.Empty, previous);
+        File.WriteAllText(Path.Combine(source, Constants.AppExeName), "version 1.6.5");
+        File.Delete(Path.Combine(source, "manifest.json"));
+        var olderManifest = PackageManifest.GenerateFromDirectory(source, "1.6.5");
+        olderManifest.SaveToFile(Path.Combine(source, "manifest.json"));
+        using var olderPayload = new EmbeddedPayloadProvider(source);
+        var olderInstall = TransactionJournal.StartNew("Install", "1.6.5",
+            Path.Combine(metadata, "older-journal.json"), Path.Combine(metadata, "older-staging"));
+        FileSynchronizer.ExecuteSynchronization(app, olderPayload,
+            FileSynchronizer.PlanSynchronization(app, olderManifest, previous), olderInstall);
+        olderInstall.Commit();
+        Assert.Equal("version 1.6.5", File.ReadAllText(Path.Combine(app, Constants.AppExeName)));
+        if (preserveUnknownFile) Assert.Equal("keep unknown", File.ReadAllText(unknown));
+    }
+
+    [Theory]
+    [InlineData("1.6.6", false)]
+    [InlineData("", true)]
+    public void Installed166StillRejects165(string detectedVersion, bool hasManifest)
+    {
+        Assert.Throws<InvalidOperationException>(() => InstallerService.EnsurePackageIsNotOlder(
+            "1.6.5", detectedVersion, hasManifest ? new PackageManifest { Version = "1.6.6" } : null));
+    }
+
+    [Fact]
+    public void FailedOwnedFileCleanupRetainsUninstallMetadata()
+    {
+        string owned = Path.Combine(_testDir, Constants.AppExeName);
+        string manifest = Path.Combine(_testDir, "installed-manifest.json");
+        string state = Path.Combine(_testDir, "install-state.json");
+        File.WriteAllText(owned, "still installed");
+        File.WriteAllText(manifest, "manifest");
+        File.WriteAllText(state, "state");
+        var journal = TransactionJournal.StartNew("Uninstall", "1.6.6",
+            Path.Combine(_testDir, "journal.json"), Path.Combine(_testDir, "staging"));
+        Assert.Throws<IOException>(() => InstallerService.CompleteUninstall(journal,
+            new[] { owned }, manifest, state));
+        Assert.Equal("PENDING", journal.Status);
+        Assert.Equal("manifest", File.ReadAllText(manifest));
+        Assert.Equal("state", File.ReadAllText(state));
+    }
+
     [Fact]
     public void TransactionRollback_UnregistersWindowsRegistration()
     {
