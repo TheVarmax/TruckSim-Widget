@@ -4777,6 +4777,7 @@ namespace ETSOverlay
             }
         }
 
+#if DEBUG
         internal static bool _isUpdateSimulationActive = false;
         internal static string? _simulationInstallerPath = null;
         internal static string? _simulationVersion = null;
@@ -4901,6 +4902,8 @@ namespace ETSOverlay
             return Convert.ToHexString(hash).ToLowerInvariant();
         }
 
+#endif
+
         /// <summary>
         /// Проверяет наличие обновлений через GitHub API
         /// </summary>
@@ -4908,11 +4911,17 @@ namespace ETSOverlay
         {
             if (_isCheckingUpdate || _isCooldownActive) return;
 
+#if DEBUG
             bool isSimulated = CheckUpdateSimulationArgs();
+#endif
 
             // Защита от лимитов GitHub API (60 запросов в час)
             // При тихой проверке (старт приложения) проверяем не чаще раз в 15 минут (если не симуляция)
-            if (!isSimulated && silent && (DateTime.Now - _lastUpdateCheck).TotalMinutes < 15) return;
+            if (
+#if DEBUG
+                !isSimulated &&
+#endif
+                silent && (DateTime.Now - _lastUpdateCheck).TotalMinutes < 15) return;
             // При ручной проверке обрабатывается через StartCooldownTimer (кнопка заблокирована)
 
             _isCheckingUpdate = true;
@@ -4931,6 +4940,7 @@ namespace ETSOverlay
                     }
                 });
 
+#if DEBUG
                 if (isSimulated)
                 {
                     WriteLog("=== UPDATE SIMULATION MODE ACTIVE ===");
@@ -5030,6 +5040,7 @@ namespace ETSOverlay
                     return;
                 }
 
+#endif
                 WriteLog("Checking for updates...");
 
                 var client = _sharedHttpClient;

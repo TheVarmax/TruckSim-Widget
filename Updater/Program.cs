@@ -89,7 +89,11 @@ static class Program
             if (assetName != Path.GetFileName(assetName) || !assetName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)
                 || assetName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 throw new InvalidOperationException("Invalid installer asset name.");
-            if (!ReleaseAssetPolicy.IsTrustedDownload(downloadUrl, assetName))
+            if (
+#if DEBUG
+                !TryGetLocalSimulationSource(downloadUrl, out _) &&
+#endif
+                !ReleaseAssetPolicy.IsTrustedDownload(downloadUrl, assetName))
                 throw new InvalidOperationException("Installer download must use the official HTTPS GitHub Releases URL.");
 
             // Запускаем форму обновления
@@ -102,6 +106,23 @@ static class Program
             ShowErrorDialog(errorMessage, logPath, "en");
         }
     }
+
+#if DEBUG
+    // Local packages are a developer-only input; Release must always use ReleaseAssetPolicy.
+    private static bool TryGetLocalSimulationSource(string url, out string localSourcePath)
+    {
+        localSourcePath = url;
+        if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return false;
+            localSourcePath = uri.LocalPath;
+            return true;
+        }
+
+        return File.Exists(url) || (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && Path.IsPathRooted(url));
+    }
+#endif
 
     /// <summary>
     /// Стилизованная форма обновления
@@ -385,24 +406,9 @@ static class Program
 
         private async Task DownloadWithProgressAsync(string url, string filePath)
         {
-            // Support local files for update simulation / testing mode
-            string localSourcePath = url;
-            bool isLocal = false;
-
-            if (url.StartsWith("file://", StringComparison.OrdinalIgnoreCase))
-            {
-                if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-                {
-                    localSourcePath = uri.LocalPath;
-                    isLocal = true;
-                }
-            }
-            else if (File.Exists(url) || (!url.StartsWith("http://", StringComparison.OrdinalIgnoreCase) && !url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) && Path.IsPathRooted(url)))
-            {
-                isLocal = true;
-            }
-
-            if (isLocal)
+#if DEBUG
+            // Support local files only in development builds.
+            if (TryGetLocalSimulationSource(url, out string localSourcePath))
             {
                 if (!File.Exists(localSourcePath))
                 {
@@ -475,6 +481,7 @@ static class Program
                 return;
             }
 
+#endif
             using var client = new HttpClient();
             client.DefaultRequestHeaders.UserAgent.ParseAdd("TruckSimWidget-Updater/1.0");
             client.Timeout = TimeSpan.FromMinutes(10);

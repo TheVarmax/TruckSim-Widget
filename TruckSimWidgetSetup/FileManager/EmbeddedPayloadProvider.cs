@@ -32,7 +32,7 @@ public class EmbeddedPayloadProvider : IDisposable
             }
             else
             {
-                _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.5");
+                _manifest = PackageManifest.GenerateFromDirectory(_sourceDirectory, "1.6.6");
             }
             return;
         }
