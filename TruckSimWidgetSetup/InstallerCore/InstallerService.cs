@@ -320,28 +320,12 @@ public class InstallerService
             if (removeUserData)
             {
                 statusText?.Report("Removing user data...");
-                string userDataDir = Constants.GetUserDataDir();
-                if (Directory.Exists(userDataDir))
-                {
-                    try
-                    {
-                        Directory.Delete(userDataDir, recursive: true);
-                        InstallerLogger.LogInfo($"Deleted user data directory: {userDataDir}");
-                    }
-                    catch (Exception ex)
-                    {
-                        InstallerLogger.LogWarn($"Could not delete user data directory {userDataDir}: {ex.Message}");
-                    }
-                }
-
-                // Delete settings registry key
-                try
+                UninstallUserData.Remove(appDir,
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), () =>
                 {
                     using var root = Registry.CurrentUser.OpenSubKey(@"Software", writable: true);
                     root?.DeleteSubKeyTree("TruckSim Widget", throwOnMissingSubKey: false);
-                    InstallerLogger.LogInfo("Deleted registry key Software\\TruckSim Widget");
-                }
-                catch { }
+                });
             }
             else
             {
@@ -353,7 +337,7 @@ public class InstallerService
             // 8. Self-delete schedule if running from app directory and verified owned
             bool isSelfOwned = !string.IsNullOrEmpty(Environment.ProcessPath) &&
                 ownedFiles.Contains(Path.GetFullPath(Environment.ProcessPath), StringComparer.OrdinalIgnoreCase);
-            ScheduleSelfDeleteIfInAppDir(appDir, isSelfOwned);
+            ScheduleSelfDeleteIfInAppDir(appDir, isSelfOwned, removeUserData);
 
             return true;
         }
@@ -361,7 +345,7 @@ public class InstallerService
         {
             InstallerLogger.LogErr($"Uninstall failed: {ex.Message}\n{ex.StackTrace}");
             statusText?.Report($"Uninstall failed: {ex.Message}");
-            if (journal != null)
+            if (journal != null && journal.Status != "COMMITTED")
             {
                 try { journal.Rollback(); }
                 catch (Exception rollbackEx) { InstallerLogger.LogErr($"Rollback could not finish: {rollbackEx.Message}"); }
@@ -489,7 +473,7 @@ public class InstallerService
         }
     }
 
-    private static void ScheduleSelfDeleteIfInAppDir(string appDir, bool isOwned)
+    private static void ScheduleSelfDeleteIfInAppDir(string appDir, bool isOwned, bool removeUserData)
     {
         if (!isOwned) return;
         try
@@ -506,7 +490,8 @@ public class InstallerService
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
-                    Arguments = $"/C choice /C Y /N /D Y /T 2 & del \"{normCurrent}\"",
+                    Arguments = $"/C choice /C Y /N /D Y /T 2 & del \"{normCurrent}\""
+                        + (removeUserData ? $" & rmdir \"{normApp}\"" : string.Empty),
                     WindowStyle = ProcessWindowStyle.Hidden,
                     CreateNoWindow = true
                 });

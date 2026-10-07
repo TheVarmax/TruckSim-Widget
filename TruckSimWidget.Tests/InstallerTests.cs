@@ -644,6 +644,58 @@ public class InstallerTests : IDisposable
     }
 
     [Fact]
+    public void DeleteEverything_RemovesLicenseCopiesAndData_WithoutRecreatingLogs()
+    {
+        string app = Path.Combine(_testDir, "app");
+        string local = Path.Combine(_testDir, "local");
+        string data = Path.Combine(local, "TruckSimWidget");
+        string legacy = Path.Combine(local, "TruckSim Widget");
+        foreach (string dir in new[] { app, data, legacy, Path.Combine(app, "Resources"), Path.Combine(local, "TrucksBook") })
+            Directory.CreateDirectory(dir);
+        foreach (string name in new[] { "device.dat", "device.dat.tmp", "state.dat", "state.dat.tmp", "app_log.txt" })
+            File.WriteAllText(Path.Combine(app, name), "runtime data");
+        File.WriteAllText(Path.Combine(app, "Resources", "city_translations.json"), "cache");
+        File.WriteAllText(Path.Combine(data, "device.dat"), "primary license");
+        File.WriteAllText(Path.Combine(legacy, "device.dat"), "legacy license");
+        File.WriteAllText(Path.Combine(app, "user.txt"), "keep");
+        string thirdParty = Path.Combine(local, "TrucksBook", "user.txt");
+        File.WriteAllText(thirdParty, "keep");
+        string previousLog = TruckSimWidgetSetup.Diagnostics.InstallerLogger.LogFilePath;
+        bool settingsRemoved = false;
+        try
+        {
+            TruckSimWidgetSetup.Diagnostics.InstallerLogger.SetCustomLogPath(Path.Combine(data, "installer", "installer_log.txt"));
+            UninstallUserData.Remove(app, local, () => settingsRemoved = true);
+            TruckSimWidgetSetup.Diagnostics.InstallerLogger.LogInfo("Uninstall completed");
+            Assert.True(settingsRemoved);
+            Assert.False(Directory.Exists(data));
+            Assert.False(Directory.Exists(legacy));
+            Assert.False(Directory.Exists(Path.Combine(app, "Resources")));
+            Assert.Equal(new[] { Path.Combine(app, "user.txt") }, Directory.GetFiles(app));
+            Assert.Equal("keep", File.ReadAllText(thirdParty));
+        }
+        finally
+        {
+            TruckSimWidgetSetup.Diagnostics.InstallerLogger.SetCustomLogPath(previousLog);
+            TruckSimWidgetSetup.Diagnostics.InstallerLogger.SetFileLoggingEnabled(true);
+        }
+    }
+
+    [Fact]
+    public void DeleteEverything_LockedLicenseFailsCleanup()
+    {
+        string app = Path.Combine(_testDir, "app");
+        Directory.CreateDirectory(app);
+        string license = Path.Combine(app, "device.dat");
+        File.WriteAllText(license, "license");
+        using var locked = new FileStream(license, FileMode.Open, FileAccess.Read, FileShare.Read);
+        bool settingsRemoved = false;
+        Assert.Throws<IOException>(() => UninstallUserData.Remove(app, Path.Combine(_testDir, "local"), () => settingsRemoved = true));
+        Assert.False(settingsRemoved);
+        Assert.True(File.Exists(license));
+    }
+
+    [Fact]
     public void TransactionRollback_UnregistersWindowsRegistration()
     {
         var journal = TransactionJournal.StartNew("Install", "1.6.4", Path.Combine(_testDir, "tx_reg.json"), Path.Combine(_testDir, "staging_reg"));

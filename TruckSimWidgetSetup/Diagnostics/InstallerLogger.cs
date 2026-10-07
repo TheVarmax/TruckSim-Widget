@@ -8,6 +8,12 @@ public static class InstallerLogger
 {
     private static readonly object LockObj = new();
     private static string? _customLogPath;
+    private static bool _fileLoggingEnabled = true;
+
+    internal static void SetFileLoggingEnabled(bool enabled)
+    {
+        lock (LockObj) { _fileLoggingEnabled = enabled; }
+    }
 
     public static void SetCustomLogPath(string path)
     {
@@ -21,6 +27,7 @@ public static class InstallerLogger
 
     public static void InitSession(string version, string commandArgs)
     {
+        SetFileLoggingEnabled(true);
         LogInfo("================================================================");
         LogInfo("TruckSim Widget Custom Installer Session Started");
         LogInfo($"Installer Version : {version}");
@@ -61,6 +68,7 @@ public static class InstallerLogger
 
             lock (LockObj)
             {
+                if (!_fileLoggingEnabled) return;
                 string targetPath = LogFilePath;
                 string? dir = Path.GetDirectoryName(targetPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
