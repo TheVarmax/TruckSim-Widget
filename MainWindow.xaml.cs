@@ -520,9 +520,10 @@ namespace ETSOverlay
             Loaded += async (s, e) =>
             {
                 ClientPresenceService.Instance.Start();
-                WindowGuard.EnsureOnScreen(this);
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
+                UpdateHeaderOverlayPosition();
+                FitRestoredWindow(this, GetHeaderOverlayExtent(), () => WindowGuard.CenterOnPrimary(this), "main");
                 UpdateHeaderOverlayPosition();
                 HideHeaderOverlay();
 
@@ -3087,7 +3088,6 @@ namespace ETSOverlay
                 {
                     _settingsWindow.Left = _savedSettingsLeft;
                     _settingsWindow.Top = _savedSettingsTop;
-                    WindowGuard.EnsureOnScreen(_settingsWindow);
                 }
             }
             else
@@ -3102,6 +3102,8 @@ namespace ETSOverlay
             {
                 _settingsWindow.Opacity = 0;
                 _settingsWindow.Show();
+                var settings = _settingsWindow;
+                FitRestoredWindow(settings, 0, () => WindowGuard.CenterOnPrimary(settings), "settings");
             }
             var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.2));
             _settingsWindow.BeginAnimation(Window.OpacityProperty, fadeIn);
@@ -3303,10 +3305,9 @@ namespace ETSOverlay
                 }
                 else
                 {
-                    _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.DesiredSize.Width) / 2;
-                    _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.DesiredSize.Height - 20; 
+                    PlaceHudAtDefault();
                 }
-                WindowGuard.EnsureOnScreen(_hudWindow);
+                FitRestoredWindow(_hudWindow, 0, PlaceHudAtDefault, "HUD");
                 if (animate)
                 {
                     _hudWindow.Opacity = 0;
@@ -5691,6 +5692,35 @@ namespace ETSOverlay
                     HideHeaderOverlay();
                 }
             };
+        }
+
+        // Height of the header overlay drawn above the main window: it has to stay on screen
+        // too, otherwise the window can't be grabbed.
+        private double GetHeaderOverlayExtent()
+        {
+            if (_headerOverlay == null || double.IsNaN(_headerOverlay.Top)) return 0;
+            return Math.Max(0, Top - _headerOverlay.Top);
+        }
+
+        private void PlaceHudAtDefault()
+        {
+            if (_hudWindow == null) return;
+            _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.DesiredSize.Width) / 2;
+            _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.DesiredSize.Height - 20;
+        }
+
+        /// <summary>
+        /// Keeps a restored window fully inside a monitor's work area. Positions left behind by
+        /// the 1.6.6 maximize bug (or off every monitor) are reset to the default; positions that
+        /// stick out are moved inside. Corrections are logged and saved right away.
+        /// </summary>
+        private void FitRestoredWindow(Window window, double extraTop, Action applyDefault, string name)
+        {
+            var fix = WindowGuard.FitToWorkArea(window, extraTop, applyDefault);
+            if (fix == WindowGuard.PositionFix.None) return;
+            string what = fix == WindowGuard.PositionFix.Reset ? "was invalid, reset to default" : "was outside the screen, moved inside";
+            WriteLog($"[WINDOW] Saved {name} window position {what}: {window.Left:0},{window.Top:0}");
+            SaveState();
         }
 
         private void UpdateHeaderOverlayPosition()
