@@ -46,10 +46,15 @@ namespace ETSOverlay
         private const double MinVisibleWidth = 60;
         private const double MinVisibleHeight = 30;
 
+        private const int WM_MOVING = 0x0216;
+        private const uint MONITOR_DEFAULTTONEAREST = 2;
+
         private sealed class GuardState
         {
             public SizeToContent SizeToContent;
             public bool AppMinimize;
+            // The visible part of the window (the card); the rest is a transparent margin/shadow.
+            public FrameworkElement? Content;
         }
 
         private static readonly ConditionalWeakTable<Window, GuardState> States = new();
@@ -68,8 +73,10 @@ namespace ETSOverlay
 
         /// <summary>
         /// Call from the window constructor (after InitializeComponent).
+        /// <paramref name="visibleContent"/> is the visible card inside the transparent window:
+        /// dragging keeps it on screen, and restored positions are checked against it.
         /// </summary>
-        public static void Attach(Window window)
+        public static void Attach(Window window, FrameworkElement? visibleContent = null)
         {
             // CanMinimize keeps the minimize box (the app minimizes windows itself)
             // but drops WS_MAXIMIZEBOX and WS_THICKFRAME, so Windows no longer offers
@@ -78,6 +85,7 @@ namespace ETSOverlay
 
             var state = States.GetValue(window, _ => new GuardState());
             state.SizeToContent = window.SizeToContent;
+            state.Content = visibleContent;
 
             window.SourceInitialized += (s, e) =>
             {
@@ -106,6 +114,15 @@ namespace ETSOverlay
                         }
                         case WM_NCLBUTTONDBLCLK:
                             handled = true;
+                            break;
+                        case WM_MOVING:
+                            // User drag (DragMove): keep the visible card inside the monitor under
+                            // the cursor, so it can be placed flush to an edge but not past it.
+                            if (lParam != IntPtr.Zero && ClampDragRect(window, lParam))
+                            {
+                                handled = true;
+                                return new IntPtr(1);
+                            }
                             break;
                         case WM_WINDOWPOSCHANGING:
                             // Move/resize requested by another process (Win+Shift+arrows, Explorer
@@ -236,116 +253,83 @@ namespace ETSOverlay
 
         internal enum PositionFix { None, Clamped, Reset }
 
-        // A maximized window sits a few pixels (its invisible frame, ~7-8 DIPs) beyond the
-        // top-left corner of the work area. Positions like that came from the 1.6.6 maximize bug.
-        private const double MaximizeOffsetMin = 0.5;
-        private const double MaximizeOffsetMax = 16;
+        // Moves smaller than this are treated as "already in place".
+        private const double PositionTolerance = 0.5;
 
         /// <summary>
-        /// Pure decision for a restored window: <paramref name="bounds"/> must fit fully inside
-        /// one of <paramref name="workAreas"/> (all in DIPs).
-        /// Reset: position is unusable (not finite, on no monitor, or a maximize leftover);
-        /// the caller applies its default. Clamped: <paramref name="position"/> is the bounds'
-        /// top-left moved inside the work area it overlaps most.
+        /// Pure decision for a restored window: <paramref name="content"/> (the visible card, in
+        /// DIPs) must fit fully inside one of <paramref name="monitors"/>.
+        /// Reset: position is unusable (not finite or on no monitor); the caller applies its
+        /// default. Clamped: <paramref name="position"/> is the card's top-left moved inside the
+        /// monitor it overlaps most. A card flush to an edge is left alone.
         /// </summary>
-        internal static PositionFix SanitizeBounds(Rect bounds, IReadOnlyList<Rect> workAreas, out Point position, bool detectMaximize = true)
+        internal static PositionFix SanitizeBounds(Rect content, IReadOnlyList<Rect> monitors, out Point position)
         {
             position = new Point(double.NaN, double.NaN);
-            if (!IsFinite(bounds.X) || !IsFinite(bounds.Y) || !IsFinite(bounds.Width) || !IsFinite(bounds.Height))
+            if (!IsFinite(content.X) || !IsFinite(content.Y) || !IsFinite(content.Width) || !IsFinite(content.Height))
                 return PositionFix.Reset;
 
             Rect best = Rect.Empty;
             double bestArea = 0;
-            foreach (var wa in workAreas)
+            foreach (var monitor in monitors)
             {
-                if (wa.IsEmpty) continue;
-                var hit = Rect.Intersect(bounds, wa);
+                if (monitor.IsEmpty) continue;
+                var hit = Rect.Intersect(content, monitor);
                 double area = hit.IsEmpty ? 0 : hit.Width * hit.Height;
                 if (area > bestArea)
                 {
                     bestArea = area;
-                    best = wa;
+                    best = monitor;
                 }
             }
             if (best.IsEmpty) return PositionFix.Reset;
 
-            if (detectMaximize && IsMaximizeLeftover(bounds, best))
-                return PositionFix.Reset;
+            var offset = ClampOffset(content, best);
+            position = new Point(content.Left + offset.X, content.Top + offset.Y);
 
-            double left = Math.Max(best.Left, Math.Min(bounds.Left, best.Right - bounds.Width));
-            double top = Math.Max(best.Top, Math.Min(bounds.Top, best.Bottom - bounds.Height));
-            position = new Point(left, top);
-
-            return Math.Abs(left - bounds.Left) > MaximizeOffsetMin || Math.Abs(top - bounds.Top) > MaximizeOffsetMin
+            return Math.Abs(offset.X) > PositionTolerance || Math.Abs(offset.Y) > PositionTolerance
                 ? PositionFix.Clamped
                 : PositionFix.None;
         }
 
         /// <summary>
-        /// True when <paramref name="bounds"/> sits just beyond the top-left corner of the work
-        /// area it overlaps most, where Windows puts a maximized window.
+        /// Shift that moves <paramref name="content"/> inside <paramref name="bounds"/>
+        /// (aligned to the left/top edge when it is larger than the bounds).
         /// </summary>
-        internal static bool IsMaximizeLeftover(Rect bounds, IReadOnlyList<Rect> workAreas)
+        internal static Vector ClampOffset(Rect content, Rect bounds)
         {
-            if (!IsFinite(bounds.X) || !IsFinite(bounds.Y)) return false;
-            Rect best = Rect.Empty;
-            double bestArea = 0;
-            foreach (var wa in workAreas)
-            {
-                if (wa.IsEmpty) continue;
-                var hit = Rect.Intersect(bounds, wa);
-                double area = hit.IsEmpty ? 0 : hit.Width * hit.Height;
-                if (area > bestArea)
-                {
-                    bestArea = area;
-                    best = wa;
-                }
-            }
-            return !best.IsEmpty && IsMaximizeLeftover(bounds, best);
-        }
-
-        private static bool IsMaximizeLeftover(Rect bounds, Rect workArea)
-        {
-            double dx = workArea.Left - bounds.Left;
-            double dy = workArea.Top - bounds.Top;
-            return dx >= MaximizeOffsetMin && dx <= MaximizeOffsetMax && dy >= MaximizeOffsetMin && dy <= MaximizeOffsetMax;
+            double dx = 0, dy = 0;
+            if (content.Left < bounds.Left || content.Width > bounds.Width) dx = bounds.Left - content.Left;
+            else if (content.Right > bounds.Right) dx = bounds.Right - content.Right;
+            if (content.Top < bounds.Top || content.Height > bounds.Height) dy = bounds.Top - content.Top;
+            else if (content.Bottom > bounds.Bottom) dy = bounds.Bottom - content.Bottom;
+            return new Vector(dx, dy);
         }
 
         /// <summary>
-        /// Fits a restored window (plus <paramref name="extraTop"/> DIPs of attached content
-        /// drawn above it, e.g. the header overlay) fully inside a monitor.
+        /// Keeps a restored window's visible card fully inside a monitor (the same rule as
+        /// dragging, so a card placed flush to an edge stays where it is).
         /// On Reset, <paramref name="applyDefault"/> positions the window, which is then clamped.
         /// </summary>
-        public static PositionFix FitToWorkArea(Window window, double extraTop, Action applyDefault)
+        public static PositionFix FitToScreen(Window window, Action applyDefault)
         {
             if (window.WindowState != WindowState.Normal) return PositionFix.None;
-            if (!IsFinite(extraTop) || extraTop < 0) extraTop = 0;
 
-            var (workAreas, monitorAreas) = GetMonitorAreas(window);
-            var fix = PositionFix.None;
-            // Maximize leftovers sit just beyond a work-area corner: detect them on the window itself.
-            if (IsMaximizeLeftover(GetBounds(window, 0), workAreas))
+            var monitors = GetMonitorAreas(window);
+            var fix = SanitizeBounds(GetContentBounds(window), monitors, out var pos);
+            if (fix == PositionFix.Reset)
             {
                 applyDefault();
-                fix = PositionFix.Reset;
+                if (SanitizeBounds(GetContentBounds(window), monitors, out pos) == PositionFix.Reset)
+                    return fix;
             }
 
-            // Keep the window (with its attached content) on a monitor. The widgets are topmost,
-            // so overlapping the taskbar is fine (the default HUD position sits over it).
-            var clamp = SanitizeBounds(GetBounds(window, extraTop), monitorAreas, out var pos, detectMaximize: false);
-            if (clamp == PositionFix.Reset && fix != PositionFix.Reset)
+            var current = GetContentBounds(window);
+            double dx = pos.X - current.X, dy = pos.Y - current.Y;
+            if (Math.Abs(dx) > 0.01 || Math.Abs(dy) > 0.01)
             {
-                applyDefault();
-                fix = PositionFix.Reset;
-                clamp = SanitizeBounds(GetBounds(window, extraTop), monitorAreas, out pos, detectMaximize: false);
-            }
-            if (clamp == PositionFix.Reset) return fix;
-            if (fix == PositionFix.None) fix = clamp;
-
-            if (!double.IsNaN(pos.X) && (Math.Abs(window.Left - pos.X) > 0.01 || Math.Abs(window.Top - extraTop - pos.Y) > 0.01))
-            {
-                window.Left = pos.X;
-                window.Top = pos.Y + extraTop;
+                window.Left += dx;
+                window.Top += dy;
             }
             return fix;
         }
@@ -368,19 +352,84 @@ namespace ETSOverlay
             return new Size(width, height);
         }
 
-        private static Rect GetBounds(Window window, double extraTop)
+        /// <summary>
+        /// The visible card inside the window, relative to the window's top-left (DIPs).
+        /// Falls back to the whole window when no card was given or it is not laid out yet.
+        /// </summary>
+        private static Rect GetContentRect(Window window)
         {
-            // Not laid out yet: use a minimal size so the position can still be checked.
             var size = GetSize(window);
-            double width = Math.Max(1, size.Width);
-            double height = Math.Max(1, size.Height) + extraTop;
+            var whole = new Rect(0, 0, Math.Max(1, size.Width), Math.Max(1, size.Height));
+            if (!States.TryGetValue(window, out var state) || state.Content == null) return whole;
+
+            var content = state.Content;
+            if (!content.IsLoaded || content.ActualWidth <= 0 || content.ActualHeight <= 0) return whole;
+            try
+            {
+                var rect = content.TransformToAncestor(window).TransformBounds(new Rect(content.RenderSize));
+                rect.Intersect(whole);
+                return rect.IsEmpty || rect.Width < 1 || rect.Height < 1 ? whole : rect;
+            }
+            catch (InvalidOperationException)
+            {
+                return whole;
+            }
+        }
+
+        private static Rect GetContentBounds(Window window)
+        {
+            var rect = GetContentRect(window);
             if (!IsFinite(window.Left) || !IsFinite(window.Top))
-                return new Rect(double.NaN, double.NaN, width, height);
-            return new Rect(window.Left, window.Top - extraTop, width, height);
+                return new Rect(double.NaN, double.NaN, rect.Width, rect.Height);
+            return new Rect(window.Left + rect.X, window.Top + rect.Y, rect.Width, rect.Height);
+        }
+
+        /// <summary>
+        /// WM_MOVING: shifts the proposed window rect (physical pixels) so the visible card stays
+        /// inside the monitor under the cursor. Returns true when the rect was changed.
+        /// </summary>
+        private static bool ClampDragRect(Window window, IntPtr lParam)
+        {
+            try
+            {
+                var source = PresentationSource.FromVisual(window);
+                if (source?.CompositionTarget == null) return false;
+                var toDevice = source.CompositionTarget.TransformToDevice;
+
+                var proposed = Marshal.PtrToStructure<RECT>(lParam);
+                var card = GetContentRect(window);
+                var cardTopLeft = toDevice.Transform(card.TopLeft);
+                var cardBottomRight = toDevice.Transform(card.BottomRight);
+                var content = new Rect(
+                    proposed.Left + cardTopLeft.X, proposed.Top + cardTopLeft.Y,
+                    cardBottomRight.X - cardTopLeft.X, cardBottomRight.Y - cardTopLeft.Y);
+
+                if (!GetCursorPos(out var cursor)) return false;
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                if (!GetMonitorInfo(MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST), ref mi)) return false;
+                var monitor = new Rect(mi.rcMonitor.Left, mi.rcMonitor.Top,
+                    mi.rcMonitor.Right - mi.rcMonitor.Left, mi.rcMonitor.Bottom - mi.rcMonitor.Top);
+
+                var offset = ClampOffset(content, monitor);
+                int dx = (int)Math.Round(offset.X), dy = (int)Math.Round(offset.Y);
+                if (dx == 0 && dy == 0) return false;
+
+                proposed.Left += dx; proposed.Right += dx;
+                proposed.Top += dy; proposed.Bottom += dy;
+                Marshal.StructureToPtr(proposed, lParam, false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct POINT { public int X, Y; }
 
         [StructLayout(LayoutKind.Sequential)]
         private struct MONITORINFO
@@ -401,15 +450,21 @@ namespace ETSOverlay
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetCursorPos(out POINT lpPoint);
+
         /// <summary>
-        /// Work areas (without taskbars) and full bounds of all monitors, in the window's DIPs.
+        /// Full bounds of all monitors (taskbar included: the widgets are topmost and may sit
+        /// over it), in the window's DIPs.
         /// </summary>
-        private static (List<Rect> WorkAreas, List<Rect> MonitorAreas) GetMonitorAreas(Window window)
+        private static List<Rect> GetMonitorAreas(Window window)
         {
-            var work = new List<Rect>();
             var monitors = new List<Rect>();
             var fromDevice = PresentationSource.FromVisual(window)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
-            Rect ToDips(RECT r) => new Rect(fromDevice.Transform(new Point(r.Left, r.Top)), fromDevice.Transform(new Point(r.Right, r.Bottom)));
             try
             {
                 EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (hMonitor, hdc, rect, data) =>
@@ -417,8 +472,9 @@ namespace ETSOverlay
                     var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
                     if (GetMonitorInfo(hMonitor, ref mi))
                     {
-                        work.Add(ToDips(mi.rcWork));
-                        monitors.Add(ToDips(mi.rcMonitor));
+                        monitors.Add(new Rect(
+                            fromDevice.Transform(new Point(mi.rcMonitor.Left, mi.rcMonitor.Top)),
+                            fromDevice.Transform(new Point(mi.rcMonitor.Right, mi.rcMonitor.Bottom))));
                     }
                     return true;
                 }, IntPtr.Zero);
@@ -427,10 +483,9 @@ namespace ETSOverlay
             {
                 // Fall back to the primary monitor below.
             }
-            if (work.Count == 0) work.Add(SystemParameters.WorkArea);
             if (monitors.Count == 0)
                 monitors.Add(new Rect(0, 0, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight));
-            return (work, monitors);
+            return monitors;
         }
 
         private static void QueueEnsureOnScreen(Window window)

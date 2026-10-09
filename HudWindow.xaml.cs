@@ -15,7 +15,7 @@ namespace ETSOverlay
         {
             InitializeComponent();
             _mainWindow = mainWindow;
-            WindowGuard.Attach(this);
+            WindowGuard.Attach(this, DataContainer);
             
             // Allow moving the window by dragging it
             MouseLeftButtonDown += (s, e) =>

@@ -242,6 +242,7 @@ namespace ETSOverlay
         private DispatcherTimer? _licenseCheckTimer;
         private bool _isHiddenByHud = false;
         private bool _skipStartupAnimation = false;
+        private bool _updateSuccessHandled = false;
 
         // Cloud Sync
         public bool CloudSyncEnabled { get; private set; } = false;
@@ -249,6 +250,9 @@ namespace ETSOverlay
         public DateTime? CloudSyncUpdatedAt { get; set; } = null;
         public DateTime? LastCloudSyncAttempt { get; set; } = null;
         public string CloudSyncStatus { get; set; } = "";
+        // Hash of the synced settings last stored in the cloud (uploaded or downloaded).
+        // Empty until the first upload: then the first launch uploads once.
+        private string _cloudSyncUploadedHash = "";
         
         public CloudSyncService SyncService { get; private set; }
         private DispatcherTimer _cloudSyncDebounceTimer;
@@ -342,6 +346,7 @@ namespace ETSOverlay
             [CloudSyncIgnore] public DateTime? CloudSyncUpdatedAt { get; set; } = null;
             [CloudSyncIgnore] public DateTime? LastCloudSyncAttempt { get; set; } = null;
             [CloudSyncIgnore] public string CloudSyncStatus { get; set; } = "";
+            [CloudSyncIgnore] public string CloudSyncUploadedHash { get; set; } = "";
             [CloudSyncIgnore] public string LastCityExtraction { get; set; } = "Unknown";
             public bool SpeedLimiterEnabled { get; set; } = false;
             public int SpeedLimiterThresholdKmh { get; set; } = 99;
@@ -392,7 +397,7 @@ namespace ETSOverlay
         public MainWindow()
         {
             InitializeComponent();
-            WindowGuard.Attach(this);
+            WindowGuard.Attach(this, MainBorder);
             SpeedLimiterService.Instance.BrakeStateChanged += (isBraking) => 
             {
                 Dispatcher.InvokeAsync(() => 
@@ -408,7 +413,7 @@ namespace ETSOverlay
             _cloudSyncDebounceTimer.Tick += (s, e) =>
             {
                 _cloudSyncDebounceTimer.Stop();
-                _ = UploadCloudSyncAsync(false);
+                _ = UploadCloudSyncIfChangedAsync();
             };
 
             MainBorder.Opacity = windowOpacity;
@@ -523,7 +528,7 @@ namespace ETSOverlay
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
-                FitRestoredWindow(this, GetHeaderOverlayExtent(), () => WindowGuard.CenterOnPrimary(this), "main");
+                FitRestoredWindow(this, () => WindowGuard.CenterOnPrimary(this), "main");
                 UpdateHeaderOverlayPosition();
                 HideHeaderOverlay();
 
@@ -605,27 +610,7 @@ namespace ETSOverlay
                     IntroOverlay.Visibility = Visibility.Collapsed;
                 }
 
-                // Show update success dialog if applicable
-                var args = Environment.GetCommandLineArgs();
-                if (Array.Exists(args, arg => arg == "--updated"))
-                {
-                    // Fallback: если release body не был сохранён предыдущей версией,
-                    // подтягиваем его из GitHub API
-                    if (string.IsNullOrWhiteSpace(LatestReleaseBody))
-                    {
-                        await FetchLatestReleaseNotesAsync();
-                    }
-
-                    var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
-                    successWindow.Owner = this;
-                    successWindow.ShowDialog();
-                    
-                    // Clear the URL after showing it
-                    LatestReleaseUrl = null;
-                    LatestReleaseName = null;
-                    LatestReleaseBody = null;
-                    SaveState();
-                }
+                await ShowUpdateSuccessIfUpdatedAsync();
 
                 // 4. Финализация: сброс анимации opacity для чистого idle-перехода
                 MainBorder.BeginAnimation(OpacityProperty, null);
@@ -640,6 +625,13 @@ namespace ETSOverlay
                     StartIdleTimer();
                 }
             };
+
+            // In HUD mode LoadState hides the main window before startup, so WPF never shows it
+            // and the Loaded handler above (which shows the update notes) never runs.
+            if (_uiMode == "hud")
+            {
+                Dispatcher.BeginInvoke(new Action(() => _ = ShowUpdateSuccessIfUpdatedAsync()), DispatcherPriority.ApplicationIdle);
+            }
 
             // Восстановление после сворачивания в трей
             StateChanged += (s, e) =>
@@ -2651,6 +2643,37 @@ namespace ETSOverlay
 
         public void SaveStatePublic() => SaveState();
 
+        // Show update success dialog if applicable (both the normal startup and HUD mode).
+        private async Task ShowUpdateSuccessIfUpdatedAsync()
+        {
+            // Once per run: switching from HUD to another mode later shows the main window and
+            // runs Loaded, which must not show the notes again.
+            if (_updateSuccessHandled) return;
+            _updateSuccessHandled = true;
+
+            var args = Environment.GetCommandLineArgs();
+            if (!Array.Exists(args, arg => arg == "--updated")) return;
+
+            // Fallback: если release body не был сохранён предыдущей версией,
+            // подтягиваем его из GitHub API
+            if (string.IsNullOrWhiteSpace(LatestReleaseBody))
+            {
+                await FetchLatestReleaseNotesAsync();
+            }
+
+            var successWindow = new UpdateSuccessWindow(uiLanguage, LatestReleaseUrl, LatestReleaseName, LatestReleaseBody);
+            // In HUD mode the main window is hidden: an owned window of a hidden owner is not shown.
+            if (IsVisible) successWindow.Owner = this;
+            else if (_hudWindow != null && _hudWindow.IsVisible) successWindow.Owner = _hudWindow;
+            successWindow.ShowDialog();
+
+            // Clear the URL after showing it
+            LatestReleaseUrl = null;
+            LatestReleaseName = null;
+            LatestReleaseBody = null;
+            SaveState();
+        }
+
         private void UpdateSupporterVisuals()
         {
             if (!Dispatcher.CheckAccess())
@@ -2769,6 +2792,7 @@ namespace ETSOverlay
                 CloudSyncUpdatedAt = CloudSyncUpdatedAt,
                 LastCloudSyncAttempt = LastCloudSyncAttempt,
                 CloudSyncStatus = CloudSyncStatus,
+                CloudSyncUploadedHash = _cloudSyncUploadedHash,
                 SpeedLimiterEnabled = SpeedLimiterService.Instance.IsEnabled,
                 SpeedLimiterThresholdKmh = SpeedLimiterService.Instance.SpeedThresholdKmh,
                 SpeedLimiterThresholdMph = SpeedLimiterService.Instance.SpeedThresholdMph,
@@ -2843,6 +2867,7 @@ namespace ETSOverlay
             CloudSyncUpdatedAt = state.CloudSyncUpdatedAt;
             LastCloudSyncAttempt = state.LastCloudSyncAttempt;
             CloudSyncStatus = state.CloudSyncStatus ?? "";
+            _cloudSyncUploadedHash = state.CloudSyncUploadedHash ?? "";
 
             SpeedLimiterService.Instance.IsEnabled = state.SpeedLimiterEnabled;
             SpeedLimiterService.Instance.SpeedThresholdKmh = state.SpeedLimiterThresholdKmh;
@@ -3103,7 +3128,7 @@ namespace ETSOverlay
                 _settingsWindow.Opacity = 0;
                 _settingsWindow.Show();
                 var settings = _settingsWindow;
-                FitRestoredWindow(settings, 0, () => WindowGuard.CenterOnPrimary(settings), "settings");
+                FitRestoredWindow(settings, () => WindowGuard.CenterOnPrimary(settings), "settings");
             }
             var fadeIn = new DoubleAnimation(1, TimeSpan.FromSeconds(0.2));
             _settingsWindow.BeginAnimation(Window.OpacityProperty, fadeIn);
@@ -3307,7 +3332,7 @@ namespace ETSOverlay
                 {
                     PlaceHudAtDefault();
                 }
-                FitRestoredWindow(_hudWindow, 0, PlaceHudAtDefault, "HUD");
+                FitRestoredWindow(_hudWindow, PlaceHudAtDefault, "HUD");
                 if (animate)
                 {
                     _hudWindow.Opacity = 0;
@@ -4585,12 +4610,12 @@ namespace ETSOverlay
 
         protected override void OnClosed(EventArgs e) 
         { 
-            WriteLog("=== OVERLAY CLOSED ==="); 
+            WriteLog("=== OVERLAY CLOSED ===");
             try
             {
                 _deliveryTimer.Update(false);
                 SaveJobState();
-                SaveState(); 
+                SaveState();
                 SpeedLimiterService.Instance.ReleaseBrake(); 
                 if (telemetry != null)
                 {
@@ -5694,14 +5719,6 @@ namespace ETSOverlay
             };
         }
 
-        // Height of the header overlay drawn above the main window: it has to stay on screen
-        // too, otherwise the window can't be grabbed.
-        private double GetHeaderOverlayExtent()
-        {
-            if (_headerOverlay == null || double.IsNaN(_headerOverlay.Top)) return 0;
-            return Math.Max(0, Top - _headerOverlay.Top);
-        }
-
         private void PlaceHudAtDefault()
         {
             if (_hudWindow == null) return;
@@ -5710,13 +5727,13 @@ namespace ETSOverlay
         }
 
         /// <summary>
-        /// Keeps a restored window fully inside a monitor. Positions left behind by
-        /// the 1.6.6 maximize bug (or off every monitor) are reset to the default; positions that
-        /// stick out are moved inside. Corrections are logged and saved right away.
+        /// Keeps a restored window's visible card fully inside a monitor (same rule as dragging).
+        /// Positions on no monitor are reset to the default; cards that stick out are moved inside.
+        /// Corrections are logged and saved right away.
         /// </summary>
-        private void FitRestoredWindow(Window window, double extraTop, Action applyDefault, string name)
+        private void FitRestoredWindow(Window window, Action applyDefault, string name)
         {
-            var fix = WindowGuard.FitToWorkArea(window, extraTop, applyDefault);
+            var fix = WindowGuard.FitToScreen(window, applyDefault);
             if (fix == WindowGuard.PositionFix.None) return;
             string what = fix == WindowGuard.PositionFix.Reset ? "was invalid, reset to default" : "was outside the screen, moved inside";
             WriteLog($"[WINDOW] Saved {name} window position {what}: {window.Left:0},{window.Top:0}");
@@ -5967,9 +5984,11 @@ namespace ETSOverlay
                     _settingsWindow?.UpdateCloudTab();
                 });
 
+                // The cloud never overwrites local settings at startup. Upload only when the
+                // settings differ from what the cloud last got (first launch: nothing recorded yet).
                 if (CloudSyncEnabled && LicenseManager.Instance.HasFeature("cloud_sync"))
                 {
-                    await InitializeCloudSyncAsync();
+                    await Dispatcher.InvokeAsync(() => UploadCloudSyncIfChangedAsync()).Task.Unwrap();
                 }
             }
             catch (Exception ex)
@@ -6059,7 +6078,12 @@ namespace ETSOverlay
 
         // --- Cloud Sync ---
 
-        private async Task InitializeCloudSyncAsync()
+        /// <summary>
+        /// "Sync now": runs when cloud sync is switched on and from the Sync now button. This and
+        /// "Download from cloud" are the only paths that let the cloud overwrite local settings.
+        /// Downloads the cloud copy if one exists, otherwise uploads the local settings.
+        /// </summary>
+        public async Task SyncNowAsync()
         {
             if (!CloudSyncEnabled) return;
             if (LicenseManager.Instance.Status != "active" || !LicenseManager.Instance.HasFeature("cloud_sync")) return;
@@ -6079,8 +6103,9 @@ namespace ETSOverlay
                             if (DateTime.TryParse(settingsResp.Sync?.UpdatedAt, out var dt))
                                 CloudSyncUpdatedAt = dt;
                             CloudSyncStatus = "Available";
+                            MarkCloudSyncInSync();
                             SaveState();
-                            WriteLog("Cloud sync: downloaded settings at startup.");
+                            WriteLog("Cloud sync: sync now downloaded settings.");
                         }
                     }
                     else
@@ -6091,7 +6116,7 @@ namespace ETSOverlay
             }
             catch (Exception ex)
             {
-                WriteLog($"Cloud sync startup error: {ex.Message}");
+                WriteLog($"Cloud sync now error: {ex.Message}");
                 CloudSyncStatus = "Cloud unavailable";
                 SaveState();
             }
@@ -6148,29 +6173,73 @@ namespace ETSOverlay
             _cloudSyncDebounceTimer.Start();
         }
 
+        /// <summary>Cloud-synced part of the state (properties without [CloudSyncIgnore]).</summary>
+        internal static Dictionary<string, object> BuildCloudSyncPayload(AppState state)
+        {
+            var settingsDict = new Dictionary<string, object>();
+            foreach (var prop in typeof(AppState).GetProperties())
+            {
+                if (Attribute.IsDefined(prop, typeof(CloudSyncIgnoreAttribute))) continue;
+                var val = prop.GetValue(state);
+                if (val != null) settingsDict[prop.Name] = val;
+            }
+            return settingsDict;
+        }
+
+        /// <summary>
+        /// Order-independent fingerprint of the synced settings, used to upload only real changes
+        /// (changing a value and changing it back is no change).
+        /// </summary>
+        internal static string ComputeCloudSyncHash(IReadOnlyDictionary<string, object> payload)
+        {
+            var canonical = new SortedDictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var (key, value) in payload)
+            {
+                canonical[key] = value is IDictionary<string, string> map
+                    ? new SortedDictionary<string, string>(map, StringComparer.Ordinal)
+                    : value;
+            }
+            var json = JsonSerializer.Serialize(canonical, StateJsonOptions);
+            var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(json));
+            return Convert.ToHexString(bytes);
+        }
+
+        private string GetCurrentCloudSyncHash() => ComputeCloudSyncHash(BuildCloudSyncPayload(GetCurrentAppState()));
+
+        // Local settings now equal the cloud copy: nothing to upload until something changes.
+        private void MarkCloudSyncInSync() => _cloudSyncUploadedHash = GetCurrentCloudSyncHash();
+
+        private bool CanUseCloudSync() =>
+            CloudSyncEnabled && LicenseManager.Instance.Status == "active" && LicenseManager.Instance.HasFeature("cloud_sync");
+
+        /// <summary>
+        /// Uploads only when the synced settings differ from what the cloud last got.
+        /// No request is sent when nothing changed.
+        /// </summary>
+        public async Task UploadCloudSyncIfChangedAsync()
+        {
+            if (!CanUseCloudSync()) return;
+            if (GetCurrentCloudSyncHash() == _cloudSyncUploadedHash) return;
+            await UploadCloudSyncAsync(false);
+        }
+
         public async Task UploadCloudSyncAsync(bool force = false)
         {
             try
             {
                 LastCloudSyncAttempt = DateTime.Now;
-                var state = GetCurrentAppState();
-                var settingsDict = new Dictionary<string, object>();
-                
-                foreach (var prop in typeof(AppState).GetProperties())
-                {
-                    if (Attribute.IsDefined(prop, typeof(CloudSyncIgnoreAttribute))) continue;
-                    var val = prop.GetValue(state);
-                    if (val != null) settingsDict[prop.Name] = val;
-                }
+                var settingsDict = BuildCloudSyncPayload(GetCurrentAppState());
+                var hash = ComputeCloudSyncHash(settingsDict);
 
                 var resp = await SyncService.SaveSettingsAsync(GetCurrentVersion(), force ? null : CloudSyncRevision, settingsDict);
-                
+
                 if (resp != null && resp.Success)
                 {
                     CloudSyncRevision = resp.Sync?.Revision;
                     if (DateTime.TryParse(resp.Sync?.UpdatedAt, out var dt))
                         CloudSyncUpdatedAt = dt;
                     CloudSyncStatus = "Available";
+                    _cloudSyncUploadedHash = hash;
                     SaveState();
                     if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
                     WriteLog("Cloud sync: uploaded successfully.");
@@ -6218,6 +6287,7 @@ namespace ETSOverlay
                     if (DateTime.TryParse(resp.Sync?.UpdatedAt, out var dt))
                         CloudSyncUpdatedAt = dt;
                     CloudSyncStatus = "Available";
+                    MarkCloudSyncInSync();
                     SaveState();
                     if (_settingsWindow != null && _settingsWindow.IsLoaded) _settingsWindow.UpdateCloudTab();
                     WriteLog("Cloud sync: manually downloaded settings.");
@@ -6271,7 +6341,7 @@ namespace ETSOverlay
             SaveState();
             if (enabled)
             {
-                _ = InitializeCloudSyncAsync();
+                _ = SyncNowAsync();
             }
         }
 

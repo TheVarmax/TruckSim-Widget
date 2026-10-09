@@ -226,18 +226,26 @@ namespace ETSOverlay
             _mainWindow?.ResetHudPosition();
         }
 
+        // These settings are part of cloud sync: save locally and let the cloud upload pick up
+        // the change (it is sent only if the synced settings really changed).
+        private void SaveSettingsAndSync()
+        {
+            _mainWindow.SaveStatePublic();
+            _mainWindow.ScheduleCloudSyncUpload();
+        }
+
         private void SpeedWarningEtsBox_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (_suppressEvents || _mainWindow == null) return;
             if (int.TryParse(SpeedWarningEtsBox.Text, out var value))
             {
                 _mainWindow.SpeedWarningEts = Math.Max(0, value);
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
             else
             {
                 _mainWindow.SpeedWarningEts = 0;
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
         }
 
@@ -247,12 +255,12 @@ namespace ETSOverlay
             if (int.TryParse(SpeedWarningAtsBox.Text, out var value))
             {
                 _mainWindow.SpeedWarningAts = Math.Max(0, value);
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
             else
             {
                 _mainWindow.SpeedWarningAts = 0;
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
         }
 
@@ -267,14 +275,14 @@ namespace ETSOverlay
                 return;
             }
             SpeedLimiterService.Instance.IsEnabled = true;
-            _mainWindow.SaveStatePublic();
+            SaveSettingsAndSync();
         }
 
         private void SpeedLimiterToggle_Unchecked(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents) return;
             SpeedLimiterService.Instance.Disable();
-            _mainWindow.SaveStatePublic();
+            SaveSettingsAndSync();
         }
 
         private void SpeedLimiterEtsBox_TextChanged(object sender, TextChangedEventArgs e)
@@ -283,12 +291,12 @@ namespace ETSOverlay
             if (int.TryParse(SpeedLimiterEtsBox.Text, out int val) && val > 0)
             {
                 SpeedLimiterService.Instance.SpeedThresholdKmh = val;
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
             else
             {
                 SpeedLimiterService.Instance.SpeedThresholdKmh = 0;
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
         }
 
@@ -298,12 +306,12 @@ namespace ETSOverlay
             if (int.TryParse(SpeedLimiterAtsBox.Text, out int val) && val > 0)
             {
                 SpeedLimiterService.Instance.SpeedThresholdMph = val;
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
             else
             {
                 SpeedLimiterService.Instance.SpeedThresholdMph = 0;
-                _mainWindow.SaveStatePublic();
+                SaveSettingsAndSync();
             }
         }
 
@@ -324,7 +332,7 @@ namespace ETSOverlay
             
             SpeedLimiterService.Instance.BrakeKey = e.Key;
             BtnSpeedLimiterKey.Content = e.Key.ToString();
-            _mainWindow.SaveStatePublic();
+            SaveSettingsAndSync();
             e.Handled = true;
         }
 
@@ -514,14 +522,14 @@ namespace ETSOverlay
         {
             if (_suppressEvents || _mainWindow == null) return;
             _mainWindow.SkipBetaUpdates = false;
-            _mainWindow.SaveStatePublic();
+            SaveSettingsAndSync();
         }
 
         private void BetaUpdatesToggle_Unchecked(object sender, RoutedEventArgs e)
         {
             if (_suppressEvents || _mainWindow == null) return;
             _mainWindow.SkipBetaUpdates = true;
-            _mainWindow.SaveStatePublic();
+            SaveSettingsAndSync();
         }
 
         // --- Appearance Logic ---
@@ -1055,7 +1063,7 @@ namespace ETSOverlay
             _mainWindow.SetCloudSyncEnabled(true);
             UpdateCloudTab();
             
-            // Start upload/download flow silently. The MainWindow InitializeCloudSyncAsync does this.
+            // SetCloudSyncEnabled runs Sync now (download if a cloud copy exists, else upload).
         }
 
         private void CloudSyncToggle_Unchecked(object sender, RoutedEventArgs e)
