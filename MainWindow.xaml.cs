@@ -5710,7 +5710,7 @@ namespace ETSOverlay
         }
 
         /// <summary>
-        /// Keeps a restored window fully inside a monitor's work area. Positions left behind by
+        /// Keeps a restored window fully inside a monitor. Positions left behind by
         /// the 1.6.6 maximize bug (or off every monitor) are reset to the default; positions that
         /// stick out are moved inside. Corrections are logged and saved right away.
         /// </summary>

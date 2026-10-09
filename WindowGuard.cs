@@ -269,9 +269,7 @@ namespace ETSOverlay
             }
             if (best.IsEmpty) return PositionFix.Reset;
 
-            double dx = best.Left - bounds.Left;
-            double dy = best.Top - bounds.Top;
-            if (detectMaximize && dx >= MaximizeOffsetMin && dx <= MaximizeOffsetMax && dy >= MaximizeOffsetMin && dy <= MaximizeOffsetMax)
+            if (detectMaximize && IsMaximizeLeftover(bounds, best))
                 return PositionFix.Reset;
 
             double left = Math.Max(best.Left, Math.Min(bounds.Left, best.Right - bounds.Width));
@@ -284,8 +282,38 @@ namespace ETSOverlay
         }
 
         /// <summary>
+        /// True when <paramref name="bounds"/> sits just beyond the top-left corner of the work
+        /// area it overlaps most, where Windows puts a maximized window.
+        /// </summary>
+        internal static bool IsMaximizeLeftover(Rect bounds, IReadOnlyList<Rect> workAreas)
+        {
+            if (!IsFinite(bounds.X) || !IsFinite(bounds.Y)) return false;
+            Rect best = Rect.Empty;
+            double bestArea = 0;
+            foreach (var wa in workAreas)
+            {
+                if (wa.IsEmpty) continue;
+                var hit = Rect.Intersect(bounds, wa);
+                double area = hit.IsEmpty ? 0 : hit.Width * hit.Height;
+                if (area > bestArea)
+                {
+                    bestArea = area;
+                    best = wa;
+                }
+            }
+            return !best.IsEmpty && IsMaximizeLeftover(bounds, best);
+        }
+
+        private static bool IsMaximizeLeftover(Rect bounds, Rect workArea)
+        {
+            double dx = workArea.Left - bounds.Left;
+            double dy = workArea.Top - bounds.Top;
+            return dx >= MaximizeOffsetMin && dx <= MaximizeOffsetMax && dy >= MaximizeOffsetMin && dy <= MaximizeOffsetMax;
+        }
+
+        /// <summary>
         /// Fits a restored window (plus <paramref name="extraTop"/> DIPs of attached content
-        /// drawn above it, e.g. the header overlay) fully inside a monitor's work area.
+        /// drawn above it, e.g. the header overlay) fully inside a monitor.
         /// On Reset, <paramref name="applyDefault"/> positions the window, which is then clamped.
         /// </summary>
         public static PositionFix FitToWorkArea(Window window, double extraTop, Action applyDefault)
@@ -293,12 +321,24 @@ namespace ETSOverlay
             if (window.WindowState != WindowState.Normal) return PositionFix.None;
             if (!IsFinite(extraTop) || extraTop < 0) extraTop = 0;
 
-            var workAreas = GetWorkAreas(window);
-            // Detect maximize leftovers on the window itself, then clamp including the attached content.
-            var fix = SanitizeBounds(GetBounds(window, 0), workAreas, out _);
-            if (fix == PositionFix.Reset) applyDefault();
+            var (workAreas, monitorAreas) = GetMonitorAreas(window);
+            var fix = PositionFix.None;
+            // Maximize leftovers sit just beyond a work-area corner: detect them on the window itself.
+            if (IsMaximizeLeftover(GetBounds(window, 0), workAreas))
+            {
+                applyDefault();
+                fix = PositionFix.Reset;
+            }
 
-            var clamp = SanitizeBounds(GetBounds(window, extraTop), workAreas, out var pos, detectMaximize: false);
+            // Keep the window (with its attached content) on a monitor. The widgets are topmost,
+            // so overlapping the taskbar is fine (the default HUD position sits over it).
+            var clamp = SanitizeBounds(GetBounds(window, extraTop), monitorAreas, out var pos, detectMaximize: false);
+            if (clamp == PositionFix.Reset && fix != PositionFix.Reset)
+            {
+                applyDefault();
+                fix = PositionFix.Reset;
+                clamp = SanitizeBounds(GetBounds(window, extraTop), monitorAreas, out pos, detectMaximize: false);
+            }
             if (clamp == PositionFix.Reset) return fix;
             if (fix == PositionFix.None) fix = clamp;
 
@@ -361,11 +401,15 @@ namespace ETSOverlay
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
 
-        /// <summary>Work areas (without taskbars) of all monitors, in the window's DIPs.</summary>
-        private static List<Rect> GetWorkAreas(Window window)
+        /// <summary>
+        /// Work areas (without taskbars) and full bounds of all monitors, in the window's DIPs.
+        /// </summary>
+        private static (List<Rect> WorkAreas, List<Rect> MonitorAreas) GetMonitorAreas(Window window)
         {
-            var result = new List<Rect>();
+            var work = new List<Rect>();
+            var monitors = new List<Rect>();
             var fromDevice = PresentationSource.FromVisual(window)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+            Rect ToDips(RECT r) => new Rect(fromDevice.Transform(new Point(r.Left, r.Top)), fromDevice.Transform(new Point(r.Right, r.Bottom)));
             try
             {
                 EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (hMonitor, hdc, rect, data) =>
@@ -373,19 +417,20 @@ namespace ETSOverlay
                     var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
                     if (GetMonitorInfo(hMonitor, ref mi))
                     {
-                        var tl = fromDevice.Transform(new Point(mi.rcWork.Left, mi.rcWork.Top));
-                        var br = fromDevice.Transform(new Point(mi.rcWork.Right, mi.rcWork.Bottom));
-                        result.Add(new Rect(tl, br));
+                        work.Add(ToDips(mi.rcWork));
+                        monitors.Add(ToDips(mi.rcMonitor));
                     }
                     return true;
                 }, IntPtr.Zero);
             }
             catch
             {
-                // Fall back to the primary work area below.
+                // Fall back to the primary monitor below.
             }
-            if (result.Count == 0) result.Add(SystemParameters.WorkArea);
-            return result;
+            if (work.Count == 0) work.Add(SystemParameters.WorkArea);
+            if (monitors.Count == 0)
+                monitors.Add(new Rect(0, 0, SystemParameters.PrimaryScreenWidth, SystemParameters.PrimaryScreenHeight));
+            return (work, monitors);
         }
 
         private static void QueueEnsureOnScreen(Window window)
