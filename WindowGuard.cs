@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using System.Windows.Media;
 using System.Windows.Threading;
 
 namespace ETSOverlay
@@ -230,6 +232,160 @@ namespace ETSOverlay
             window.Left = wa.Left + Math.Max(0, (wa.Width - width) / 2);
             window.Top = wa.Top + Math.Max(0, (wa.Height - height) / 2);
             return true;
+        }
+
+        internal enum PositionFix { None, Clamped, Reset }
+
+        // A maximized window sits a few pixels (its invisible frame, ~7-8 DIPs) beyond the
+        // top-left corner of the work area. Positions like that came from the 1.6.6 maximize bug.
+        private const double MaximizeOffsetMin = 0.5;
+        private const double MaximizeOffsetMax = 16;
+
+        /// <summary>
+        /// Pure decision for a restored window: <paramref name="bounds"/> must fit fully inside
+        /// one of <paramref name="workAreas"/> (all in DIPs).
+        /// Reset: position is unusable (not finite, on no monitor, or a maximize leftover);
+        /// the caller applies its default. Clamped: <paramref name="position"/> is the bounds'
+        /// top-left moved inside the work area it overlaps most.
+        /// </summary>
+        internal static PositionFix SanitizeBounds(Rect bounds, IReadOnlyList<Rect> workAreas, out Point position, bool detectMaximize = true)
+        {
+            position = new Point(double.NaN, double.NaN);
+            if (!IsFinite(bounds.X) || !IsFinite(bounds.Y) || !IsFinite(bounds.Width) || !IsFinite(bounds.Height))
+                return PositionFix.Reset;
+
+            Rect best = Rect.Empty;
+            double bestArea = 0;
+            foreach (var wa in workAreas)
+            {
+                if (wa.IsEmpty) continue;
+                var hit = Rect.Intersect(bounds, wa);
+                double area = hit.IsEmpty ? 0 : hit.Width * hit.Height;
+                if (area > bestArea)
+                {
+                    bestArea = area;
+                    best = wa;
+                }
+            }
+            if (best.IsEmpty) return PositionFix.Reset;
+
+            double dx = best.Left - bounds.Left;
+            double dy = best.Top - bounds.Top;
+            if (detectMaximize && dx >= MaximizeOffsetMin && dx <= MaximizeOffsetMax && dy >= MaximizeOffsetMin && dy <= MaximizeOffsetMax)
+                return PositionFix.Reset;
+
+            double left = Math.Max(best.Left, Math.Min(bounds.Left, best.Right - bounds.Width));
+            double top = Math.Max(best.Top, Math.Min(bounds.Top, best.Bottom - bounds.Height));
+            position = new Point(left, top);
+
+            return Math.Abs(left - bounds.Left) > MaximizeOffsetMin || Math.Abs(top - bounds.Top) > MaximizeOffsetMin
+                ? PositionFix.Clamped
+                : PositionFix.None;
+        }
+
+        /// <summary>
+        /// Fits a restored window (plus <paramref name="extraTop"/> DIPs of attached content
+        /// drawn above it, e.g. the header overlay) fully inside a monitor's work area.
+        /// On Reset, <paramref name="applyDefault"/> positions the window, which is then clamped.
+        /// </summary>
+        public static PositionFix FitToWorkArea(Window window, double extraTop, Action applyDefault)
+        {
+            if (window.WindowState != WindowState.Normal) return PositionFix.None;
+            if (!IsFinite(extraTop) || extraTop < 0) extraTop = 0;
+
+            var workAreas = GetWorkAreas(window);
+            // Detect maximize leftovers on the window itself, then clamp including the attached content.
+            var fix = SanitizeBounds(GetBounds(window, 0), workAreas, out _);
+            if (fix == PositionFix.Reset) applyDefault();
+
+            var clamp = SanitizeBounds(GetBounds(window, extraTop), workAreas, out var pos, detectMaximize: false);
+            if (clamp == PositionFix.Reset) return fix;
+            if (fix == PositionFix.None) fix = clamp;
+
+            if (!double.IsNaN(pos.X) && (Math.Abs(window.Left - pos.X) > 0.01 || Math.Abs(window.Top - extraTop - pos.Y) > 0.01))
+            {
+                window.Left = pos.X;
+                window.Top = pos.Y + extraTop;
+            }
+            return fix;
+        }
+
+        /// <summary>Centers the window in the primary monitor's work area.</summary>
+        public static void CenterOnPrimary(Window window)
+        {
+            var size = GetSize(window);
+            var wa = SystemParameters.WorkArea;
+            window.Left = wa.Left + Math.Max(0, (wa.Width - size.Width) / 2);
+            window.Top = wa.Top + Math.Max(0, (wa.Height - size.Height) / 2);
+        }
+
+        private static Size GetSize(Window window)
+        {
+            double width = window.ActualWidth > 0 ? window.ActualWidth : window.DesiredSize.Width;
+            double height = window.ActualHeight > 0 ? window.ActualHeight : window.DesiredSize.Height;
+            if (!IsFinite(width) || width < 0) width = 0;
+            if (!IsFinite(height) || height < 0) height = 0;
+            return new Size(width, height);
+        }
+
+        private static Rect GetBounds(Window window, double extraTop)
+        {
+            // Not laid out yet: use a minimal size so the position can still be checked.
+            var size = GetSize(window);
+            double width = Math.Max(1, size.Width);
+            double height = Math.Max(1, size.Height) + extraTop;
+            if (!IsFinite(window.Left) || !IsFinite(window.Top))
+                return new Rect(double.NaN, double.NaN, width, height);
+            return new Rect(window.Left, window.Top - extraTop, width, height);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct RECT { public int Left, Top, Right, Bottom; }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
+        }
+
+        private delegate bool MonitorEnumProc(IntPtr hMonitor, IntPtr hdc, IntPtr lprcMonitor, IntPtr data);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool EnumDisplayMonitors(IntPtr hdc, IntPtr lprcClip, MonitorEnumProc lpfnEnum, IntPtr dwData);
+
+        [DllImport("user32.dll", EntryPoint = "GetMonitorInfoW")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+        /// <summary>Work areas (without taskbars) of all monitors, in the window's DIPs.</summary>
+        private static List<Rect> GetWorkAreas(Window window)
+        {
+            var result = new List<Rect>();
+            var fromDevice = PresentationSource.FromVisual(window)?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+            try
+            {
+                EnumDisplayMonitors(IntPtr.Zero, IntPtr.Zero, (hMonitor, hdc, rect, data) =>
+                {
+                    var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                    if (GetMonitorInfo(hMonitor, ref mi))
+                    {
+                        var tl = fromDevice.Transform(new Point(mi.rcWork.Left, mi.rcWork.Top));
+                        var br = fromDevice.Transform(new Point(mi.rcWork.Right, mi.rcWork.Bottom));
+                        result.Add(new Rect(tl, br));
+                    }
+                    return true;
+                }, IntPtr.Zero);
+            }
+            catch
+            {
+                // Fall back to the primary work area below.
+            }
+            if (result.Count == 0) result.Add(SystemParameters.WorkArea);
+            return result;
         }
 
         private static void QueueEnsureOnScreen(Window window)
