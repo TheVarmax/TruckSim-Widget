@@ -316,12 +316,12 @@ internal static class Program
         destinationStream.Flush(flushToDisk: true);
     }
 
-    private static bool IsAllowedPath(string path, bool isDirectory, List<string>? allowedRoots = null)
+    internal static bool IsAllowedPath(string path, bool isDirectory, List<string>? allowedRoots = null)
     {
         return IsAllowedPath(path, isDirectory, isSourceOnly: false, allowedRoots);
     }
 
-    private static bool IsAllowedPath(string path, bool isDirectory, bool isSourceOnly, List<string>? allowedRoots)
+    internal static bool IsAllowedPath(string path, bool isDirectory, bool isSourceOnly, List<string>? allowedRoots)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
         if (!Path.IsPathRooted(path)) return false;
