@@ -106,7 +106,22 @@ namespace ETSOverlay
     public class TruckSimCloudClient : ITruckSimCloudClient
     {
         private const string BASE_URL = "https://api.trucksim.uk";
-        private static readonly HttpClient _httpClient = new HttpClient();
+        private static readonly HttpClient SharedHttpClient = new HttpClient();
+
+        private readonly HttpClient _httpClient;
+        private readonly Action<string>? _diagnosticLog;
+
+        public TruckSimCloudClient()
+        {
+            _httpClient = SharedHttpClient;
+        }
+
+        // Test seam: lets tests stub HTTP responses and capture diagnostics.
+        internal TruckSimCloudClient(HttpClient httpClient, Action<string> diagnosticLog)
+        {
+            _httpClient = httpClient;
+            _diagnosticLog = diagnosticLog;
+        }
 
         private static string CreateSafeLicenseResponseDiagnostic(string endpoint, System.Net.HttpStatusCode statusCode, string rawJson)
         {
@@ -137,6 +152,11 @@ namespace ETSOverlay
         private void WriteSafeLicenseResponseDiagnostic(string endpoint, System.Net.HttpStatusCode statusCode, string rawJson)
         {
             var message = CreateSafeLicenseResponseDiagnostic(endpoint, statusCode, rawJson);
+            if (_diagnosticLog != null)
+            {
+                _diagnosticLog(message);
+                return;
+            }
             try
             {
                 if (System.Windows.Application.Current?.MainWindow is MainWindow main)

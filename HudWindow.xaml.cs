@@ -15,6 +15,7 @@ namespace ETSOverlay
         {
             InitializeComponent();
             _mainWindow = mainWindow;
+            WindowGuard.Attach(this);
             
             // Allow moving the window by dragging it
             MouseLeftButtonDown += (s, e) =>
@@ -24,7 +25,7 @@ namespace ETSOverlay
 
             LocationChanged += (s, e) =>
             {
-                if (!_isUpdatingPosition && WindowState != WindowState.Minimized)
+                if (!_isUpdatingPosition && WindowState == WindowState.Normal)
                 {
                     _targetCenterLeft = GetTrueCenterLeft();
                 }
@@ -201,7 +202,9 @@ namespace ETSOverlay
         private void DataContainer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (double.IsNaN(_targetCenterLeft)) return;
-            if (WindowState == WindowState.Minimized) return;
+            // Only re-center while the window is in its normal state; otherwise a maximized /
+            // minimized size would push Left (and the saved HUD position) off-screen.
+            if (WindowState != WindowState.Normal) return;
 
             if (e.WidthChanged && e.PreviousSize.Width > 0 && !_isUpdatingPosition)
             {
