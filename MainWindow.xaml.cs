@@ -392,6 +392,7 @@ namespace ETSOverlay
         public MainWindow()
         {
             InitializeComponent();
+            WindowGuard.Attach(this);
             SpeedLimiterService.Instance.BrakeStateChanged += (isBraking) => 
             {
                 Dispatcher.InvokeAsync(() => 
@@ -519,6 +520,7 @@ namespace ETSOverlay
             Loaded += async (s, e) =>
             {
                 ClientPresenceService.Instance.Start();
+                WindowGuard.EnsureOnScreen(this);
                 EnsureHeaderOverlay();
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
@@ -2705,13 +2707,29 @@ namespace ETSOverlay
 
         internal AppState GetCurrentAppState()
         {
+            // Never persist maximized/minimized geometry: it is what pinned windows to a corner
+            // (or off-screen) after a restart.
+            var mainPos = WindowGuard.GetSavablePosition(this);
+            bool hudNormal = _hudWindow != null && _hudWindow.WindowState == WindowState.Normal;
+            if (hudNormal)
+            {
+                _savedHudLeft = _hudWindow!.Left;
+                _savedHudTop = _hudWindow.Top;
+                _savedHudCenterLeft = _hudWindow.GetTrueCenterLeft();
+            }
+            var settingsPos = _settingsWindow != null ? WindowGuard.GetSavablePosition(_settingsWindow) : new Point(double.NaN, double.NaN);
+            if (!double.IsNaN(settingsPos.X) && !double.IsNaN(settingsPos.Y))
+            {
+                _savedSettingsLeft = settingsPos.X;
+                _savedSettingsTop = settingsPos.Y;
+            }
             return new AppState
             {
-                Left = Left,
-                Top = Top,
-                HudLeft = _hudWindow?.Left ?? _savedHudLeft,
-                HudTop = _hudWindow?.Top ?? _savedHudTop,
-                HudCenterLeft = _hudWindow != null ? _hudWindow.GetTrueCenterLeft() : _savedHudCenterLeft,
+                Left = mainPos.X,
+                Top = mainPos.Y,
+                HudLeft = _savedHudLeft,
+                HudTop = _savedHudTop,
+                HudCenterLeft = _savedHudCenterLeft,
                 HudShowCurrentSpeed = _hudShowCurrentSpeed,
                 HudShowMaxSpeed = _hudShowMaxSpeed,
                 HudShowDeliveryType = _hudShowDeliveryType,
@@ -2725,8 +2743,8 @@ namespace ETSOverlay
                 TextOpacity = textOpacity,
                 UiLanguage = uiLanguage,
                 AutoHideEnabled = _autoHideEnabled,
-                SettingsLeft = _settingsWindow?.Left ?? _savedSettingsLeft,
-                SettingsTop = _settingsWindow?.Top ?? _savedSettingsTop,
+                SettingsLeft = _savedSettingsLeft,
+                SettingsTop = _savedSettingsTop,
                 UiScale = _uiScale,
                 CancelledJobs = _cancelledJobs.ToList(),
                 HardwareHash = LicenseManager.Instance.HardwareHash,
@@ -2761,8 +2779,6 @@ namespace ETSOverlay
 
         private void ApplyAppState(AppState state)
         {
-            Left = state.Left;
-            Top = state.Top;
             _uiMode = state.UIMode ?? "full";
             _hudShowCurrentSpeed = state.HudShowCurrentSpeed;
             _hudShowMaxSpeed = state.HudShowMaxSpeed;
@@ -2780,19 +2796,23 @@ namespace ETSOverlay
             {
                 windowOpacity = 0.85;
             }
-            if (!double.IsNaN(state.Left) && !double.IsNaN(state.Top))
+            // Saved positions that are off every monitor (e.g. written while a window was
+            // maximized or snapped) are dropped so the window falls back to a visible default.
+            if (WindowGuard.IsPositionVisible(state.Left, state.Top, 0, 0))
             {
                 Left = state.Left;
                 Top = state.Top;
             }
-            if (!double.IsNaN(state.HudLeft) && !double.IsNaN(state.HudTop))
+            if (WindowGuard.IsPositionVisible(state.HudLeft, state.HudTop, 0, 0))
             {
                 _savedHudLeft = state.HudLeft;
                 _savedHudTop = state.HudTop;
-                _savedHudCenterLeft = state.HudCenterLeft;
+                _savedHudCenterLeft = WindowGuard.IsPositionVisible(state.HudCenterLeft, state.HudTop, 0, 0)
+                    ? state.HudCenterLeft
+                    : double.NaN;
             }
             // Restore settings window position if available
-            if (!double.IsNaN(state.SettingsLeft) && !double.IsNaN(state.SettingsTop))
+            if (WindowGuard.IsPositionVisible(state.SettingsLeft, state.SettingsTop, 0, 0))
             {
                 _savedSettingsLeft = state.SettingsLeft;
                 _savedSettingsTop = state.SettingsTop;
@@ -3067,6 +3087,7 @@ namespace ETSOverlay
                 {
                     _settingsWindow.Left = _savedSettingsLeft;
                     _settingsWindow.Top = _savedSettingsTop;
+                    WindowGuard.EnsureOnScreen(_settingsWindow);
                 }
             }
             else
@@ -3285,6 +3306,7 @@ namespace ETSOverlay
                     _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.DesiredSize.Width) / 2;
                     _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.DesiredSize.Height - 20; 
                 }
+                WindowGuard.EnsureOnScreen(_hudWindow);
                 if (animate)
                 {
                     _hudWindow.Opacity = 0;
@@ -4493,11 +4515,11 @@ namespace ETSOverlay
             }
             
             await Task.Delay(200);
-            WindowState = WindowState.Minimized;
+            WindowGuard.MinimizeByApp(this);
 
             if (_hudWindow != null && _hudWindow.IsVisible)
             {
-                _hudWindow.WindowState = WindowState.Minimized;
+                WindowGuard.MinimizeByApp(_hudWindow);
             }
             
             // Восстанавливаем анимацию, чтобы при StateChanged виджет проявился нормально

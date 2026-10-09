@@ -12,6 +12,7 @@ namespace ETSOverlay
         {
             InitializeComponent();
             _mainWindow = mainWindow;
+            WindowGuard.Attach(this);
             MouseLeftButtonDown += (s, e) =>
             {
                 if (!_mainWindow.IsLocked) _mainWindow.DragMove();
