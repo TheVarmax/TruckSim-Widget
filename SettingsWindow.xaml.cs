@@ -19,6 +19,7 @@ namespace ETSOverlay
         {
             InitializeComponent();
             _mainWindow = mainWindow;
+            WindowGuard.Attach(this);
             MouseLeftButtonDown += (s, e) => { DragMove(); };
             _suppressEvents = false;
 
