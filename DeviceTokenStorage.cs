@@ -12,12 +12,14 @@ namespace ETSOverlay
         public static string StoragePath => PrimaryStoragePath;
 
         public static string PrimaryStoragePath => CustomStoragePath ?? Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            DevInstance.LocalAppData,
             "TruckSimWidget",
             "device.dat"
         );
 
-        public static string BackupStoragePath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "device.dat");
+        public static string BackupStoragePath => DevInstance.IsIsolated
+            ? Path.Combine(DevInstance.LocalAppData, "TruckSimWidget", "device.backup.dat")
+            : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "device.dat");
 
         private static void LogMessage(string message)
         {
@@ -104,7 +106,7 @@ namespace ETSOverlay
 
                 // 3. Migration: check legacy AppData path "TruckSim Widget"
                 string legacyAppData = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    DevInstance.LocalAppData,
                     "TruckSim Widget",
                     "device.dat"
                 );
@@ -173,7 +175,7 @@ namespace ETSOverlay
             try
             {
                 string legacyAppData = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    DevInstance.LocalAppData,
                     "TruckSim Widget",
                     "device.dat"
                 );

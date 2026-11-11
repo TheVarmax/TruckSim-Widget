@@ -265,8 +265,11 @@ namespace ETSOverlay
                 else
                 {
                     if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
-                    Show();
-                    FitRestoredWindow(this, () => WindowGuard.CenterOnPrimary(this), "main");
+                    // Back to the saved position, placed while transparent so the first visible
+                    // frame is already there. A correction (monitor not connected) is temporary.
+                    WindowGuard.ShowAt(this, _savedMainLeft, _savedMainTop, () => WindowGuard.CenterOnPrimary(this));
+                    UpdateMainPlacedTemporarily();
+                    WriteLog($"[WINDOW] Main window shown at {Left:0.#},{Top:0.#}; saved {_savedMainLeft:0.#},{_savedMainTop:0.#}{(_mainPlacedTemporarily ? ", temporary" : "")}");
                     EnsureHeaderOverlay();
                     _headerOverlay?.Show();
                     UpdateHeaderOverlayPosition();

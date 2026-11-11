@@ -363,6 +363,28 @@ namespace ETSOverlay
             return SystemParameters.WorkArea;
         }
 
+        /// <summary>
+        /// Shows <paramref name="window"/> at <paramref name="left"/>/<paramref name="top"/> (when
+        /// finite) and checks its visible card against the monitors before anything is seen: the
+        /// window stays fully transparent until it is placed. Returns the correction that was needed.
+        /// </summary>
+        public static PositionFix ShowAt(Window window, double left, double top, Action applyDefault)
+        {
+            if (IsFinite(left) && IsFinite(top))
+            {
+                window.Left = left;
+                window.Top = top;
+            }
+            window.BeginAnimation(UIElement.OpacityProperty, null);
+            double opacity = window.Opacity > 0 ? window.Opacity : 1.0;
+            window.Opacity = 0;
+            if (!window.IsVisible) window.Show();
+            window.UpdateLayout();
+            var fix = FitToScreen(window, applyDefault);
+            window.Opacity = opacity;
+            return fix;
+        }
+
         /// <summary>Centers the window in the primary monitor's work area.</summary>
         public static void CenterOnPrimary(Window window)
         {

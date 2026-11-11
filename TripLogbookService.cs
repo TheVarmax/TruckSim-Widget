@@ -38,7 +38,7 @@ namespace ETSOverlay
 
         private TripLogbookService()
             : this(Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                DevInstance.LocalAppData,
                 "TruckSimWidget",
                 "logbook"))
         {

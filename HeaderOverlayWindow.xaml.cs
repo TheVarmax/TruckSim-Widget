@@ -15,7 +15,7 @@ namespace ETSOverlay
             WindowGuard.Attach(this);
             MouseLeftButtonDown += (s, e) =>
             {
-                if (!_mainWindow.IsLocked) _mainWindow.DragMove();
+                if (!_mainWindow.IsLocked) _mainWindow.DragByUser();
             };
             MouseEnter += HeaderOverlay_MouseEnter;
             MouseLeave += HeaderOverlay_MouseLeave;

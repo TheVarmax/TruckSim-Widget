@@ -17,18 +17,16 @@ namespace ETSOverlay
             _mainWindow = mainWindow;
             WindowGuard.Attach(this, DataContainer);
             
-            // Allow moving the window by dragging it
+            // Allow moving the window by dragging it. Only the end of a drag is a position the
+            // user chose; moves made by the application (showing, restoring, re-centring after a
+            // width change) never become the saved position.
             MouseLeftButtonDown += (s, e) =>
             {
-                if (!_mainWindow.IsLocked) DragMove();
-            };
-
-            LocationChanged += (s, e) =>
-            {
-                if (!_isUpdatingPosition && WindowState == WindowState.Normal)
-                {
-                    _targetCenterLeft = GetTrueCenterLeft();
-                }
+                if (_mainWindow.IsLocked) return;
+                DragMove();
+                if (WindowState != WindowState.Normal) return;
+                _targetCenterLeft = GetTrueCenterLeft();
+                UserMoved?.Invoke();
             };
 
             ApplyVisibilitySettings(false);
@@ -199,6 +197,34 @@ namespace ETSOverlay
         private bool _isUpdatingPosition = false;
         private double _targetCenterLeft = double.NaN;
 
+        /// <summary>The user finished dragging the HUD (its new position is final).</summary>
+        public event Action? UserMoved;
+
+        /// <summary>Horizontal centre the HUD keeps while its width changes.</summary>
+        public double TargetCenterLeft => _targetCenterLeft;
+
+        /// <summary>
+        /// Puts the visible card's horizontal centre at <paramref name="centerLeft"/> and its window
+        /// top at <paramref name="top"/>. The centre is kept when the width changes later.
+        /// </summary>
+        public void PlaceAtCenter(double centerLeft, double top)
+        {
+            _isUpdatingPosition = true;
+            try
+            {
+                _targetCenterLeft = centerLeft;
+                Left = centerLeft - GetCardWidth() / 2;
+                Top = top;
+            }
+            finally
+            {
+                _isUpdatingPosition = false;
+            }
+        }
+
+        /// <summary>Keeps the current centre for later width changes (after a correction by the app).</summary>
+        public void KeepCurrentCenter() => _targetCenterLeft = GetTrueCenterLeft();
+
         private void DataContainer_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (double.IsNaN(_targetCenterLeft)) return;
@@ -209,29 +235,38 @@ namespace ETSOverlay
             if (e.WidthChanged && e.PreviousSize.Width > 0 && !_isUpdatingPosition)
             {
                 _isUpdatingPosition = true;
-                double scale = UIScaleTransform?.ScaleX ?? 1.0;
-                this.Left = _targetCenterLeft - (32 + e.NewSize.Width) * scale / 2;
+                // Always computed from the chosen centre, never from where the card is shown now,
+                // so after a widening near an edge the narrower HUD lands exactly on it again.
+                double before = this.Left;
+                this.Left = _targetCenterLeft - CardWidth(e.NewSize.Width) / 2;
+                // Near a screen edge the centre cannot be kept without pushing the card off the
+                // monitor: the card is shown inside for now. The chosen centre stays the target.
+                WindowGuard.FitToScreen(this, () => this.Left = before);
                 _isUpdatingPosition = false;
             }
         }
 
-        public double GetTrueCenterLeft()
+        // One rule for every centre calculation (saving, restoring, re-centring): the window is
+        // the card plus a 16 px margin on each side, all scaled by the HUD scale.
+        private double CardWidth(double dataWidth) => (32 + dataWidth) * (UIScaleTransform?.ScaleX ?? 1.0);
+
+        /// <summary>Width of the window around the card, from the laid-out card (measured when not laid out yet).</summary>
+        public double GetCardWidth()
         {
-            double scale = UIScaleTransform?.ScaleX ?? 1.0;
-            return this.Left + (32 + DataContainer.ActualWidth) * scale / 2;
+            double width = DataContainer.ActualWidth;
+            if (width <= 0)
+            {
+                Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                width = DataContainer.DesiredSize.Width;
+            }
+            return CardWidth(width);
         }
 
-        public double GetBaseWidth()
-        {
-            double scale = UIScaleTransform?.ScaleX ?? 1.0;
-            return (32 + DataContainer.ActualWidth) * scale;
-        }
+        public double GetTrueCenterLeft() => this.Left + GetCardWidth() / 2;
 
-        public double GetDesiredBaseWidth()
-        {
-            double scale = UIScaleTransform?.ScaleX ?? 1.0;
-            return (32 + DataContainer.DesiredSize.Width) * scale;
-        }
+        public double GetBaseWidth() => GetCardWidth();
+
+        public double GetDesiredBaseWidth() => GetCardWidth();
 
         public void SetScale(double scale)
         {

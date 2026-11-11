@@ -13,8 +13,9 @@ namespace TruckSim_Widget
     public partial class App : Application
     {
         // No "Global\" prefix: both names live in the user's own session.
-        private const string MutexName = "TruckSim_Widget_SingleInstance_Mutex";
-        private const string RestoreEventName = "TruckSim_Widget_RestoreInstance_Event";
+        // A development test instance (DevInstance) gets its own names and runs beside the installed widget.
+        private static readonly string MutexName = "TruckSim_Widget_SingleInstance_Mutex" + DevInstance.InstanceSuffix;
+        private static readonly string RestoreEventName = "TruckSim_Widget_RestoreInstance_Event" + DevInstance.InstanceSuffix;
 
         private static Mutex? _mutex;
         private static EventWaitHandle? _restoreEvent;

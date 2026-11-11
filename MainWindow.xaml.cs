@@ -50,9 +50,9 @@ namespace ETSOverlay
 
         private bool locked = false;
         private DispatcherTimer? tbTimer;
-        private string logFilePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"TrucksBook\log.txt");
-        private string deliveriesFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"TrucksBook\deliveries");
-        private string deliveredFolderPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), @"TrucksBook\delivered");
+        private string logFilePath = Path.Combine(DevInstance.LocalAppData, @"TrucksBook\log.txt");
+        private string deliveriesFolderPath = Path.Combine(DevInstance.LocalAppData, @"TrucksBook\deliveries");
+        private string deliveredFolderPath = Path.Combine(DevInstance.LocalAppData, @"TrucksBook\delivered");
         private string stateFilePath;
         private string appLogFilePath; // Наш новый файл логов
 
@@ -233,9 +233,18 @@ namespace ETSOverlay
         private SettingsWindow? _settingsWindow;
         private double _savedSettingsLeft = double.NaN;
         private double _savedSettingsTop = double.NaN;
+        // Positions the user chose (window coordinates). They change only when the user drags a
+        // window or uses a HUD position command; showing, restoring from the tray and corrections
+        // for a missing monitor never overwrite them.
+        private double _savedMainLeft = double.NaN;
+        private double _savedMainTop = double.NaN;
         private double _savedHudLeft = double.NaN;
         private double _savedHudTop = double.NaN;
         private double _savedHudCenterLeft = double.NaN;
+        // The window is somewhere else than its saved position for now (the saved one is not
+        // on any connected monitor). The saved position is kept for the next start.
+        private bool _mainPlacedTemporarily;
+        private bool _hudPlacedTemporarily;
 
         // UI Scale
         private const double BASE_SCALE = 1.15; // default "100%" is 15% larger than design
@@ -519,7 +528,7 @@ namespace ETSOverlay
 
             SpeedLimiterService.Instance.LogAction = msg => WriteLog($"[SPEED LIMITER] {msg}");
 
-            string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string appData = DevInstance.LocalAppData;
             string folder = Path.Combine(appData, "TruckSimWidget");
             if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
 
@@ -587,12 +596,10 @@ namespace ETSOverlay
             ApplyScale();
             ApplyAppearance();
 
-            MouseLeftButtonDown += (s, e) => { if (!locked) DragMove(); };
-            LocationChanged += (s, e) =>
-            {
-                SaveState();
-                UpdateHeaderOverlayPosition();
-            };
+            MouseLeftButtonDown += (s, e) => { if (!locked) DragByUser(); };
+            // Moving the window by the application (restore, correction, display change) is not a
+            // user choice: only the end of a drag is saved (DragByUser).
+            LocationChanged += (s, e) => UpdateHeaderOverlayPosition();
             SizeChanged += (s, e) => { UpdateHeaderOverlayPosition(); };
 
             _licenseCheckTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(5) };
@@ -634,6 +641,7 @@ namespace ETSOverlay
                 UpdatePinIcon();
                 UpdateHeaderOverlayPosition();
                 FitRestoredWindow(this, () => WindowGuard.CenterOnPrimary(this), "main");
+                UpdateMainPlacedTemporarily();
                 UpdateHeaderOverlayPosition();
                 HideHeaderOverlay();
 
@@ -3287,18 +3295,45 @@ namespace ETSOverlay
             SaveState();
         }
 
+        internal readonly record struct SavedPositions(double MainLeft, double MainTop, double HudLeft, double HudTop, double HudCenterLeft);
+
+        /// <summary>
+        /// Saved window positions as stored, only checked to be numbers. Whether they fit a
+        /// monitor is decided when the window is shown, from its visible card: the transparent
+        /// margin around a card placed at a screen edge lies off screen, and a monitor that is not
+        /// connected yet must not cost the position. NaN where nothing usable is saved.
+        /// </summary>
+        internal static SavedPositions ReadSavedPositions(AppState state)
+        {
+            bool main = double.IsFinite(state.Left) && double.IsFinite(state.Top);
+            bool hud = double.IsFinite(state.HudTop) && (double.IsFinite(state.HudLeft) || double.IsFinite(state.HudCenterLeft));
+            return new SavedPositions(
+                main ? state.Left : double.NaN,
+                main ? state.Top : double.NaN,
+                hud && double.IsFinite(state.HudLeft) ? state.HudLeft : double.NaN,
+                hud ? state.HudTop : double.NaN,
+                hud && double.IsFinite(state.HudCenterLeft) ? state.HudCenterLeft : double.NaN);
+        }
+
+        /// <summary>Main window position of the oldest, pipe-separated state format (fields 4 and 5).</summary>
+        internal static bool TryReadLegacyPosition(string[] parts, out double left, out double top)
+        {
+            left = double.NaN;
+            top = double.NaN;
+            if (parts == null || parts.Length < 6) return false;
+            if (!double.TryParse(parts[4], out var l) || !double.TryParse(parts[5], out var t)) return false;
+            if (!double.IsFinite(l) || !double.IsFinite(t)) return false;
+            left = l;
+            top = t;
+            return true;
+        }
+
         internal AppState GetCurrentAppState()
         {
             // Never persist maximized/minimized geometry: it is what pinned windows to a corner
             // (or off-screen) after a restart.
-            var mainPos = WindowGuard.GetSavablePosition(this);
-            bool hudNormal = _hudWindow != null && _hudWindow.WindowState == WindowState.Normal;
-            if (hudNormal)
-            {
-                _savedHudLeft = _hudWindow!.Left;
-                _savedHudTop = _hudWindow.Top;
-                _savedHudCenterLeft = _hudWindow.GetTrueCenterLeft();
-            }
+            // Main window and HUD: the positions the user chose, not where the windows happen to be
+            // right now (CommitMainPosition / CommitHudPosition).
             var settingsPos = _settingsWindow != null ? WindowGuard.GetSavablePosition(_settingsWindow) : new Point(double.NaN, double.NaN);
             if (!double.IsNaN(settingsPos.X) && !double.IsNaN(settingsPos.Y))
             {
@@ -3307,8 +3342,8 @@ namespace ETSOverlay
             }
             return new AppState
             {
-                Left = mainPos.X,
-                Top = mainPos.Y,
+                Left = _savedMainLeft,
+                Top = _savedMainTop,
                 HudLeft = _savedHudLeft,
                 HudTop = _savedHudTop,
                 HudCenterLeft = _savedHudCenterLeft,
@@ -3384,20 +3419,28 @@ namespace ETSOverlay
             {
                 windowOpacity = 0.85;
             }
-            // Saved positions that are off every monitor (e.g. written while a window was
-            // maximized or snapped) are dropped so the window falls back to a visible default.
-            if (WindowGuard.IsPositionVisible(state.Left, state.Top, 0, 0))
+            // Saved positions are kept as they are. Whether they fit a monitor is decided when the
+            // window is shown, from its visible card (FitRestoredWindow): the transparent margin
+            // around the card may legitimately lie off screen, and a monitor that is not connected
+            // yet must not cost the user the saved position.
+            var saved = ReadSavedPositions(state);
+            if (double.IsFinite(saved.MainLeft))
             {
-                Left = state.Left;
-                Top = state.Top;
+                _savedMainLeft = saved.MainLeft;
+                _savedMainTop = saved.MainTop;
+                // Only before the window is shown: applying settings later (cloud download)
+                // must not move a window that is already on screen.
+                if (!IsLoaded)
+                {
+                    Left = saved.MainLeft;
+                    Top = saved.MainTop;
+                }
             }
-            if (WindowGuard.IsPositionVisible(state.HudLeft, state.HudTop, 0, 0))
+            if (double.IsFinite(saved.HudTop))
             {
-                _savedHudLeft = state.HudLeft;
-                _savedHudTop = state.HudTop;
-                _savedHudCenterLeft = WindowGuard.IsPositionVisible(state.HudCenterLeft, state.HudTop, 0, 0)
-                    ? state.HudCenterLeft
-                    : double.NaN;
+                _savedHudLeft = saved.HudLeft;
+                _savedHudTop = saved.HudTop;
+                _savedHudCenterLeft = saved.HudCenterLeft;
             }
             // Restore settings window position if available
             if (WindowGuard.IsPositionVisible(state.SettingsLeft, state.SettingsTop, 0, 0))
@@ -3542,8 +3585,15 @@ namespace ETSOverlay
                         }
                         if (parts.Length >= 6)
                         {
-                            if (double.TryParse(parts[4], out var l)) Left = l;
-                            if (double.TryParse(parts[5], out var t)) Top = t;
+                            // Oldest state format: the main window position is the saved position
+                            // too, so it is written to the JSON state on the next save.
+                            if (TryReadLegacyPosition(parts, out var l, out var t))
+                            {
+                                _savedMainLeft = l;
+                                _savedMainTop = t;
+                                Left = l;
+                                Top = t;
+                            }
                         }
                         if (parts.Length >= 8)
                         {
@@ -3853,6 +3903,7 @@ namespace ETSOverlay
                 if (_hudWindow == null)
                 {
                     _hudWindow = new HudWindow(this);
+                    _hudWindow.UserMoved += CommitHudPosition;
                     _hudWindow.SetTrayCommandText(GetTrayCommandText());
                     _hudWindow.StateChanged += (s, e) =>
                     {
@@ -3897,33 +3948,16 @@ namespace ETSOverlay
                 
                 _hudWindow.SetScale(BASE_SCALE * (_uiScale / 100.0));
                 _hudWindow.UpdatePinIcon(Topmost);
-                _hudWindow.Show();
+                // Placed while fully transparent: the first visible frame is already at the saved
+                // position (no flash at a default spot, no jump).
+                ShowHudAtSavedPosition();
                 _hudSyncTimer?.Start();
-                
+
                 ApplyDualLayerOpacity();
-                
-                // Position properly with levitation margin
-                _hudWindow.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-                if (!double.IsNaN(_savedHudCenterLeft))
-                {
-                    _hudWindow.Left = _savedHudCenterLeft - _hudWindow.GetDesiredBaseWidth() / 2;
-                    _hudWindow.Top = _savedHudTop;
-                }
-                else if (!double.IsNaN(_savedHudLeft) && !double.IsNaN(_savedHudTop))
-                {
-                    _hudWindow.Left = _savedHudLeft;
-                    _hudWindow.Top = _savedHudTop;
-                }
-                else
-                {
-                    PlaceHudAtDefault();
-                }
-                FitRestoredWindow(_hudWindow, PlaceHudAtDefault, "HUD");
                 if (animate)
                 {
-                    _hudWindow.Opacity = 0;
-                    _hudWindow.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(1.0, TimeSpan.FromSeconds(0.3)));
-                    
+                    _hudWindow.BeginAnimation(Window.OpacityProperty, new DoubleAnimation(0.0, 1.0, TimeSpan.FromSeconds(0.3)));
+
                     var fadeOut = new DoubleAnimation(0.0, TimeSpan.FromSeconds(0.3));
                     fadeOut.Completed += (s, ev) => 
                     {
@@ -3935,9 +3969,11 @@ namespace ETSOverlay
                 }
                 else
                 {
+                    _hudWindow.BeginAnimation(Window.OpacityProperty, null);
+                    _hudWindow.Opacity = 1.0;
                     this.Hide();
                 }
-                
+
                 return;
             }
             else
@@ -4109,28 +4145,93 @@ namespace ETSOverlay
         {
             if (_hudWindow != null)
             {
-                _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.ActualWidth) / 2;
-                _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.ActualHeight - 20;
-                _savedHudLeft = _hudWindow.Left;
-                _savedHudTop = _hudWindow.Top;
+                PlaceHudAtDefault();
+                CommitHudPosition();
             }
             else
             {
                 _savedHudLeft = double.NaN;
                 _savedHudTop = double.NaN;
+                _savedHudCenterLeft = double.NaN;
+                SaveState();
             }
-            SaveState();
         }
 
         public void MoveHudToTop()
         {
             if (_hudWindow != null)
             {
-                _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.ActualWidth) / 2;
-                _hudWindow.Top = 20;
-                _savedHudLeft = _hudWindow.Left;
-                _savedHudTop = _hudWindow.Top;
+                var wa = SystemParameters.WorkArea;
+                _hudWindow.PlaceAtCenter(wa.Left + wa.Width / 2, 20);
+                CommitHudPosition();
             }
+        }
+
+        /// <summary>
+        /// Shows the HUD (if hidden) at the saved position. The window is transparent until it is
+        /// placed and checked against the monitors, so nothing is seen at a temporary spot.
+        /// </summary>
+        private void ShowHudAtSavedPosition()
+        {
+            var hud = _hudWindow;
+            if (hud == null) return;
+
+            hud.BeginAnimation(Window.OpacityProperty, null);
+            hud.Opacity = 0;
+            if (!hud.IsVisible) hud.Show();
+            hud.UpdateLayout();
+
+            if (double.IsFinite(_savedHudCenterLeft) && double.IsFinite(_savedHudTop))
+                hud.PlaceAtCenter(_savedHudCenterLeft, _savedHudTop);
+            else if (double.IsFinite(_savedHudLeft) && double.IsFinite(_savedHudTop))
+                hud.PlaceAtCenter(_savedHudLeft + hud.GetCardWidth() / 2, _savedHudTop);
+            else
+                PlaceHudAtDefault();
+
+            bool hasSaved = double.IsFinite(_savedHudTop) && (double.IsFinite(_savedHudCenterLeft) || double.IsFinite(_savedHudLeft));
+            var fix = FitRestoredWindow(hud, PlaceHudAtDefault, "HUD");
+            _hudPlacedTemporarily = hasSaved && fix != WindowGuard.PositionFix.None;
+            // Clamped (card at a screen edge, content wider than when it was saved): the chosen
+            // centre stays the target, so the HUD returns to it when the content narrows again.
+            // Reset (the saved place is on no connected monitor): the HUD keeps to where it is
+            // shown now; the saved position itself is kept on disk for the next start.
+            if (fix == WindowGuard.PositionFix.Reset) hud.KeepCurrentCenter();
+            WriteLog($"[WINDOW] HUD shown at {hud.Left:0.#},{hud.Top:0.#} (centre {hud.TargetCenterLeft:0.#}); saved centre {_savedHudCenterLeft:0.#}, top {_savedHudTop:0.#}{(_hudPlacedTemporarily ? ", temporary" : "")}");
+        }
+
+        /// <summary>The user placed the HUD (drag or a position command): this is its saved position.</summary>
+        private void CommitHudPosition()
+        {
+            if (_hudWindow == null || _hudWindow.WindowState != WindowState.Normal) return;
+            _savedHudLeft = _hudWindow.Left;
+            _savedHudTop = _hudWindow.Top;
+            _savedHudCenterLeft = _hudWindow.TargetCenterLeft;
+            _hudPlacedTemporarily = false;
+            WriteLog($"[WINDOW] HUD position saved: {_savedHudLeft:0.#},{_savedHudTop:0.#} (centre {_savedHudCenterLeft:0.#})");
+            SaveState();
+        }
+
+        /// <summary>The main window is shown somewhere else than its saved position (for now only).</summary>
+        private void UpdateMainPlacedTemporarily()
+        {
+            _mainPlacedTemporarily = double.IsFinite(_savedMainLeft) && double.IsFinite(_savedMainTop)
+                && (Math.Abs(Left - _savedMainLeft) > 0.5 || Math.Abs(Top - _savedMainTop) > 0.5);
+        }
+
+        /// <summary>Drags the main window; the position where the user lets go is saved.</summary>
+        internal void DragByUser()
+        {
+            DragMove();
+            CommitMainPosition();
+        }
+
+        private void CommitMainPosition()
+        {
+            var pos = WindowGuard.GetSavablePosition(this);
+            if (!double.IsFinite(pos.X) || !double.IsFinite(pos.Y)) return;
+            _savedMainLeft = pos.X;
+            _savedMainTop = pos.Y;
+            _mainPlacedTemporarily = false;
             SaveState();
         }
 
@@ -4881,7 +4982,7 @@ namespace ETSOverlay
         private string GetGameStateFolder(GameType game)
         {
             string root = _gameStateRootOverride
-                ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TruckSimWidget");
+                ?? Path.Combine(DevInstance.LocalAppData, "TruckSimWidget");
             string folder = Path.Combine(root, game == GameType.Ats ? "ATS" : "ETS");
             if (!Directory.Exists(folder)) Directory.CreateDirectory(folder);
             return folder;
@@ -5436,7 +5537,7 @@ namespace ETSOverlay
             }
 
             // 2. Installed application directory / Programs
-            string localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+            string localAppData = DevInstance.LocalAppData;
             string installedSetup = Path.Combine(localAppData, "Programs", "TruckSim Widget", "TruckSimWidgetSetup.exe");
             if (File.Exists(installedSetup))
             {
@@ -6252,22 +6353,24 @@ namespace ETSOverlay
         private void PlaceHudAtDefault()
         {
             if (_hudWindow == null) return;
-            _hudWindow.Left = (SystemParameters.WorkArea.Width - _hudWindow.DesiredSize.Width) / 2;
-            _hudWindow.Top = SystemParameters.PrimaryScreenHeight - _hudWindow.DesiredSize.Height - 20;
+            var wa = SystemParameters.WorkArea;
+            double height = _hudWindow.ActualHeight > 0 ? _hudWindow.ActualHeight : _hudWindow.DesiredSize.Height;
+            _hudWindow.PlaceAtCenter(wa.Left + wa.Width / 2, SystemParameters.PrimaryScreenHeight - height - 20);
         }
 
         /// <summary>
         /// Keeps a restored window's visible card fully inside a monitor (same rule as dragging).
         /// Positions on no monitor are reset to the default; cards that stick out are moved inside.
-        /// Corrections are logged and saved right away.
+        /// The correction is for now only: the saved position is not changed, so a monitor that is
+        /// not available yet (at sign-in) does not cost the user the position chosen on it.
         /// </summary>
-        private void FitRestoredWindow(Window window, Action applyDefault, string name)
+        private WindowGuard.PositionFix FitRestoredWindow(Window window, Action applyDefault, string name)
         {
             var fix = WindowGuard.FitToScreen(window, applyDefault);
-            if (fix == WindowGuard.PositionFix.None) return;
-            string what = fix == WindowGuard.PositionFix.Reset ? "was invalid, reset to default" : "was outside the screen, moved inside";
-            WriteLog($"[WINDOW] Saved {name} window position {what}: {window.Left:0},{window.Top:0}");
-            SaveState();
+            if (fix == WindowGuard.PositionFix.None) return fix;
+            string what = fix == WindowGuard.PositionFix.Reset ? "is on no connected monitor, shown at the default place" : "was partly outside the screen, shown inside";
+            WriteLog($"[WINDOW] Saved {name} window position {what}: now {window.Left:0.#},{window.Top:0.#}; saved position kept");
+            return fix;
         }
 
         private void UpdateHeaderOverlayPosition()

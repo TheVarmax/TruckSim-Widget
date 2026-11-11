@@ -105,7 +105,7 @@ namespace ETSOverlay
 
     public class TruckSimCloudClient : ITruckSimCloudClient
     {
-        private const string BASE_URL = "https://api.trucksim.uk";
+        private static readonly string BASE_URL = DevInstance.ApiBaseUrl;
         private static readonly HttpClient SharedHttpClient = new HttpClient();
 
         private readonly HttpClient _httpClient;
