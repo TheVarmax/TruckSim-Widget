@@ -71,6 +71,8 @@ namespace ETSOverlay
         public string GameType { get; set; } = ""; // "ETS" or "ATS"
         public string PlayMode { get; set; } = ""; // "Singleplayer", "Convoy", "TruckersMP", or empty for old trips
         public bool HasLocationWarning { get; set; }
+        /// <summary>An earlier save was loaded during the delivery (the distance was rolled back with it).</summary>
+        public bool HasRollbackWarning { get; set; }
 
         // Future extensibility
         public Dictionary<string, string> Extra { get; set; } = new();

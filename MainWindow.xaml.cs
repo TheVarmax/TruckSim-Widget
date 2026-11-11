@@ -88,6 +88,18 @@ namespace ETSOverlay
         private bool _sessionJobConfirmed = false;
         // A cancel event of the game waits here until it is clear whose it is.
         private CancelEventReview _cancelReview = new();
+        // Delivered / paused / resumed, read from the job flags of the telemetry plugin.
+        private JobEventTracker _jobEvents = new();
+        // Distance of the tracked delivery as odometer stretches (rolled back with a loaded save).
+        private OdometerLedger _kmLedger = new();
+        // Record the ledger belongs to ("" = none loaded).
+        private string _kmLedgerRecordId = "";
+        // The tracked order is paused in the game (kept in its record across restarts).
+        private bool _orderPaused = false;
+        // An earlier save was loaded during the tracked delivery (kept in its record).
+        private bool _deliveryRolledBack = false;
+        private bool _pendingOrderPaused = false;
+        private bool _pendingOrderResumed = false;
         private int _pendingTripRetryTicks = 0;
         // Tests replace the logbook so they never write to the user's trips.
         internal TripLogbookService? _tripLogbookOverride;
@@ -117,7 +129,6 @@ namespace ETSOverlay
         private long _tripFinesTotal = 0;
         private List<TripFine> _tripFines = new();
         private bool _pendingDeliveryData = false;
-        private bool _lastSpecialEventsJobDelivered = false;
         private bool _pendingFineData = false;
         private string _tripTruckBrand = "";
         private string _tripTruckName = "";
@@ -394,6 +405,12 @@ namespace ETSOverlay
             public double LastLocationX { get; set; }
             public double LastLocationZ { get; set; }
             public bool HasLocationWarning { get; set; }
+            /// <summary>An earlier save was loaded during this delivery.</summary>
+            public bool HadRollback { get; set; }
+            /// <summary>The order is paused in the game.</summary>
+            public bool OrderPaused { get; set; }
+            /// <summary>Driven distance as odometer stretches (null: record of an older version).</summary>
+            public OdometerLedger? Odometer { get; set; }
             public float FerryDistance { get; set; }
             public bool FerryCrossed { get; set; }
             public float LastNavDistWithTrailer { get; set; }
@@ -609,8 +626,12 @@ namespace ETSOverlay
             };
             _licenseCheckTimer.Start();
 
-            telemetry = new SCSSdkTelemetry();
-            HookTelemetryEvents(telemetry);
+            // Development builds can play recorded telemetry instead of the game (DevTelemetryReplay).
+            if (!DevTelemetryReplay.Start(this))
+            {
+                telemetry = new SCSSdkTelemetry();
+                HookTelemetryEvents(telemetry);
+            }
 
             tbTimer = new DispatcherTimer();
             tbTimer.Interval = TimeSpan.FromSeconds(1);
@@ -803,6 +824,26 @@ namespace ETSOverlay
         private bool _jobCancelledOrDeliveredFlag = false;
         private bool _pendingCancelledData = false;
 
+        /// <summary>
+        /// Replay mode (development builds): one telemetry frame with the library events the
+        /// telemetry library would raise for it.
+        /// </summary>
+        internal void DevFeedTelemetry(SCSTelemetry data, IEnumerable<string> libraryEvents)
+        {
+            if (!DevTelemetryReplay.IsActive) return;
+            foreach (var ev in libraryEvents)
+            {
+                switch (ev)
+                {
+                    case "JobStarted": Telemetry_JobStarted(this, EventArgs.Empty); break;
+                    case "JobCancelled": Telemetry_JobCancelled(this, EventArgs.Empty); break;
+                    case "JobDelivered": Telemetry_JobDelivered(this, EventArgs.Empty); break;
+                    case "Fined": Telemetry_Fined(this, EventArgs.Empty); break;
+                }
+            }
+            Telemetry_Data(data, true);
+        }
+
         private void Telemetry_JobStarted(object? sender, EventArgs e)
         {
             WriteLog("[EVENT] Job Started fired by telemetry.");
@@ -818,9 +859,9 @@ namespace ETSOverlay
 
         private void Telemetry_JobDelivered(object? sender, EventArgs e)
         {
-            WriteLog("[EVENT] Job Delivered fired by telemetry.");
-            _jobCancelledOrDeliveredFlag = true;
-            _pendingDeliveryData = true;
+            // The library also raises this for a flag left over from before the connection, so the
+            // delivery is taken only from the pulse in Telemetry_Data (JobEventTracker).
+            WriteLog("[EVENT] Job Delivered fired by telemetry (library event; the delivery pulse decides).");
         }
 
         public void HandleJobCancelled(string reason)
@@ -842,6 +883,10 @@ namespace ETSOverlay
             _jobCancelledOrDeliveredFlag = true;
 
             // 2. Reset counters & timer
+            _kmLedgerRecordId = "";
+            _kmLedger = new OdometerLedger();
+            _orderPaused = false;
+            _deliveryRolledBack = false;
             jobDrivenDistance = 0;
             maxSpeedKmh = 0;
             isRace = false;
@@ -957,7 +1002,8 @@ namespace ETSOverlay
                         TruckBrand = _tripTruckBrand,
                         TruckName = _tripTruckName,
                         GameType = _currentGame == GameType.Ats ? "ATS" : "ETS",
-                        HasLocationWarning = _jobStates.TryGetValue(GetJobStateKey(CurrentLastJobId), out var s) ? s.HasLocationWarning : false
+                        HasLocationWarning = _jobStates.TryGetValue(GetJobStateKey(CurrentLastJobId), out var s) ? s.HasLocationWarning : false,
+                        HasRollbackWarning = _deliveryRolledBack || (s?.HadRollback ?? false)
                     };
 
                     // Calculate avg fuel consumption (L/100km)
@@ -1136,15 +1182,38 @@ namespace ETSOverlay
         {
             lastTelemetryUpdate = DateTime.Now;
 
-            // Direct check from shared memory: ONLY on rising edge (false -> true) while a delivery was active
-            bool isJobDeliveredInTelemetry = data.SpecialEventsValues != null && (data.SpecialEventsValues.JobDelivered || data.SpecialEventsValues.JobFinished);
-            if (isJobDeliveredInTelemetry && !_lastSpecialEventsJobDelivered && (_tripTrackingActive || _cargoWasLoaded))
+            // The order state from the job flags. Only the game's delivery pulse is a delivery: the
+            // JobFinished flag also turns on when the order is paused or cancelled.
+            var special = data.SpecialEventsValues;
+            if (special != null)
             {
-                WriteLog("[EVENT] Rising edge of JobDelivered in shared memory.");
-                _pendingDeliveryData = true;
-                _jobCancelledOrDeliveredFlag = true;
+                var jobEvent = _jobEvents.Observe(
+                    new JobFlags(data.SdkActive, special.OnJob, special.JobFinished, special.JobDelivered, special.JobCancelled),
+                    Environment.TickCount64);
+                if (jobEvent == JobEvent.Delivered)
+                {
+                    if (_tripTrackingActive || _cargoWasLoaded)
+                    {
+                        WriteLog("[EVENT] Job delivered (delivery pulse in shared memory).");
+                        _pendingDeliveryData = true;
+                        _jobCancelledOrDeliveredFlag = true;
+                    }
+                    else
+                    {
+                        WriteLog("[EVENT] Job delivered pulse ignored: no delivery with cargo is tracked.");
+                    }
+                }
+                else if (jobEvent == JobEvent.Paused)
+                {
+                    WriteLog("[EVENT] Order paused in the game (job ended without delivery or cancellation).");
+                    _pendingOrderPaused = true;
+                }
+                else if (jobEvent == JobEvent.Resumed)
+                {
+                    WriteLog("[EVENT] Paused order is active again.");
+                    _pendingOrderResumed = true;
+                }
             }
-            _lastSpecialEventsJobDelivered = isJobDeliveredInTelemetry;
 
             // Process pending events before the update check
             if (_pendingCancelledData)
@@ -1325,6 +1394,60 @@ namespace ETSOverlay
                     // Only now a waiting cancel event is looked at.
                     ReviewCancelEvent(nowMs, data.SpecialEventsValues != null && data.SpecialEventsValues.OnJob, identity);
 
+                    // A loaded earlier save: the odometer (part of the save) reads less than the
+                    // distance driven, so everything past it belongs to the discarded timeline.
+                    if (!string.IsNullOrWhiteSpace(CurrentLastJobId) && !_awaitingTelemetryJob && !_forceProfileUnloaded)
+                    {
+                        EnsureLedgerForCurrentRecord();
+                        var ledgerReading = _kmLedger.Observe(odometerNow, TruckKeyOf(data), out double removedKm);
+                        if (ledgerReading == LedgerReading.RolledBack) ApplyRollback(odometerNow, removedKm);
+                        else if (ledgerReading == LedgerReading.Rebased)
+                        {
+                            LogDeliveryDiag("odometer", "another truck: the distance so far is kept as it is");
+                            SaveJobState();
+                        }
+                    }
+                    if (discontinuity == "game-time-went-back" && _cargoWasLoaded && !string.IsNullOrWhiteSpace(CurrentLastJobId) && !_deliveryRolledBack)
+                    {
+                        _deliveryRolledBack = true;
+                        LogDeliveryDiag("rollback", "game time went back: an earlier save was loaded during the delivery");
+                        SaveJobState();
+                    }
+
+                    // Paused / resumed order (JobEventTracker, read before this dispatch).
+                    bool isOnJobNow = data.SpecialEventsValues != null && data.SpecialEventsValues.OnJob;
+                    if (_pendingOrderPaused)
+                    {
+                        _pendingOrderPaused = false;
+                        if (!string.IsNullOrWhiteSpace(CurrentLastJobId))
+                        {
+                            EnsureLedgerForCurrentRecord();
+                            _orderPaused = true;
+                            _odo.Break(); _lastTickOdometer = -1;
+                            LogDeliveryDiag("paused", "order paused in the game; progress kept");
+                            SaveJobState();
+                        }
+                    }
+                    if (_orderPaused && (_pendingOrderResumed || (isOnJobNow && !_jobEvents.IsPaused)))
+                    {
+                        _orderPaused = false;
+                        LogDeliveryDiag("resumed", "paused order is active again; progress continues");
+                        SaveJobState();
+                    }
+                    else if (_orderPaused && fingerprint.IsComplete
+                        && _jobStates.TryGetValue(GetJobStateKey(CurrentLastJobId), out var pausedRecord)
+                        && pausedRecord.Fingerprint != null && !pausedRecord.Fingerprint.Matches(fingerprint))
+                    {
+                        // Another order was taken while this one is paused: the paused one keeps
+                        // its record (it can be resumed later) and the new one is tracked.
+                        _orderPaused = false;
+                        LogDeliveryDiag("paused", "another order is shown; the paused order keeps its record");
+                        pausedRecord.OrderPaused = true;
+                        SaveIndividualJobFile(_currentGame, CurrentLastJobId, pausedRecord);
+                    }
+                    _pendingOrderResumed = false;
+                    bool orderPausedNow = _orderPaused && !isOnJobNow;
+
                     // --- ЛОГИКА ФАНТОМНЫХ ДАННЫХ (GHOST DATA) ---
                     if (_triggerGhostSnapshot)
                     {
@@ -1376,6 +1499,8 @@ namespace ETSOverlay
                     }
 
                     if (_jobCancelledOrDeliveredFlag || !_hasEnteredCabin) hasJobInfo = false;
+                    // A paused order: its data stays in telemetry, but nothing is driven for it.
+                    if (orderPausedNow) hasJobInfo = false;
 
                     // Если заказ ранее был принудительно отменён нами из-за багнутого кэша SDK
                     if (IsCancelledIdentity(resolvedJobId, telemetryJobId, fingerprintKey))
@@ -1544,7 +1669,16 @@ namespace ETSOverlay
                         _telHasJobInfo = false;
                         _telHasActiveJob = false;
 
-                        if (isDelivering || (RouteText != (uiLanguage == "uk" ? "НЕ ВИЗНАЧЕНО" : "NOT DEFINED") && RouteText != (uiLanguage == "uk" ? "ВІЛЬНА ЇЗДА" : "FREE ROAM")))
+                        if (orderPausedNow)
+                        {
+                            if (isDelivering)
+                            {
+                                isDelivering = false;
+                                SaveJobState();
+                            }
+                            ShowPausedOrderUI();
+                        }
+                        else if (isDelivering || (RouteText != (uiLanguage == "uk" ? "НЕ ВИЗНАЧЕНО" : "NOT DEFINED") && RouteText != (uiLanguage == "uk" ? "ВІЛЬНА ЇЗДА" : "FREE ROAM")))
                         {
                             isDelivering = false;
                             
@@ -1666,7 +1800,10 @@ namespace ETSOverlay
                                 {
                                     _cargoWasLoaded = true;
                                     _lastTickOdometer = currentOdo;
-                                    
+                                    EnsureLedgerForCurrentRecord();
+                                    if (_kmLedger.Spans.Count == 0 && _kmLedger.CarriedKm <= 0 && currentOdo > 0)
+                                        _kmLedger.LoadOdometerKm = currentOdo;
+
                                     // РАСШИРЕННЫЙ ЛОГ ДЛЯ ДИАГНОСТИКИ
                                     string trailerLog = data.TrailerValues != null 
                                         ? string.Join(", ", data.TrailerValues.Select(t => $"[Attached:{t.Attached}, Name:{t.Name}, ID:{t.Id}, Body:{t.BodyType}]"))
@@ -1760,15 +1897,21 @@ namespace ETSOverlay
                                 // Считаем пройденный путь дельтами (только пока едем с грузом!).
                                 // The first reading after any break is only a new base; implausible
                                 // steps (jumps, teleports) add nothing.
-                                double addedKm = _odo.Sample(currentOdo, Math.Abs(rawSpeed) * 3.6, nowMs, counting: true);
+                                // While a drop of the odometer (loaded save) is being confirmed, nothing counts.
+                                EnsureLedgerForCurrentRecord();
+                                double addedKm = _kmLedger.RollbackPending
+                                    ? 0
+                                    : _odo.Sample(currentOdo, Math.Abs(rawSpeed) * 3.6, nowMs, counting: true);
+                                if (_kmLedger.RollbackPending) _odo.Break();
                                 if (addedKm > 0)
                                 {
-                                    _jobDrivenKm += addedKm;
+                                    _kmLedger.Add(currentOdo - addedKm, currentOdo, TruckKeyOf(data));
+                                    _jobDrivenKm = _kmLedger.TotalKm;
                                     SaveJobState();
                                 }
                                 else if (_odo.LastResult == OdometerDeltaResult.Implausible || _odo.LastResult == OdometerDeltaResult.Gap)
                                 {
-                                    LogDeliveryDiag("odometer", $"step ignored ({_odo.LastResult})");
+                                    LogDeliveryDiag("odometer", $"step ignored ({_odo.LastResult}: {_odo.LastDetail})");
                                 }
                                 _lastTickOdometer = currentOdo;
 
@@ -1923,6 +2066,13 @@ namespace ETSOverlay
             isEtsRunning = Process.GetProcessesByName("eurotrucks2").Any();
             isAtsRunning = Process.GetProcessesByName("amtrucks").Any();
             _isTbRunning = Process.GetProcessesByName("TB Client").Any();
+            if (DevTelemetryReplay.IsActive)
+            {
+                // Replay: the script is the game; TrucksBook is not part of it.
+                isEtsRunning = DevTelemetryReplay.GameRunning;
+                isAtsRunning = false;
+                _isTbRunning = false;
+            }
             bool isGameRunning = isEtsRunning || isAtsRunning;
             // Only the processes decide: pause, menu, profile loading or lost telemetry are not "closed".
             EvaluateTrayAutomation(isGameRunning);
@@ -1957,7 +2107,7 @@ namespace ETSOverlay
                 isGameOnline = false;
             }
 
-            if (isGameRunning && (DateTime.Now - lastTelemetryUpdate).TotalSeconds > 5)
+            if (isGameRunning && !DevTelemetryReplay.IsActive && (DateTime.Now - lastTelemetryUpdate).TotalSeconds > 5)
             {
                 try
                 {
@@ -2540,6 +2690,7 @@ namespace ETSOverlay
             else if (_isRecordingBroken && _telHasJobInfo) UpdateStatusUI(LocalizeStatus("TB_ERROR_CHECK"), Brushes.Red, false);
             else if (isProfileLoaded && _hasEnteredCabin && (_deliveredIndicatorUntil > DateTime.Now || _deliveredFromLogUntil > DateTime.Now) && isPaused && !_telHasActiveJob) UpdateStatusUI(LocalizeStatus("DELIVERED"), new SolidColorBrush(Color.FromRgb(82, 193, 79)), false);
             else if (_telHasActiveJob && !_tbHasActiveJob && _tbSaysNoJob) UpdateStatusUI(LocalizeStatus("KM_NOT_REC"), Brushes.Red, false);
+            else if (_orderPaused && !isDelivering && !string.IsNullOrWhiteSpace(CurrentLastJobId)) UpdateStatusUI(LocalizeStatus("ORDER_PAUSED"), Brushes.Orange, false);
             else if (!isDelivering) UpdateStatusUI(LocalizeStatus("FREE_ROAM"), Brushes.White, false);
             else if (isDelivering && !_telHasActiveJob)
             {
@@ -2612,6 +2763,10 @@ namespace ETSOverlay
         private void ResetDeliverySessionTracking()
         {
             _sessionJobConfirmed = false;
+            // Job flags of the next session start from a new base.
+            _jobEvents.Reset();
+            _pendingOrderPaused = false;
+            _pendingOrderResumed = false;
             // An event from the session that just ended cannot be attributed any more.
             _cancelReview.NoteBreak(Environment.TickCount64);
             if (_cancelReview.IsOpen)
@@ -2649,6 +2804,7 @@ namespace ETSOverlay
         {
             _awaitingTelemetryJob = true;
             ResetDeliverySessionTracking();
+            _kmLedgerRecordId = "";
             jobDrivenDistance = 0;
             maxSpeedKmh = 0;
             isRace = false;
@@ -2709,6 +2865,10 @@ namespace ETSOverlay
                 state.TrailerWasAttachedBeforeLoading = false;
                 state.LastNavDistWithTrailer = 0f;
                 state.HasLocationWarning = false;
+                state.HadRollback = false;
+                state.OrderPaused = false;
+                state.Odometer = new OdometerLedger();
+                if (CurrentLastJobId == jobId) BindLedger(jobId, state);
                 state.TripData = new TripState();
                 WriteLog($"New job — all state reset for: {jobId}");
                 // Сбрасываем переменные сразу и сохраняем на диск
@@ -2740,6 +2900,11 @@ namespace ETSOverlay
             }
 
             _jobDrivenKm = state.DrivenKm;
+            if (CurrentLastJobId == jobId)
+            {
+                BindLedger(jobId, state);
+                _jobDrivenKm = _kmLedger.TotalKm;
+            }
             // The saved total is held until the GPS is trustworthy again; the first odometer
             // reading after the restore is only a new base.
             _routeTotal.Restore(state.PlannedKm, state.LastTotalKm, state.LastNavRemainingKm);
@@ -2811,7 +2976,8 @@ namespace ETSOverlay
 
 
 
-        private void SaveJobState()
+        /// <param name="cargoReset">An earlier save from before the cargo was taken was loaded: the record goes back to "to pickup".</param>
+        private void SaveJobState(bool cargoReset = false)
         {
             if (_awaitingTelemetryJob) return;
 
@@ -2829,7 +2995,7 @@ namespace ETSOverlay
 
             // Empty runtime values (menu, reconnect, a half-restored session) never replace the
             // last usable snapshot of a delivery that already has cargo.
-            if (oldState != null && oldState.CargoWasLoaded && !_cargoWasLoaded)
+            if (oldState != null && oldState.CargoWasLoaded && !_cargoWasLoaded && !cargoReset)
             {
                 SaveState();
                 return;
@@ -2837,7 +3003,10 @@ namespace ETSOverlay
 
             _deliveryTimer.Flush();
 
-            double drivenKm = _cargoWasLoaded ? _jobDrivenKm : 0;
+            // With the ledger of this record loaded, the ledger is the distance: it goes down when
+            // an earlier save is loaded. Without it the stored distance only grows.
+            bool ledgerBound = LedgerBoundToCurrentRecord;
+            double drivenKm = _cargoWasLoaded ? (ledgerBound ? _kmLedger.TotalKm : _jobDrivenKm) : 0;
             var jobState = new JobState
             {
                 SchemaVersion = JobState.CurrentSchema,
@@ -2855,13 +3024,16 @@ namespace ETSOverlay
                 IsRace = _cargoWasLoaded && isRace,
                 CargoWasLoaded = _cargoWasLoaded,
                 TrailerWasAttachedBeforeLoading = _trailerWasAttachedBeforeLoading,
-                LastNavDistWithTrailer = _lastNavDistWithTrailer
+                LastNavDistWithTrailer = _lastNavDistWithTrailer,
+                Odometer = ledgerBound ? _kmLedger.Copy() : oldState?.Odometer,
+                OrderPaused = ledgerBound ? _orderPaused : oldState?.OrderPaused ?? false,
+                HadRollback = ledgerBound ? _deliveryRolledBack : oldState?.HadRollback ?? false
             };
 
             if (oldState != null)
             {
-                // The distance of one delivery only grows.
-                if (oldState.DrivenKm > jobState.DrivenKm)
+                // Without the ledger the distance of one delivery only grows.
+                if (!ledgerBound && oldState.DrivenKm > jobState.DrivenKm)
                 {
                     jobState.DrivenKm = oldState.DrivenKm;
                     jobState.DrivenDistance = (float)DeliveryUnits.KmToDisplay(oldState.DrivenKm, UseMiles);
@@ -3006,9 +3178,102 @@ namespace ETSOverlay
             return true;
         }
 
+        // ==================== PAUSED ORDER, ROLLBACK, ODOMETER LEDGER ====================
+
+        private static string TruckKeyOf(SCSTelemetry data)
+        {
+            string id = data.TruckValues?.ConstantsValues?.Id ?? "";
+            if (string.IsNullOrWhiteSpace(id)) return "";
+            return id + "|" + (data.TruckValues?.ConstantsValues?.LicensePlate ?? "");
+        }
+
+        /// <summary>Makes the ledger, pause and rollback marks those of the tracked record.</summary>
+        private void EnsureLedgerForCurrentRecord()
+        {
+            string id = CurrentLastJobId ?? "";
+            if (_kmLedgerRecordId == id) return;
+            JobState? state = null;
+            if (id.Length > 0) _jobStates.TryGetValue(GetJobStateKey(id), out state);
+            BindLedger(id, state);
+        }
+
+        private void BindLedger(string recordId, JobState? state)
+        {
+            _kmLedgerRecordId = recordId ?? "";
+            if (state == null)
+            {
+                _kmLedger = new OdometerLedger();
+                _orderPaused = false;
+                _deliveryRolledBack = false;
+                return;
+            }
+            state.Normalize(UseMiles);
+            _kmLedger = state.Odometer?.Copy()
+                ?? (state.DrivenKm > 0 ? OdometerLedger.FromLegacy(state.DrivenKm) : new OdometerLedger());
+            _orderPaused = state.OrderPaused;
+            _deliveryRolledBack = state.HadRollback;
+        }
+
+        /// <summary>The ledger is the distance of the tracked record (not of another one).</summary>
+        private bool LedgerBoundToCurrentRecord =>
+            !string.IsNullOrWhiteSpace(CurrentLastJobId) && _kmLedgerRecordId == CurrentLastJobId;
+
+        /// <summary>
+        /// An earlier save was loaded: the distance is what it was at the save. If the save is from
+        /// before the cargo was taken, the delivery goes back to "to pickup".
+        /// </summary>
+        private void ApplyRollback(double odometerKm, double removedKm)
+        {
+            _deliveryRolledBack = true;
+            _odo.Break();
+            _lastTickOdometer = -1;
+            _routeTotal.NotifyDiscontinuity();
+            bool beforePickup = _kmLedger.IsBeforePickup(odometerKm);
+            _jobDrivenKm = _kmLedger.TotalKm;
+            LogDeliveryDiag("rollback", $"earlier save loaded: odometer {odometerKm:0.00} km, {removedKm:0.00} km removed, delivery now {_jobDrivenKm:0.00} km" + (beforePickup ? "; the save is from before the cargo was taken" : ""));
+
+            if (beforePickup)
+            {
+                _kmLedger = new OdometerLedger();
+                _jobDrivenKm = 0;
+                _cargoWasLoaded = false;
+                _cargoLoadedTicks = 0;
+                _tripTrackingActive = false;
+                _tripMaxSpeedKmh = 0f;
+                _tripSpeedSumKmh = 0;
+                _tripSpeedSamples = 0;
+                _tripTotalFuelConsumed = 0f;
+                _tripTruckDamage = 0f;
+                _tripTrailerDamage = 0f;
+                _tripCargoDamage = 0f;
+                _tripFinesTotal = 0;
+                lock (_tripFines) { _tripFines.Clear(); }
+                maxSpeedKmh = 0;
+                isRace = false;
+                MaxSpeedValue.Text = "0";
+                _deliveryTimer.Reset();
+                SaveJobState(cargoReset: true);
+                return;
+            }
+            SaveJobState();
+        }
+
+        private void ShowPausedOrderUI()
+        {
+            RouteText = uiLanguage == "uk" ? "ЗАМОВЛЕННЯ ПРИЗУПИНЕНО" : "ORDER SUSPENDED";
+            int drivenInt = Math.Max(0, (int)Math.Floor(jobDrivenDistance));
+            double totalKm = _routeTotal.LastTotalKm > 0 ? _routeTotal.LastTotalKm : _routeTotal.PlannedKm;
+            int totalInt = Math.Max(drivenInt, (int)Math.Floor(DeliveryUnits.KmToDisplay(totalKm, UseMiles)));
+            DistanceInfo.Text = totalInt > 0 ? $"{drivenInt} / {totalInt} {GetDistanceUnitShort()}" : $"{drivenInt} {GetDistanceUnitShort()}";
+        }
+
         /// <summary>Counters shown for the delivery being tracked. Stored records are not touched.</summary>
         private void ResetRuntimeJobCounters()
         {
+            _kmLedgerRecordId = "";
+            _kmLedger = new OdometerLedger();
+            _orderPaused = false;
+            _deliveryRolledBack = false;
             _jobDrivenKm = 0;
             maxSpeedKmh = 0;
             isRace = false;
@@ -4642,6 +4907,7 @@ namespace ETSOverlay
                 "PROFILE_MENU" => isUk ? "В меню" : "In Menu",
                 "DELIVERED" => isUk ? "ДОСТАВЛЕНО" : "DELIVERED",
                 "KM_NOT_REC" => isUk ? "КМ ВТРАЧЕНО (TB)" : "KM LOST (TB)",
+                "ORDER_PAUSED" => isUk ? "Замовлення призупинено" : "Order paused",
                 _ => key
             };
         }
@@ -4664,6 +4930,7 @@ namespace ETSOverlay
                 "Waiting for order upload..." or "Uploading..." or "Відправка..." or "Очікування відправки замовлення..." => LocalizeStatus("WAIT_TB_UPLOAD"),
                 "KM NOT REC (TB)" or "KM LOST (TB)" or "КМ ВТРАЧЕНО (TB)" or "КМ НЕ ЗАП (TB)" => LocalizeStatus("KM_NOT_REC"),
                 "DELIVERED" or "ДОСТАВЛЕНО" => LocalizeStatus("DELIVERED"),
+                "Order paused" or "Замовлення призупинено" => LocalizeStatus("ORDER_PAUSED"),
                 "Delivering..." or "Здаємо вантаж..." => uiLanguage == "uk" ? "Здаємо вантаж..." : "Delivering...",
                 _ => status
             };

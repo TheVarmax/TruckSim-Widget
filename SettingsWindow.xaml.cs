@@ -1426,15 +1426,11 @@ namespace ETSOverlay
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             var routePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
-            if (trip.HasLocationWarning)
+            if (trip.HasLocationWarning || trip.HasRollbackWarning)
             {
-                var warningBorder = new Border { CornerRadius = new CornerRadius(8), Background = Brushes.Orange, Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0) };
-                var warningText = new TextBlock { Text = "¡", Foreground = Brushes.White, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 10, Margin = new Thickness(0,-1,0,0) };
-                warningBorder.ToolTip = _isUk ? "Під час поточного рейсу віджет зафіксував перезапуск гри/віджета, і дані про місцезнаходження вантажівки відрізняються від тих, що були до перезапуску." : "During the current delivery, the widget detected a restart of the game/widget and the truck's location differs from the one before the restart.";
-                warningBorder.Child = warningText;
-                routePanel.Children.Add(warningBorder);
+                routePanel.Children.Add(CreateTripWarningBadge(string.Join(Environment.NewLine + Environment.NewLine, TripWarningTooltips(trip))));
             }
-            
+
             var routeBlock = new TextBlock
             {
                 Text = $"{_mainWindow.GetLocalizedCity(trip.Origin, trip.GameType).ToUpper()} → {_mainWindow.GetLocalizedCity(trip.Destination, trip.GameType).ToUpper()}",
@@ -1477,6 +1473,41 @@ namespace ETSOverlay
             return border;
         }
 
+        private string LocationWarningTooltip() => _isUk
+            ? "Під час поточного рейсу віджет зафіксував перезапуск гри/віджета, і дані про місцезнаходження вантажівки відрізняються від тих, що були до перезапуску."
+            : "During the current delivery, the widget detected a restart of the game/widget and the truck's location differs from the one before the restart.";
+
+        private string RollbackWarningTooltip() => _isUk
+            ? "Під час рейсу гру повернули до попереднього збереження. Кілометри після точки збереження віджет не врахував, але дані рейсу можуть бути неточними."
+            : "During the trip the game was returned to an earlier save. The widget did not count the kilometres after the save point, but the trip data may be inaccurate.";
+
+        private IEnumerable<string> TripWarningTooltips(TripRecord trip)
+        {
+            if (trip.HasLocationWarning) yield return LocationWarningTooltip();
+            if (trip.HasRollbackWarning) yield return RollbackWarningTooltip();
+        }
+
+        private static Border CreateTripWarningBadge(string tooltip)
+        {
+            var warningText = new TextBlock { Text = "¡", Foreground = Brushes.White, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 10, Margin = new Thickness(0, -1, 0, 0) };
+            return new Border { CornerRadius = new CornerRadius(8), Background = Brushes.Orange, Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0), ToolTip = tooltip, Child = warningText };
+        }
+
+        private static StackPanel CreateTripWarningLine(string message, string tooltip)
+        {
+            var warningPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+            warningPanel.Children.Add(CreateTripWarningBadge(tooltip));
+            warningPanel.Children.Add(new TextBlock
+            {
+                Text = message,
+                Foreground = Brushes.Orange,
+                FontWeight = FontWeights.Medium,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextWrapping = TextWrapping.Wrap
+            });
+            return warningPanel;
+        }
+
         private void ShowTripDetail(TripRecord trip)
         {
             if (trip == null) return;
@@ -1496,22 +1527,15 @@ namespace ETSOverlay
             
             if (trip.HasLocationWarning)
             {
-                var warningPanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
-                var warningBorder = new Border { CornerRadius = new CornerRadius(8), Background = Brushes.Orange, Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0) };
-                var warningText = new TextBlock { Text = "¡", Foreground = Brushes.White, FontWeight = FontWeights.Bold, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center, FontSize = 10, Margin = new Thickness(0,-1,0,0) };
-                warningBorder.ToolTip = _isUk ? "Під час поточного рейсу віджет зафіксував перезапуск гри/віджета, і дані про місцезнаходження вантажівки відрізняються від тих, що були до перезапуску." : "During the current delivery, the widget detected a restart of the game/widget and the truck's location differs from the one before the restart.";
-                warningBorder.Child = warningText;
-                
-                var warningMessage = new TextBlock
-                {
-                    Text = _isUk ? "Дані рейсу можуть бути неточними через перезапуск" : "Trip data might be inaccurate due to a restart",
-                    Foreground = Brushes.Orange,
-                    FontWeight = FontWeights.Medium,
-                    VerticalAlignment = VerticalAlignment.Center
-                };
-                warningPanel.Children.Add(warningBorder);
-                warningPanel.Children.Add(warningMessage);
-                LogbookDetailPanel.Children.Add(warningPanel);
+                LogbookDetailPanel.Children.Add(CreateTripWarningLine(
+                    _isUk ? "Дані рейсу можуть бути неточними через перезапуск" : "Trip data might be inaccurate due to a restart",
+                    LocationWarningTooltip()));
+            }
+            if (trip.HasRollbackWarning)
+            {
+                LogbookDetailPanel.Children.Add(CreateTripWarningLine(
+                    _isUk ? "Під час рейсу було завантажено попереднє збереження (відкат)" : "An earlier save was loaded during this trip (rollback)",
+                    RollbackWarningTooltip()));
             }
             
             // Free tier details

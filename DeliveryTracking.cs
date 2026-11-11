@@ -235,9 +235,23 @@ namespace ETSOverlay
         /// <summary>Distance that is always accepted between two readings (rounding of the odometer), km.</summary>
         public const double MinAllowanceKm = 0.05;
 
+        /// <summary>
+        /// Longest time since the odometer last changed that the allowance is computed for. The
+        /// game updates the odometer less often than telemetry is read, so a step covers every
+        /// reading since the last change; but a long standstill must not allow a big jump.
+        /// </summary>
+        public const long MaxAllowanceSpanMs = 10000;
+
         private double _lastOdometerKm = -1;
+        /// <summary>When the odometer last changed (the allowance runs from here).</summary>
         private long _lastSampleMs;
+        /// <summary>When the last reading came (gaps are measured from here).</summary>
+        private long _lastReadingMs;
+        /// <summary>Highest speed seen since the odometer last changed.</summary>
         private double _lastSpeedKmh;
+
+        /// <summary>Details of the last ignored step, for diagnostics.</summary>
+        public string LastDetail { get; private set; } = "";
 
         public bool HasBase => _lastOdometerKm >= 0;
         public OdometerDeltaResult LastResult { get; private set; } = OdometerDeltaResult.NoBase;
@@ -272,18 +286,39 @@ namespace ETSOverlay
             }
 
             double delta = odometerKm - _lastOdometerKm;
-            long elapsedMs = nowMs - _lastSampleMs;
-            double previousSpeed = _lastSpeedKmh;
+            long sinceChangeMs = nowMs - _lastSampleMs;
+            long sinceReadingMs = nowMs - _lastReadingMs;
+            double topSpeed = Math.Max(speedKmh, _lastSpeedKmh);
+
+            if (delta == 0 && !teleported && sinceReadingMs >= 0 && sinceReadingMs <= MaxSampleGapMs)
+            {
+                // Same reading again: the step that follows covers this time too.
+                _lastReadingMs = nowMs;
+                _lastSpeedKmh = topSpeed;
+                LastResult = OdometerDeltaResult.NotMoved;
+                return 0;
+            }
+
             SetBase(odometerKm, speedKmh, nowMs);
 
             if (teleported) { LastResult = OdometerDeltaResult.Teleport; return 0; }
             if (delta < 0) { LastResult = OdometerDeltaResult.WentBack; return 0; }
             if (delta == 0) { LastResult = OdometerDeltaResult.NotMoved; return 0; }
-            if (elapsedMs < 0 || elapsedMs > MaxSampleGapMs) { LastResult = OdometerDeltaResult.Gap; return 0; }
+            if (sinceReadingMs < 0 || sinceReadingMs > MaxSampleGapMs || sinceChangeMs < 0)
+            {
+                LastDetail = $"no reading for {sinceReadingMs} ms";
+                LastResult = OdometerDeltaResult.Gap;
+                return 0;
+            }
 
-            double hours = Math.Max(elapsedMs, 1) / 3_600_000.0;
-            double allowed = (Math.Max(speedKmh, previousSpeed) + SpeedMarginKmh) * hours * 1.5 + MinAllowanceKm;
-            if (delta > allowed) { LastResult = OdometerDeltaResult.Implausible; return 0; }
+            double hours = Math.Max(Math.Min(sinceChangeMs, MaxAllowanceSpanMs), 1) / 3_600_000.0;
+            double allowed = (topSpeed + SpeedMarginKmh) * hours * 1.5 + MinAllowanceKm;
+            if (delta > allowed)
+            {
+                LastDetail = $"step {delta * 1000:0} m in {sinceChangeMs} ms at up to {topSpeed:0} km/h (allowed {allowed * 1000:0} m)";
+                LastResult = OdometerDeltaResult.Implausible;
+                return 0;
+            }
 
             LastResult = OdometerDeltaResult.Counted;
             return delta;
@@ -294,6 +329,7 @@ namespace ETSOverlay
             _lastOdometerKm = odometerKm;
             _lastSpeedKmh = speedKmh;
             _lastSampleMs = nowMs;
+            _lastReadingMs = nowMs;
         }
     }
 
@@ -572,6 +608,274 @@ namespace ETSOverlay
 
             LastReason = "cannot tell which order the game shows";
             return CancelDecision.Pending;
+        }
+    }
+
+    /// <summary>Job flags of one telemetry reading (SpecialEventsValues of the telemetry plugin).</summary>
+    internal readonly record struct JobFlags(bool SdkActive, bool OnJob, bool JobFinished, bool JobDelivered, bool JobCancelled);
+
+    /// <summary>What happened to the order in the game between two readings.</summary>
+    internal enum JobEvent
+    {
+        None,
+        /// <summary>The game handed the cargo in (job.delivered).</summary>
+        Delivered,
+        /// <summary>The order was paused in the game: the job ended without delivery or cancellation.</summary>
+        Paused,
+        /// <summary>The paused order is active again (or the game shows a job again).</summary>
+        Resumed
+    }
+
+    /// <summary>
+    /// Reads the order state from the job flags of the telemetry plugin.
+    /// - JobDelivered is a short pulse sent when the game hands the cargo in. Only its rising edge
+    ///   is a delivery.
+    /// - JobFinished is a state: it turns on whenever the job ends (delivered, cancelled or paused)
+    ///   and may stay on after the next job starts. On its own it never means "delivered".
+    /// - A pause of the order: JobFinished turns on, OnJob turns off, and neither JobDelivered nor
+    ///   JobCancelled follows within <see cref="PauseConfirmMs"/>.
+    /// The first reading of a telemetry session is only the base: flags left over from before the
+    /// connection are never events, and nothing is read as an event in the first
+    /// <see cref="ConnectQuietMs"/> after connecting.
+    /// </summary>
+    internal sealed class JobEventTracker
+    {
+        public const long PauseConfirmMs = 2000;
+        public const long ConnectQuietMs = 3000;
+        /// <summary>A delivery or cancellation this recent explains a JobFinished edge.</summary>
+        public const long EndEventWindowMs = 10000;
+
+        private bool _hasBase;
+        private JobFlags _previous;
+        private long _baseMs;
+        private long _lastReadingMs;
+        private long _pausePendingSinceMs = -1;
+        private long _lastEndEventMs = long.MinValue;
+
+        /// <summary>The order is paused in the game.</summary>
+        public bool IsPaused { get; private set; }
+        public bool PausePending => _pausePendingSinceMs >= 0;
+
+        /// <summary>A new telemetry session: the next reading is a new base.</summary>
+        public void Reset()
+        {
+            _hasBase = false;
+            _pausePendingSinceMs = -1;
+            IsPaused = false;
+            _lastEndEventMs = long.MinValue;
+        }
+
+        public JobEvent Observe(JobFlags flags, long nowMs)
+        {
+            if (!flags.SdkActive)
+            {
+                // Game closed or telemetry stopped: a later session starts from a new base. A
+                // known pause is kept in the delivery record, not here.
+                _hasBase = false;
+                _pausePendingSinceMs = -1;
+                return JobEvent.None;
+            }
+
+            if (!_hasBase || nowMs - _lastReadingMs > OdometerAccumulator.MaxSampleGapMs || nowMs < _lastReadingMs)
+            {
+                _hasBase = true;
+                _previous = flags;
+                _baseMs = nowMs;
+                _lastReadingMs = nowMs;
+                _pausePendingSinceMs = -1;
+                return JobEvent.None;
+            }
+
+            _lastReadingMs = nowMs;
+
+            var previous = _previous;
+            _previous = flags;
+            bool quiet = nowMs - _baseMs < ConnectQuietMs;
+
+            if (flags.JobCancelled && !previous.JobCancelled && !quiet)
+            {
+                _lastEndEventMs = nowMs;
+                _pausePendingSinceMs = -1;
+            }
+
+            if (flags.JobDelivered && !previous.JobDelivered && !quiet)
+            {
+                _lastEndEventMs = nowMs;
+                _pausePendingSinceMs = -1;
+                IsPaused = false;
+                return JobEvent.Delivered;
+            }
+
+            bool recentEndEvent = _lastEndEventMs != long.MinValue && nowMs - _lastEndEventMs < EndEventWindowMs;
+            if (flags.JobFinished && !previous.JobFinished && !flags.JobDelivered && !flags.JobCancelled
+                && !flags.OnJob && !quiet && !recentEndEvent && !IsPaused)
+            {
+                _pausePendingSinceMs = nowMs;
+            }
+
+            if (_pausePendingSinceMs >= 0)
+            {
+                if (!flags.JobFinished || flags.OnJob || flags.JobDelivered || flags.JobCancelled)
+                {
+                    _pausePendingSinceMs = -1;
+                }
+                else if (nowMs - _pausePendingSinceMs >= PauseConfirmMs)
+                {
+                    _pausePendingSinceMs = -1;
+                    IsPaused = true;
+                    return JobEvent.Paused;
+                }
+            }
+
+            if (IsPaused && (flags.OnJob || !flags.JobFinished))
+            {
+                IsPaused = false;
+                return JobEvent.Resumed;
+            }
+
+            return JobEvent.None;
+        }
+    }
+
+    /// <summary>One stretch of the truck odometer driven with the cargo, km.</summary>
+    internal sealed class OdometerSpan
+    {
+        public double Start { get; set; }
+        public double End { get; set; }
+    }
+
+    /// <summary>Result of one odometer reading for <see cref="OdometerLedger"/>.</summary>
+    internal enum LedgerReading
+    {
+        None,
+        /// <summary>The odometer is below the driven stretches; waiting for it to be confirmed.</summary>
+        RollbackPending,
+        /// <summary>An earlier save was loaded: the stretches after the loaded odometer were removed.</summary>
+        RolledBack,
+        /// <summary>Another truck: the distance so far is kept, but cannot be rolled back any more.</summary>
+        Rebased
+    }
+
+    /// <summary>
+    /// The distance of a delivery as stretches of the truck odometer. The odometer is part of the
+    /// game save, so after an earlier save is loaded it reads less than before, and every stretch
+    /// past that reading belongs to the discarded timeline: it is removed and the distance goes
+    /// back to what it was at the save. Distance whose odometer stretches are unknown (records of
+    /// older versions, another truck) is carried as a fixed amount.
+    /// </summary>
+    internal sealed class OdometerLedger
+    {
+        /// <summary>Drop below the driven stretches that counts as a loaded earlier save, km.</summary>
+        public const double RollbackThresholdKm = 0.05;
+        /// <summary>Readings in a row below the stretches before the rollback is applied.</summary>
+        public const int RollbackConfirmReadings = 3;
+        /// <summary>Stretches kept; older ones are merged.</summary>
+        public const int MaxSpans = 400;
+
+        private int _belowReadings;
+
+        /// <summary>Distance without known odometer stretches, km.</summary>
+        public double CarriedKm { get; set; }
+        public List<OdometerSpan> Spans { get; set; } = new();
+        /// <summary>Odometer when the cargo was taken (-1: unknown).</summary>
+        public double LoadOdometerKm { get; set; } = -1;
+        /// <summary>Truck the stretches were driven with.</summary>
+        public string TruckKey { get; set; } = "";
+
+        public double TotalKm
+        {
+            get
+            {
+                double sum = CarriedKm;
+                foreach (var span in Spans) sum += Math.Max(0, span.End - span.Start);
+                return sum;
+            }
+        }
+
+        /// <summary>Highest odometer reading driven with the cargo (-1: none).</summary>
+        public double EndOdometerKm => Spans.Count == 0 ? -1 : Spans[Spans.Count - 1].End;
+
+        public bool RollbackPending => _belowReadings > 0;
+
+        public static OdometerLedger FromLegacy(double drivenKm) =>
+            new() { CarriedKm = double.IsNaN(drivenKm) || drivenKm < 0 ? 0 : drivenKm };
+
+        public OdometerLedger Copy() => new()
+        {
+            CarriedKm = CarriedKm,
+            Spans = Spans.Select(s => new OdometerSpan { Start = s.Start, End = s.End }).ToList(),
+            LoadOdometerKm = LoadOdometerKm,
+            TruckKey = TruckKey
+        };
+
+        /// <summary>A driven step with the cargo, from one odometer reading to the next.</summary>
+        public void Add(double fromKm, double toKm, string truckKey)
+        {
+            if (!(toKm > fromKm) || fromKm <= 0) return;
+            if (string.IsNullOrEmpty(TruckKey)) TruckKey = truckKey ?? "";
+            if (LoadOdometerKm < 0 && CarriedKm <= 0 && Spans.Count == 0) LoadOdometerKm = fromKm;
+            var last = Spans.Count > 0 ? Spans[Spans.Count - 1] : null;
+            if (last != null && Math.Abs(last.End - fromKm) < 0.0005) last.End = toKm;
+            else Spans.Add(new OdometerSpan { Start = fromKm, End = toKm });
+            while (Spans.Count > MaxSpans)
+            {
+                // The oldest stretch becomes fixed distance: a rollback that far back is not expected.
+                CarriedKm += Math.Max(0, Spans[0].End - Spans[0].Start);
+                Spans.RemoveAt(0);
+            }
+        }
+
+        /// <summary>
+        /// One odometer reading of the truck while this delivery is tracked.
+        /// </summary>
+        public LedgerReading Observe(double odometerKm, string truckKey, out double removedKm)
+        {
+            removedKm = 0;
+            if (odometerKm <= 0 || double.IsNaN(odometerKm)) { _belowReadings = 0; return LedgerReading.None; }
+
+            if (!string.IsNullOrEmpty(truckKey) && !string.IsNullOrEmpty(TruckKey) && truckKey != TruckKey)
+            {
+                Rebase(truckKey);
+                return LedgerReading.Rebased;
+            }
+
+            if (Spans.Count == 0 || odometerKm >= EndOdometerKm - RollbackThresholdKm)
+            {
+                _belowReadings = 0;
+                return LedgerReading.None;
+            }
+
+            if (++_belowReadings < RollbackConfirmReadings) return LedgerReading.RollbackPending;
+            _belowReadings = 0;
+            removedKm = TruncateAt(odometerKm);
+            return LedgerReading.RolledBack;
+        }
+
+        /// <summary>True when the odometer is at or before the point where the cargo was taken.</summary>
+        public bool IsBeforePickup(double odometerKm) =>
+            CarriedKm <= 0 && Spans.Count == 0 && LoadOdometerKm > 0 && odometerKm <= LoadOdometerKm + RollbackThresholdKm;
+
+        /// <summary>Removes every driven stretch past the odometer reading; returns the removed km.</summary>
+        public double TruncateAt(double odometerKm)
+        {
+            double before = TotalKm;
+            for (int i = Spans.Count - 1; i >= 0; i--)
+            {
+                var span = Spans[i];
+                if (span.Start >= odometerKm) Spans.RemoveAt(i);
+                else if (span.End > odometerKm) span.End = odometerKm;
+            }
+            return Math.Max(0, before - TotalKm);
+        }
+
+        /// <summary>Keeps the distance as carried km and starts new stretches (another truck).</summary>
+        public void Rebase(string truckKey)
+        {
+            CarriedKm = TotalKm;
+            Spans.Clear();
+            LoadOdometerKm = -1;
+            TruckKey = truckKey ?? "";
+            _belowReadings = 0;
         }
     }
 
