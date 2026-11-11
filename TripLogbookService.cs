@@ -8,6 +8,17 @@ using System.Text.Json;
 
 namespace ETSOverlay
 {
+    /// <summary>What happened to a trip handed to the logbook.</summary>
+    public enum TripSaveResult
+    {
+        /// <summary>The trip was written and is on disk.</summary>
+        Saved,
+        /// <summary>The trip is already in the logbook; nothing was added.</summary>
+        Duplicate,
+        /// <summary>The trip could not be written. The caller keeps it and tries again.</summary>
+        Failed
+    }
+
     public sealed class TripLogbookService
     {
         private static readonly Lazy<TripLogbookService> _instance = new(() => new TripLogbookService());
@@ -26,11 +37,17 @@ namespace ETSOverlay
         };
 
         private TripLogbookService()
-        {
-            _logbookDir = Path.Combine(
+            : this(Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "TruckSimWidget",
-                "logbook");
+                "logbook"))
+        {
+        }
+
+        /// <summary>A logbook in the given folder (tests use a temporary one).</summary>
+        internal TripLogbookService(string logbookDir)
+        {
+            _logbookDir = logbookDir;
 
             try
             {
@@ -42,10 +59,25 @@ namespace ETSOverlay
             }
         }
 
-        public void SaveTrip(TripRecord trip)
+        /// <summary>
+        /// Writes the trip and reports the outcome. "Saved" is returned only after the file is in
+        /// place; any error gives "Failed" so the caller can keep its data and repeat the call.
+        /// Calling it again for a stored trip returns "Duplicate" and adds nothing.
+        /// </summary>
+        public TripSaveResult SaveTrip(TripRecord trip)
         {
             try
             {
+                Directory.CreateDirectory(_logbookDir);
+                var filePath = Path.Combine(_logbookDir, $"{trip.Id}.json");
+
+                // The same trip handed in again (repeated event, retry after a restart).
+                if (File.Exists(filePath))
+                {
+                    Debug.WriteLine("[TripLogbook] Trip is already stored, skipping save.");
+                    return TripSaveResult.Duplicate;
+                }
+
                 // Prevent duplicate saves (same trip within 2 minutes)
                 var recentTrips = LoadTrips(5);
                 if (recentTrips.Any(t => 
@@ -55,18 +87,19 @@ namespace ETSOverlay
                     Math.Abs((trip.EndTimeUtc - t.EndTimeUtc).TotalMinutes) < 2))
                 {
                     Debug.WriteLine("[TripLogbook] Duplicate trip detected, skipping save.");
-                    return;
+                    return TripSaveResult.Duplicate;
                 }
 
-                var filePath = Path.Combine(_logbookDir, $"{trip.Id}.json");
                 var json = JsonSerializer.Serialize(trip, WriteOptions);
                 var tempPath = filePath + ".tmp";
                 File.WriteAllText(tempPath, json, Encoding.UTF8);
                 File.Move(tempPath, filePath, true);
+                return File.Exists(filePath) ? TripSaveResult.Saved : TripSaveResult.Failed;
             }
             catch (Exception ex)
             {
                 Debug.WriteLine($"[TripLogbook] Failed to save trip {trip.Id}: {ex.Message}");
+                return TripSaveResult.Failed;
             }
         }
 

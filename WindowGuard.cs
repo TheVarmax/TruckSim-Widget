@@ -334,6 +334,35 @@ namespace ETSOverlay
             return fix;
         }
 
+        /// <summary>
+        /// Work area (screen without the taskbar) of the monitor the window is on, in the window's
+        /// DIPs. Falls back to the primary work area.
+        /// </summary>
+        public static Rect GetWorkArea(Window window)
+        {
+            try
+            {
+                var source = PresentationSource.FromVisual(window);
+                var fromDevice = source?.CompositionTarget?.TransformFromDevice ?? Matrix.Identity;
+                var toDevice = source?.CompositionTarget?.TransformToDevice ?? Matrix.Identity;
+                double left = double.IsNaN(window.Left) ? 0 : window.Left;
+                double top = double.IsNaN(window.Top) ? 0 : window.Top;
+                var center = toDevice.Transform(new Point(left + window.ActualWidth / 2, top + Math.Min(window.ActualHeight, 200) / 2));
+                var mi = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+                if (GetMonitorInfo(MonitorFromPoint(new POINT { X = (int)center.X, Y = (int)center.Y }, MONITOR_DEFAULTTONEAREST), ref mi))
+                {
+                    return new Rect(
+                        fromDevice.Transform(new Point(mi.rcWork.Left, mi.rcWork.Top)),
+                        fromDevice.Transform(new Point(mi.rcWork.Right, mi.rcWork.Bottom)));
+                }
+            }
+            catch
+            {
+                // Fall back to the primary work area below.
+            }
+            return SystemParameters.WorkArea;
+        }
+
         /// <summary>Centers the window in the primary monitor's work area.</summary>
         public static void CenterOnPrimary(Window window)
         {

@@ -4,10 +4,10 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <RootNamespace>TruckSim_Widget</RootNamespace>
     <AssemblyName>TruckSim Widget</AssemblyName>
-    <Version>1.6.7</Version>
-    <AssemblyVersion>1.6.7.0</AssemblyVersion>
-    <FileVersion>1.6.7.0</FileVersion>
-    <InformationalVersion>1.6.7</InformationalVersion>
+    <Version>1.6.8</Version>
+    <AssemblyVersion>1.6.8.0</AssemblyVersion>
+    <FileVersion>1.6.8.0</FileVersion>
+    <InformationalVersion>1.6.8</InformationalVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>

@@ -58,6 +58,8 @@
         <Style x:Key="ModernScrollBar" TargetType="ScrollBar">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Width" Value="4"/>
+            <!-- The Windows theme otherwise widens the bar to the system scroll bar width (17). -->
+            <Setter Property="MinWidth" Value="0"/>
             <Setter Property="Margin" Value="0,2,0,2"/>
             <Setter Property="Orientation" Value="Vertical"/>
             <Setter Property="Template">
@@ -90,7 +92,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="0" CanContentScroll="{TemplateBinding CanContentScroll}" />
+                            <!-- The bar lies over the right gutter: the content keeps its width whether it scrolls or not. -->
+                            <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="0" Grid.ColumnSpan="2" CanContentScroll="{TemplateBinding CanContentScroll}" />
                             <ScrollBar x:Name="PART_VerticalScrollBar"
                                        Grid.Column="1"
                                        Opacity="1"
@@ -106,6 +109,17 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <Style x:Key="PanelFocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Border BorderBrush="#7AC5CD" BorderThickness="2" CornerRadius="8" Margin="-3" SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="TabButtonStyle" TargetType="RadioButton">
             <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
             <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/>
@@ -408,822 +422,750 @@
             </Setter>
         </Style>
 
+
+        <!-- ===== Shared layout of the settings window =====
+             Tabs use a 16 DIP column gap and 8 DIP row spacing. Controls: field 32 high, icon button 28x28, switch 48x26,
+             action button 32 high, small button 28 high. Panels: padding 14, rows 10 apart. -->
+        <Thickness x:Key="RowSpacing">0,0,0,8</Thickness>
+
+        <Style x:Key="GroupHeaderStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Margin" Value="0,6,0,6"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+        </Style>
+        <Style x:Key="FirstGroupHeaderStyle" TargetType="TextBlock" BasedOn="{StaticResource GroupHeaderStyle}">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+        </Style>
+
+        <!-- Label of a row whose control sits on the right (switch, icon button). -->
+        <Style x:Key="SettingLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MainTextBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <!-- Label above a full-width control (selector, button). -->
+        <Style x:Key="FieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource SettingLabelStyle}">
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+        <Style x:Key="HintStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
+        </Style>
+        <Style x:Key="PanelLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource MainTextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+        </Style>
+
+        <!-- Square icon button that opens a panel. -->
+        <DataTemplate x:Key="GearIcon">
+            <Path Data="M19.4,13C19.4,12.6 19.5,12.3 19.5,12C19.5,11.7 19.4,11.4 19.4,11L21.5,9.3C21.7,9.1 21.8,8.9 21.7,8.6L19.7,5.1C19.6,4.9 19.3,4.8 19,4.9L16.5,5.9C16,5.5 15.4,5.2 14.8,4.9L14.4,2.3C14.4,2 14.2,1.8 13.9,1.8L9.9,1.8C9.7,1.8 9.4,2 9.4,2.3L9,4.9C8.4,5.2 7.9,5.5 7.4,5.9L4.9,4.9C4.6,4.8 4.3,4.9 4.2,5.1L2.2,8.6C2.1,8.9 2.2,9.1 2.4,9.3L4.5,11C4.4,11.4 4.4,11.7 4.4,12C4.4,12.3 4.4,12.6 4.5,13L2.4,14.7C2.2,14.9 2.1,15.1 2.2,15.4L4.2,18.9C4.3,19.1 4.6,19.2 4.9,19.1L7.4,18.1C7.9,18.5 8.4,18.8 9,19.1L9.4,21.7C9.4,22 9.7,22.2 9.9,22.2L13.9,22.2C14.2,22.2 14.4,22 14.4,21.7L14.8,19.1C15.4,18.8 16,18.5 16.5,18.1L19,19.1C19.3,19.2 19.6,19.1 19.7,18.9L21.7,15.4C21.8,15.1 21.7,14.9 21.5,14.7L19.4,13M11.9,15.5C10,15.5 8.4,13.9 8.4,12C8.4,10.1 10,8.5 11.9,8.5C13.8,8.5 15.4,10.1 15.4,12C15.4,13.9 13.8,15.5 11.9,15.5Z" Fill="{DynamicResource MainTextBrush}" Stretch="Uniform" Width="14" Height="14"/>
+        </DataTemplate>
+        <Style x:Key="ConfigToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Width" Value="28"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="ToolTip" Value="Configure"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource PanelFocusVisual}"/>
+            <Setter Property="ContentTemplate" Value="{StaticResource GearIcon}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AppearanceFieldLabelStyle" TargetType="TextBlock" BasedOn="{StaticResource FieldLabelStyle}">
+            <Setter Property="MinHeight" Value="20"/>
+        </Style>
+        <Style x:Key="FieldConfigToggleStyle" TargetType="ToggleButton" BasedOn="{StaticResource ConfigToggleStyle}">
+            <Setter Property="Width" Value="Auto"/>
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="ContentTemplate" Value="{x:Null}"/>
+            <Setter Property="Foreground" Value="{DynamicResource MainTextBrush}"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+
+        <!-- Buttons: one shape, two heights. Tag = hover colour of coloured actions. -->
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="32"/>
+            <Setter Property="Padding" Value="12,0"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="{DynamicResource MainTextBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Tag" Value="{DynamicResource InputHoverBrush}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource PanelFocusVisual}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="6" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" RecognizesAccessKey="False"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="{Binding Tag, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SmallButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="10,0"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+        <Style x:Key="PrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource ActionButtonStyle}">
+            <Setter Property="Background" Value="#3F9843"/>
+            <Setter Property="BorderBrush" Value="#3F9843"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Tag" Value="#4CAE50"/>
+        </Style>
+
+        <!-- Small number box inside a panel. -->
+        <Style x:Key="PanelInputBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource InputBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource InputBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="Width" Value="76"/>
+        </Style>
+        <Style x:Key="PanelTextBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{DynamicResource MainTextBrush}"/>
+            <Setter Property="CaretBrush" Value="{DynamicResource MainTextBrush}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="FontSize" Value="12"/>
+        </Style>
+
+        <!-- Panel opened from an icon button. -->
+        <Style x:Key="PanelBorderStyle" TargetType="Border">
+            <Setter Property="Background" Value="{DynamicResource CardBackgroundBrush}"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource CardBorderBrush}"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Margin" Value="0,4,0,4"/>
+            <Setter Property="Padding" Value="14"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="PanelRowStyle" TargetType="Grid">
+            <Setter Property="Margin" Value="0,0,0,10"/>
+            <Setter Property="MinHeight" Value="28"/>
+        </Style>
+
+        <!-- Info icon at the end of a label (wraps with the text). -->
+        <Style x:Key="InfoIconStyle" TargetType="Border">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Margin" Value="6,0,0,-2"/>
+            <Setter Property="ToolTipService.InitialShowDelay" Value="200"/>
+        </Style>
+
     </Window.Resources>
 
-    <Border Background="{DynamicResource WindowBackgroundBrush}" CornerRadius="12" Padding="20,20,20,8" Margin="20">
+    <Border Background="{DynamicResource WindowBackgroundBrush}" CornerRadius="12" Padding="16,12,16,10" Margin="20">
         <Border.Effect>
             <DropShadowEffect Color="Black" BlurRadius="25" Opacity="{DynamicResource ShadowOpacity}" Direction="270" ShadowDepth="5"/>
         </Border.Effect>
         <Grid>
-            <StackPanel>
-                <!-- Header -->
-            <Grid Margin="0,0,0,18">
-                <TextBlock x:Name="SettingsTitle" Text="SETTINGS" Foreground="{DynamicResource MainTextBrush}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
-                <Button Click="BtnCloseSettings_Click" HorizontalAlignment="Right" Width="32" Height="32" Cursor="Hand">
-                    <Button.Template>
-                        <ControlTemplate TargetType="Button">
-                            <Border x:Name="border" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="6">
-                                <Path Data="M0,0 L10,10 M0,10 L10,0" Stroke="{DynamicResource MutedTextBrush}" StrokeThickness="2" Stretch="Uniform" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <ControlTemplate.Triggers>
-                                <Trigger Property="IsMouseOver" Value="True">
-                                    <Setter TargetName="border" Property="Background" Value="#E81123"/>
-                                </Trigger>
-                            </ControlTemplate.Triggers>
-                        </ControlTemplate>
-                    </Button.Template>
-                </Button>
-            </Grid>
+            <!-- Header, tabs, tab content (scrolls when the screen is small), common part, version. -->
+            <Grid x:Name="SettingsLayout">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
 
-            <!-- Tabs Selection -->
-            <Grid Margin="0,0,0,16">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="10" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="10" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="10" />
-                    <ColumnDefinition Width="*" />
-                </Grid.ColumnDefinitions>
-                    <RadioButton x:Name="TabGeneralBtn" Grid.Column="0" Content="General" Height="30" IsChecked="True" Checked="TabGeneralBtn_Checked" Style="{StaticResource TabButtonStyle}" />
-                    <RadioButton x:Name="TabAppearanceBtn" Grid.Column="2" Content="Appearance" Height="30" Checked="TabAppearanceBtn_Checked" Style="{StaticResource TabButtonStyle}" />
-                    <RadioButton x:Name="TabCloudBtn" Grid.Column="4" Content="Cloud" Height="30" Checked="TabCloudBtn_Checked" Style="{StaticResource TabButtonStyle}" />
-                    <RadioButton x:Name="TabLogbookBtn" Grid.Column="6" Content="Logbook" Height="30" Checked="TabLogbookBtn_Checked" Style="{StaticResource TabButtonStyle}" />
+                <!-- Header -->
+                <Grid Grid.Row="0" Margin="0,0,0,10">
+                    <TextBlock x:Name="SettingsTitle" Text="SETTINGS" Foreground="{DynamicResource MainTextBrush}" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <Button Click="BtnCloseSettings_Click" HorizontalAlignment="Right" Width="32" Height="32" Cursor="Hand" IsCancel="False" AutomationProperties.Name="Close">
+                        <Button.Template>
+                            <ControlTemplate TargetType="Button">
+                                <Border x:Name="border" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="6">
+                                    <Path Data="M0,0 L10,10 M0,10 L10,0" Stroke="{DynamicResource MutedTextBrush}" StrokeThickness="2" Stretch="Uniform" Width="10" Height="10" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="IsMouseOver" Value="True">
+                                        <Setter TargetName="border" Property="Background" Value="#E81123"/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Button.Template>
+                    </Button>
                 </Grid>
 
-            <!-- Tab: General Content -->
-            <Grid x:Name="TabGeneralContent" Margin="0,0,0,16" Visibility="Visible">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="20"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
+                <!-- Tabs -->
+                <Grid Grid.Row="1" Margin="0,0,0,10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="8"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <RadioButton x:Name="TabGeneralBtn" Grid.Column="0" Content="General" Height="32" IsChecked="True" Checked="TabGeneralBtn_Checked" Style="{StaticResource TabButtonStyle}"/>
+                    <RadioButton x:Name="TabAppearanceBtn" Grid.Column="2" Content="Appearance" Height="32" Checked="TabAppearanceBtn_Checked" Style="{StaticResource TabButtonStyle}"/>
+                    <RadioButton x:Name="TabCloudBtn" Grid.Column="4" Content="Cloud" Height="32" Checked="TabCloudBtn_Checked" Style="{StaticResource TabButtonStyle}"/>
+                    <RadioButton x:Name="TabLogbookBtn" Grid.Column="6" Content="Logbook" Height="32" Checked="TabLogbookBtn_Checked" Style="{StaticResource TabButtonStyle}"/>
+                </Grid>
 
-                <!-- Left Column -->
-                <StackPanel Grid.Column="0">
-                    <!-- UI Mode -->
-                    <StackPanel Margin="0,0,0,16">
-                        <TextBlock x:Name="UIModeLabel" Text="UI Mode" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <ComboBox x:Name="UIModeSelector" Grid.Column="0" SelectionChanged="UIModeSelector_SelectionChanged">
-                            </ComboBox>
-                            <Button x:Name="CustomModeConfigBtn" Grid.Column="1" Content="Change" Foreground="White" FontSize="11" Margin="6,0,0,0" Padding="8,2" VerticalAlignment="Center" Visibility="Collapsed" Click="CustomModeConfigBtn_Click" Cursor="Hand">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                <!-- Tab content: one at a time -->
+                <Grid Grid.Row="2" Margin="0,0,0,10">
+
+                    <!-- ===== General ===== -->
+                    <ScrollViewer x:Name="TabGeneralContent" Visibility="Visible" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Focusable="False">
+                        <StackPanel Margin="0,0,12,0">
+                            <!-- In-game assistance -->
+                            <TextBlock x:Name="GroupAssistTitle" Text="IN-GAME ASSISTANCE" Style="{StaticResource FirstGroupHeaderStyle}"/>
+                            <Grid Margin="{StaticResource RowSpacing}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Speed warning -->
+                                <Grid Grid.Column="0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource SettingLabelStyle}" Margin="0,0,10,0">
+                                        <Run x:Name="SpeedWarningLabel" Text="Speed warning"/><InlineUIContainer BaselineAlignment="Center"><Border Style="{StaticResource InfoIconStyle}"><Border.ToolTip><ToolTip x:Name="SpeedWarningToolTip" Content="When enabled, warns you if your speed is higher than the specified threshold."/></Border.ToolTip><Path Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" Fill="{DynamicResource MutedTextBrush}" Stretch="Uniform" Width="13" Height="13"/></Border></InlineUIContainer>
+                                    </TextBlock>
+                                    <ToggleButton x:Name="BtnSpeedWarningConfig" Grid.Column="1" Style="{StaticResource ConfigToggleStyle}"/>
+
+                                    <Popup x:Name="SpeedWarningPopup" PlacementTarget="{Binding ElementName=BtnSpeedWarningConfig}" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnSpeedWarningConfig, Mode=TwoWay}">
+                                        <Border Style="{StaticResource PanelBorderStyle}" Width="260">
+                                            <StackPanel>
+                                                <Grid Style="{StaticResource PanelRowStyle}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="SpeedWarningEtsLabel" Text="ETS2 (km/h)" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <Border Grid.Column="1" Style="{StaticResource PanelInputBorderStyle}">
+                                                        <TextBox x:Name="SpeedWarningEtsBox" Style="{StaticResource PanelTextBoxStyle}" AutomationProperties.LabeledBy="{Binding ElementName=SpeedWarningEtsLabel}" TextChanged="SpeedWarningEtsBox_TextChanged"/>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Style="{StaticResource PanelRowStyle}" Margin="0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="SpeedWarningAtsLabel" Text="ATS (mph)" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <Border Grid.Column="1" Style="{StaticResource PanelInputBorderStyle}">
+                                                        <TextBox x:Name="SpeedWarningAtsBox" Style="{StaticResource PanelTextBoxStyle}" AutomationProperties.LabeledBy="{Binding ElementName=SpeedWarningAtsLabel}" TextChanged="SpeedWarningAtsBox_TextChanged"/>
+                                                    </Border>
+                                                </Grid>
+                                            </StackPanel>
                                         </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                            <Button x:Name="HudModeConfigBtn" Grid.Column="1" Content="Change" Foreground="White" FontSize="11" Margin="6,0,0,0" Padding="8,2" VerticalAlignment="Center" Visibility="Collapsed" Click="HudModeConfigBtn_Click" Cursor="Hand">
-                                <Button.Template>
-                                    <ControlTemplate TargetType="Button">
-                                        <Border Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource CardBorderBrush}">
-                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                                    </Popup>
+                                </Grid>
+
+                                <!-- Speed limiter (Supporter) -->
+                                <Grid x:Name="SpeedLimiterPanel" Grid.Column="2" Visibility="Visible">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource SettingLabelStyle}" Margin="0,0,10,0">
+                                        <Run x:Name="SpeedLimiterTitle" Text="Speed Limiter"/><InlineUIContainer BaselineAlignment="Center"><Border Style="{StaticResource InfoIconStyle}"><Border.ToolTip><ToolTip x:Name="SpeedLimiterToolTip" Content="When enabled, automatically brakes the truck to keep it below the speed limit. The braking key MUST match the one configured in the game."/></Border.ToolTip><Path Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" Fill="{DynamicResource MutedTextBrush}" Stretch="Uniform" Width="13" Height="13"/></Border></InlineUIContainer>
+                                    </TextBlock>
+                                    <ToggleButton x:Name="BtnSpeedLimiterConfig" Grid.Column="1" Style="{StaticResource ConfigToggleStyle}" Click="BtnSpeedLimiterConfig_Click"/>
+
+                                    <Popup x:Name="SpeedLimiterPopup" PlacementTarget="{Binding ElementName=BtnSpeedLimiterConfig}" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnSpeedLimiterConfig, Mode=TwoWay}">
+                                        <Border Style="{StaticResource PanelBorderStyle}" Width="260">
+                                            <StackPanel>
+                                                <Grid Style="{StaticResource PanelRowStyle}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="SpeedLimiterEnableLabel" Text="Enable Limiter" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <ToggleButton x:Name="SpeedLimiterToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="SpeedLimiterToggle_Checked" Unchecked="SpeedLimiterToggle_Unchecked" VerticalAlignment="Center"/>
+                                                </Grid>
+                                                <Grid Style="{StaticResource PanelRowStyle}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="SpeedLimiterEtsLabel" Text="ETS2 (km/h)" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <Border Grid.Column="1" Style="{StaticResource PanelInputBorderStyle}">
+                                                        <TextBox x:Name="SpeedLimiterEtsBox" Style="{StaticResource PanelTextBoxStyle}" AutomationProperties.LabeledBy="{Binding ElementName=SpeedLimiterEtsLabel}" TextChanged="SpeedLimiterEtsBox_TextChanged"/>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Style="{StaticResource PanelRowStyle}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="SpeedLimiterAtsLabel" Text="ATS (mph)" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <Border Grid.Column="1" Style="{StaticResource PanelInputBorderStyle}">
+                                                        <TextBox x:Name="SpeedLimiterAtsBox" Style="{StaticResource PanelTextBoxStyle}" AutomationProperties.LabeledBy="{Binding ElementName=SpeedLimiterAtsLabel}" TextChanged="SpeedLimiterAtsBox_TextChanged"/>
+                                                    </Border>
+                                                </Grid>
+                                                <Grid Style="{StaticResource PanelRowStyle}" Margin="0">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="SpeedLimiterKeyLabel" Text="Brake Key" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <Button x:Name="BtnSpeedLimiterKey" Grid.Column="1" Content="S" Width="76" Style="{StaticResource SmallButtonStyle}" Padding="4,0" AutomationProperties.LabeledBy="{Binding ElementName=SpeedLimiterKeyLabel}" Click="BtnSpeedLimiterKey_Click"/>
+                                                </Grid>
+                                            </StackPanel>
                                         </Border>
-                                    </ControlTemplate>
-                                </Button.Template>
-                            </Button>
-                        </Grid>
-                        
-                        <Popup x:Name="HudModePopup" PlacementTarget="{Binding ElementName=HudModeConfigBtn}" Placement="Bottom" HorizontalOffset="-140" AllowsTransparency="True" StaysOpen="False">
-                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" Padding="12" Width="180">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
-                                </Border.Effect>
-                                <StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="4,0,0,8">
-                                        <ToggleButton x:Name="HudToggleSpeed" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="HudToggleSpeedLabel" Text="Current Speed" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="13"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="4,0,0,8">
-                                        <ToggleButton x:Name="HudToggleMaxSpeed" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="HudToggleMaxSpeedLabel" Text="Max Speed" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="13"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Margin="4,0,0,12">
-                                        <ToggleButton x:Name="HudToggleType" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="HudToggleTypeLabel" Text="Delivery Type" Foreground="White" Margin="8,0,0,0" VerticalAlignment="Center" FontSize="13"/>
-                                    </StackPanel>
-                                    <Button Content="Move to Top" Click="HudMoveToTopBtn_Click" Foreground="White" BorderThickness="0" Padding="8,6" Margin="0,0,0,6" Cursor="Hand">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <Border x:Name="border" Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="4">
-                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                    </Button>
-                                    <Button Content="Reset Position" Click="HudResetPositionBtn_Click" Foreground="White" BorderThickness="0" Padding="8,6" Cursor="Hand">
-                                        <Button.Template>
-                                            <ControlTemplate TargetType="Button">
-                                                <Border x:Name="border" Background="{DynamicResource HeaderButtonBackgroundBrush}" CornerRadius="4">
-                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
-                                                </Border>
-                                                <ControlTemplate.Triggers>
-                                                    <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                                    </Trigger>
-                                                </ControlTemplate.Triggers>
-                                            </ControlTemplate>
-                                        </Button.Template>
-                                    </Button>
+                                    </Popup>
+                                </Grid>
+                            </Grid>
+
+                            <!-- Startup and tray -->
+                            <TextBlock x:Name="GroupStartupTitle" Text="STARTUP AND TRAY" Style="{StaticResource GroupHeaderStyle}"/>
+                            <Grid x:Name="AutostartPanel">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <Grid x:Name="AutostartRunRow" Grid.Row="0" Grid.Column="0" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AutostartRunLabel" Text="Start with Windows" Style="{StaticResource PanelLabelStyle}"/>
+                                    <ToggleButton x:Name="AutostartRunToggle" Grid.Column="1" Focusable="True" Style="{StaticResource ModernSwitchToggleStyle}" FocusVisualStyle="{StaticResource PanelFocusVisual}" AutomationProperties.LabeledBy="{Binding ElementName=AutostartRunLabel}" Checked="AutostartRunToggle_Changed" Unchecked="AutostartRunToggle_Changed" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Grid x:Name="AutostartTrayRow" ToolTipService.ShowOnDisabled="True" Grid.Row="0" Grid.Column="2" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AutostartTrayLabel" Text="Start in the tray" Style="{StaticResource PanelLabelStyle}"/>
+                                    <ToggleButton x:Name="AutostartTrayToggle" Grid.Column="1" Focusable="True" Style="{StaticResource ModernSwitchToggleStyle}" FocusVisualStyle="{StaticResource PanelFocusVisual}" AutomationProperties.LabeledBy="{Binding ElementName=AutostartTrayLabel}" Checked="AutostartTrayToggle_Changed" Unchecked="AutostartTrayToggle_Changed" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Grid x:Name="AutostartStateRow" Grid.Row="1" Grid.ColumnSpan="3" Margin="0,0,0,6" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AutostartStateText" Text="" Foreground="#E5A23C" FontSize="11" TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                    <Button x:Name="BtnAutostartRetry" Grid.Column="1" Content="Try again" Style="{StaticResource SmallButtonStyle}" Click="BtnAutostartRetry_Click" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Grid x:Name="AutostartShowRow" Grid.Row="2" Grid.Column="0" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AutostartShowLabel" Text="Show when ETS2 or ATS starts" Style="{StaticResource PanelLabelStyle}"/>
+                                    <ToggleButton x:Name="AutostartShowToggle" Grid.Column="1" Focusable="True" Style="{StaticResource ModernSwitchToggleStyle}" FocusVisualStyle="{StaticResource PanelFocusVisual}" AutomationProperties.LabeledBy="{Binding ElementName=AutostartShowLabel}" Checked="AutostartShowToggle_Changed" Unchecked="AutostartShowToggle_Changed" VerticalAlignment="Center"/>
+                                </Grid>
+                                <Grid x:Name="AutostartHideRow" Grid.Row="2" Grid.Column="2" Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="AutostartHideLabel" Text="Hide when the last game closes" Style="{StaticResource PanelLabelStyle}"/>
+                                    <ToggleButton x:Name="AutostartHideToggle" Grid.Column="1" Focusable="True" Style="{StaticResource ModernSwitchToggleStyle}" FocusVisualStyle="{StaticResource PanelFocusVisual}" AutomationProperties.LabeledBy="{Binding ElementName=AutostartHideLabel}" Checked="AutostartHideToggle_Changed" Unchecked="AutostartHideToggle_Changed" VerticalAlignment="Center"/>
+                                </Grid>
+                                <TextBlock x:Name="AutostartShowBadge" Grid.Row="3" Grid.ColumnSpan="3" Text="Game options require Supporter" Foreground="#F5C542" FontSize="11" TextWrapping="Wrap"/>
+                            </Grid>
+
+                            <!-- Application -->
+                            <TextBlock x:Name="GroupAppTitle" Text="APPLICATION" Style="{StaticResource GroupHeaderStyle}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="LanguageLabel" Text="Language" Style="{StaticResource FieldLabelStyle}"/>
+                                    <ComboBox x:Name="LanguageSelector" AutomationProperties.LabeledBy="{Binding ElementName=LanguageLabel}" SelectionChanged="LanguageSelector_SelectionChanged">
+                                        <ComboBoxItem Content="English" Tag="en"/>
+                                        <ComboBoxItem Content="Українська" Tag="uk"/>
+                                    </ComboBox>
                                 </StackPanel>
-                            </Border>
-                        </Popup>
-                    </StackPanel>
 
-                    <!-- Auto-hide toggle -->
-                    <StackPanel Margin="0,0,0,16">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock x:Name="AutoHideLabel" Text="Auto-hide" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                            <ToggleButton x:Name="AutoHideToggle" Style="{StaticResource ModernSwitchToggleStyle}" PreviewMouseLeftButtonDown="AutoHideToggle_PreviewMouseLeftButtonDown" Checked="AutoHideToggle_Checked" Unchecked="AutoHideToggle_Unchecked" VerticalAlignment="Center"/>
+                                <StackPanel Grid.Row="0" Grid.Column="2" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="UpdatesLabel" Text="Updates" Style="{StaticResource FieldLabelStyle}"/>
+                                    <Button x:Name="BtnCheckUpdate" Content="🔄 Check for updates" Style="{StaticResource PrimaryButtonStyle}" Click="BtnCheckUpdate_Click"/>
+                                </StackPanel>
+
+                                <!-- Beta channel (tester and developer plans) -->
+                                <Grid x:Name="BetaUpdatesContainer" Grid.Row="1" Grid.Column="2" Margin="{StaticResource RowSpacing}" Visibility="Collapsed">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="BetaUpdatesLabel" Text="Receive beta updates" Style="{StaticResource SettingLabelStyle}" Margin="0,0,10,0"/>
+                                    <ToggleButton x:Name="BetaUpdatesToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" AutomationProperties.LabeledBy="{Binding ElementName=BetaUpdatesLabel}" Checked="BetaUpdatesToggle_Checked" Unchecked="BetaUpdatesToggle_Unchecked" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Grid>
                         </StackPanel>
-                        <TextBlock x:Name="AutoHideHint" Text="Uses TruckBook status only. Temporarily hides the selected UI mode when status is calm." Foreground="#8A8F98" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                    </StackPanel>
+                    </ScrollViewer>
 
-                    <!-- Scale -->
-                    <Grid VerticalAlignment="Center">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="ScaleLabel" Grid.Column="0" Text="Scale" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="ScaleSelector" Grid.Column="1" SelectionChanged="ScaleSelector_SelectionChanged">
-                            <ComboBoxItem Content="75%" Tag="75"/>
-                            <ComboBoxItem Content="100%" Tag="100" IsSelected="True"/>
-                            <ComboBoxItem Content="125%" Tag="125"/>
-                            <ComboBoxItem Content="150%" Tag="150"/>
-                        </ComboBox>
-                    </Grid>
-                </StackPanel>
+                    <!-- ===== Appearance ===== -->
+                    <ScrollViewer x:Name="TabAppearanceContent" Visibility="Collapsed" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Focusable="False">
+                        <StackPanel Margin="0,0,12,0">
+                            <!-- Widget mode -->
+                            <TextBlock x:Name="GroupModeTitle" Text="WIDGET MODE" Style="{StaticResource FirstGroupHeaderStyle}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
 
-                <!-- Right Column -->
-                <StackPanel Grid.Column="2">
-                    <!-- Language -->
-                    <StackPanel Margin="0,0,0,16">
-                        <TextBlock x:Name="LanguageLabel" Text="Language" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,6" TextWrapping="Wrap"/>
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                            </Grid.ColumnDefinitions>
-                            <ComboBox x:Name="LanguageSelector" Grid.Column="0" SelectionChanged="LanguageSelector_SelectionChanged">
-                                <ComboBoxItem Content="English" Tag="en"/>
-                                <ComboBoxItem Content="Українська" Tag="uk"/>
-                            </ComboBox>
-                        </Grid>
-                    </StackPanel>
-
-                    <!-- Speed Warning -->
-                    <Grid VerticalAlignment="Center" Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                            <TextBlock x:Name="SpeedWarningLabel" Text="Speed warning" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                            <Border Background="Transparent" Margin="6,0,0,0" VerticalAlignment="Center" ToolTipService.InitialShowDelay="200">
-                                <Border.ToolTip>
-                                    <ToolTip x:Name="SpeedWarningToolTip" Content="When enabled, warns you if your speed is higher than the specified threshold." />
-                                </Border.ToolTip>
-                                <Path Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" Fill="{DynamicResource MutedTextBrush}" Stretch="Uniform" Width="14" Height="14" />
-                            </Border>
-                        </StackPanel>
-                        
-                        <ToggleButton x:Name="BtnSpeedWarningConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
-                            <ToggleButton.Template>
-                                <ControlTemplate TargetType="ToggleButton">
-                                    <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
-                                        <Path Data="M19.4,13C19.4,12.6 19.5,12.3 19.5,12C19.5,11.7 19.4,11.4 19.4,11L21.5,9.3C21.7,9.1 21.8,8.9 21.7,8.6L19.7,5.1C19.6,4.9 19.3,4.8 19,4.9L16.5,5.9C16,5.5 15.4,5.2 14.8,4.9L14.4,2.3C14.4,2 14.2,1.8 13.9,1.8L9.9,1.8C9.7,1.8 9.4,2 9.4,2.3L9,4.9C8.4,5.2 7.9,5.5 7.4,5.9L4.9,4.9C4.6,4.8 4.3,4.9 4.2,5.1L2.2,8.6C2.1,8.9 2.2,9.1 2.4,9.3L4.5,11C4.4,11.4 4.4,11.7 4.4,12C4.4,12.3 4.4,12.6 4.5,13L2.4,14.7C2.2,14.9 2.1,15.1 2.2,15.4L4.2,18.9C4.3,19.1 4.6,19.2 4.9,19.1L7.4,18.1C7.9,18.5 8.4,18.8 9,19.1L9.4,21.7C9.4,22 9.7,22.2 9.9,22.2L13.9,22.2C14.2,22.2 14.4,22 14.4,21.7L14.8,19.1C15.4,18.8 16,18.5 16.5,18.1L19,19.1C19.3,19.2 19.6,19.1 19.7,18.9L21.7,15.4C21.8,15.1 21.7,14.9 21.5,14.7L19.4,13M11.9,15.5C10,15.5 8.4,13.9 8.4,12C8.4,10.1 10,8.5 11.9,8.5C13.8,8.5 15.4,10.1 15.4,12C15.4,13.9 13.8,15.5 11.9,15.5Z" Fill="White" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                        </Trigger>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </ToggleButton.Template>
-                        </ToggleButton>
-                        
-                        <Popup x:Name="SpeedWarningPopup" PlacementTarget="{Binding ElementName=BtnSpeedWarningConfig}" Placement="Bottom" HorizontalOffset="-172" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnSpeedWarningConfig, Mode=TwoWay}">
-                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" Padding="12" Width="200">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
-                                </Border.Effect>
-                                <StackPanel>
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="SpeedWarningEtsLabel" Grid.Column="0" Text="ETS2 (km/h)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                        <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                            <TextBox x:Name="SpeedWarningEtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningEtsBox_TextChanged"/>
-                                        </Border>
-                                    </Grid>
+                                <StackPanel Grid.Column="0" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="UIModeLabel" Text="UI Mode" Style="{StaticResource AppearanceFieldLabelStyle}"/>
                                     <Grid>
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="SpeedWarningAtsLabel" Grid.Column="0" Text="ATS (mph)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                        <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                            <TextBox x:Name="SpeedWarningAtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedWarningAtsBox_TextChanged"/>
+                                        <ComboBox x:Name="UIModeSelector" Grid.Column="0" AutomationProperties.LabeledBy="{Binding ElementName=UIModeLabel}" SelectionChanged="UIModeSelector_SelectionChanged"/>
+                                        <Button x:Name="CustomModeConfigBtn" Grid.Column="1" Content="Change" Style="{StaticResource ActionButtonStyle}" Padding="10,0" Margin="8,0,0,0" Visibility="Collapsed" Click="CustomModeConfigBtn_Click"/>
+                                        <Button x:Name="HudModeConfigBtn" Grid.Column="1" Content="Change" Style="{StaticResource ActionButtonStyle}" Padding="10,0" Margin="8,0,0,0" Visibility="Collapsed" Click="HudModeConfigBtn_Click"/>
+                                    </Grid>
+
+                                    <Popup x:Name="HudModePopup" PlacementTarget="{Binding ElementName=HudModeConfigBtn}" AllowsTransparency="True" StaysOpen="False">
+                                        <Border Style="{StaticResource PanelBorderStyle}" Width="260">
+                                            <StackPanel>
+                                                <Grid Style="{StaticResource PanelRowStyle}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="HudToggleSpeedLabel" Text="Current Speed" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <ToggleButton x:Name="HudToggleSpeed" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
+                                                </Grid>
+                                                <Grid Style="{StaticResource PanelRowStyle}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="HudToggleMaxSpeedLabel" Text="Max Speed" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <ToggleButton x:Name="HudToggleMaxSpeed" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
+                                                </Grid>
+                                                <Grid Style="{StaticResource PanelRowStyle}" Margin="0,0,0,14">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="HudToggleTypeLabel" Text="Delivery Type" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <ToggleButton x:Name="HudToggleType" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="HudToggle_Changed" Unchecked="HudToggle_Changed" VerticalAlignment="Center"/>
+                                                </Grid>
+                                                <Button x:Name="HudMoveToTopBtn" Content="Move to Top" Style="{StaticResource SmallButtonStyle}" Margin="0,0,0,8" Click="HudMoveToTopBtn_Click"/>
+                                                <Button x:Name="HudResetPositionBtn" Content="Reset Position" Style="{StaticResource SmallButtonStyle}" Click="HudResetPositionBtn_Click"/>
+                                            </StackPanel>
                                         </Border>
+                                    </Popup>
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="AutoHideLabel" Text="Auto-hide" Style="{StaticResource AppearanceFieldLabelStyle}">
+                                        <TextBlock.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock x:Name="AutoHideHint" Text="Hides the widget while TrucksBook is idle." MaxWidth="260" TextWrapping="Wrap"/>
+                                            </ToolTip>
+                                        </TextBlock.ToolTip>
+                                    </TextBlock>
+                                    <Grid Height="32">
+                                        <ToggleButton x:Name="AutoHideToggle" HorizontalAlignment="Left" Style="{StaticResource ModernSwitchToggleStyle}" AutomationProperties.LabeledBy="{Binding ElementName=AutoHideLabel}" PreviewMouseLeftButtonDown="AutoHideToggle_PreviewMouseLeftButtonDown" Checked="AutoHideToggle_Checked" Unchecked="AutoHideToggle_Unchecked" VerticalAlignment="Center"/>
                                     </Grid>
                                 </StackPanel>
-                            </Border>
-                        </Popup>
-                    </Grid>
-                    
-                    <!-- Speed Limiter Settings (Premium) -->
-                    <StackPanel x:Name="SpeedLimiterPanel" Visibility="Visible" Margin="0,0,0,16">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,10,0">
-                                <TextBlock x:Name="SpeedLimiterTitle" Text="Speed Limiter" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                                <Border Background="Transparent" Margin="6,0,0,0" VerticalAlignment="Center" ToolTipService.InitialShowDelay="200">
-                                    <Border.ToolTip>
-                                        <ToolTip x:Name="SpeedLimiterToolTip" Content="When enabled, automatically brakes the truck to keep it below the speed limit. The braking key MUST match the one configured in the game." />
-                                    </Border.ToolTip>
-                                    <Path Data="M11 7h2v2h-2zm0 4h2v6h-2zm1-9C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z" Fill="{DynamicResource MutedTextBrush}" Stretch="Uniform" Width="14" Height="14" />
-                                </Border>
-                            </StackPanel>
-                            
-                            <ToggleButton x:Name="BtnSpeedLimiterConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure" Click="BtnSpeedLimiterConfig_Click">
-                                <ToggleButton.Template>
-                                    <ControlTemplate TargetType="ToggleButton">
-                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
-                                            <Path Data="M19.4,13C19.4,12.6 19.5,12.3 19.5,12C19.5,11.7 19.4,11.4 19.4,11L21.5,9.3C21.7,9.1 21.8,8.9 21.7,8.6L19.7,5.1C19.6,4.9 19.3,4.8 19,4.9L16.5,5.9C16,5.5 15.4,5.2 14.8,4.9L14.4,2.3C14.4,2 14.2,1.8 13.9,1.8L9.9,1.8C9.7,1.8 9.4,2 9.4,2.3L9,4.9C8.4,5.2 7.9,5.5 7.4,5.9L4.9,4.9C4.6,4.8 4.3,4.9 4.2,5.1L2.2,8.6C2.1,8.9 2.2,9.1 2.4,9.3L4.5,11C4.4,11.4 4.4,11.7 4.4,12C4.4,12.3 4.4,12.6 4.5,13L2.4,14.7C2.2,14.9 2.1,15.1 2.2,15.4L4.2,18.9C4.3,19.1 4.6,19.2 4.9,19.1L7.4,18.1C7.9,18.5 8.4,18.8 9,19.1L9.4,21.7C9.4,22 9.7,22.2 9.9,22.2L13.9,22.2C14.2,22.2 14.4,22 14.4,21.7L14.8,19.1C15.4,18.8 16,18.5 16.5,18.1L19,19.1C19.3,19.2 19.6,19.1 19.7,18.9L21.7,15.4C21.8,15.1 21.7,14.9 21.5,14.7L19.4,13M11.9,15.5C10,15.5 8.4,13.9 8.4,12C8.4,10.1 10,8.5 11.9,8.5C13.8,8.5 15.4,10.1 15.4,12C15.4,13.9 13.8,15.5 11.9,15.5Z" Fill="White" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <!-- Look -->
+                            <TextBlock x:Name="GroupLookTitle" Text="LOOK" Style="{StaticResource GroupHeaderStyle}"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <!-- Row 1: scale | theme -->
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="ScaleLabel" Text="Scale" Style="{StaticResource AppearanceFieldLabelStyle}"/>
+                                    <ComboBox x:Name="ScaleSelector" AutomationProperties.LabeledBy="{Binding ElementName=ScaleLabel}" SelectionChanged="ScaleSelector_SelectionChanged">
+                                        <ComboBoxItem Content="75%" Tag="75"/>
+                                        <ComboBoxItem Content="100%" Tag="100" IsSelected="True"/>
+                                        <ComboBoxItem Content="125%" Tag="125"/>
+                                        <ComboBoxItem Content="150%" Tag="150"/>
+                                    </ComboBox>
+                                </StackPanel>
+                                <StackPanel Grid.Row="0" Grid.Column="2" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="ThemeLabel" Text="Theme" Style="{StaticResource AppearanceFieldLabelStyle}"/>
+                                    <ComboBox x:Name="ThemeSelector" AutomationProperties.LabeledBy="{Binding ElementName=ThemeLabel}" SelectionChanged="AppearanceSetting_SelectionChanged"/>
+                                </StackPanel>
+                                <!-- Row 2: opacity | accent mode -->
+                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="OpacityLabel" Text="Opacity" Style="{StaticResource AppearanceFieldLabelStyle}"/>
+                                    <ToggleButton x:Name="BtnOpacityConfig" Content="Configure" Style="{StaticResource FieldConfigToggleStyle}" AutomationProperties.LabeledBy="{Binding ElementName=OpacityLabel}"/>
+
+                                    <Popup x:Name="OpacityPopup" PlacementTarget="{Binding ElementName=BtnOpacityConfig}" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnOpacityConfig, Mode=TwoWay}">
+                                        <Border Style="{StaticResource PanelBorderStyle}" Width="260">
+                                            <StackPanel>
+                                                <Grid Style="{StaticResource PanelRowStyle}">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock x:Name="SplitOpacityModeLabel" Text="Split mode" Style="{StaticResource PanelLabelStyle}"/>
+                                                    <ToggleButton x:Name="SplitOpacityToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="SplitOpacityToggle_Checked" Unchecked="SplitOpacityToggle_Unchecked" VerticalAlignment="Center"/>
+                                                </Grid>
+
+                                                <StackPanel x:Name="GlobalOpacityPanel" Margin="0,0,0,10">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock x:Name="GlobalOpacityLabel" Text="Global Opacity" Style="{StaticResource PanelLabelStyle}"/>
+                                                        <TextBlock x:Name="OpacityValue" Grid.Column="1" Text="85%" Foreground="{DynamicResource MainTextBrush}" FontSize="12" MinWidth="34" TextAlignment="Right" VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                    <Slider x:Name="OpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="OpacitySlider_ValueChanged"/>
+                                                </StackPanel>
+
+                                                <StackPanel x:Name="BackgroundOpacityPanel" Margin="0,0,0,10" IsEnabled="False" Opacity="0.5">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock x:Name="BackgroundOpacityLabel" Text="Background Opacity" Style="{StaticResource PanelLabelStyle}"/>
+                                                        <TextBlock x:Name="BackgroundOpacityValue" Grid.Column="1" Text="85%" Foreground="{DynamicResource MainTextBrush}" FontSize="12" MinWidth="34" TextAlignment="Right" VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                    <Slider x:Name="BackgroundOpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="BackgroundOpacitySlider_ValueChanged"/>
+                                                </StackPanel>
+
+                                                <StackPanel x:Name="TextOpacityPanel" IsEnabled="False" Opacity="0.5">
+                                                    <Grid>
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="Auto"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock x:Name="TextOpacityLabel" Text="Text Opacity" Style="{StaticResource PanelLabelStyle}"/>
+                                                        <TextBlock x:Name="TextOpacityValue" Grid.Column="1" Text="100%" Foreground="{DynamicResource MainTextBrush}" FontSize="12" MinWidth="34" TextAlignment="Right" VerticalAlignment="Center"/>
+                                                    </Grid>
+                                                    <Slider x:Name="TextOpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="100" VerticalAlignment="Center" ValueChanged="TextOpacitySlider_ValueChanged"/>
+                                                </StackPanel>
+                                            </StackPanel>
                                         </Border>
-                                        <ControlTemplate.Triggers>
-                                            <Trigger Property="IsMouseOver" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                            </Trigger>
-                                            <Trigger Property="IsChecked" Value="True">
-                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                            </Trigger>
-                                        </ControlTemplate.Triggers>
-                                    </ControlTemplate>
-                                </ToggleButton.Template>
-                            </ToggleButton>
-                            
-                            <Popup x:Name="SpeedLimiterPopup" PlacementTarget="{Binding ElementName=BtnSpeedLimiterConfig}" Placement="Bottom" HorizontalOffset="-172" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnSpeedLimiterConfig, Mode=TwoWay}">
-                                <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" Padding="12" Width="200">
-                                    <Border.Effect>
-                                        <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
-                                    </Border.Effect>
-                                    <StackPanel>
-                                        <!-- Toggle -->
-                                        <Grid Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="SpeedLimiterEnableLabel" Grid.Column="0" Text="Enable Limiter" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
-                                            <ToggleButton x:Name="SpeedLimiterToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="SpeedLimiterToggle_Checked" Unchecked="SpeedLimiterToggle_Unchecked" VerticalAlignment="Center"/>
-                                        </Grid>
-                                        
-                                        <!-- Threshold ETS2 -->
-                                        <Grid Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="SpeedLimiterEtsLabel" Grid.Column="0" Text="ETS2 (km/h)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                                <TextBox x:Name="SpeedLimiterEtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterEtsBox_TextChanged"/>
-                                            </Border>
-                                        </Grid>
-                                        
-                                        <!-- Threshold ATS -->
-                                        <Grid Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="SpeedLimiterAtsLabel" Grid.Column="0" Text="ATS (mph)" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <Border Grid.Column="1" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6" Height="26">
-                                                <TextBox x:Name="SpeedLimiterAtsBox" Background="Transparent" Foreground="White" CaretBrush="White" BorderThickness="0" VerticalContentAlignment="Center" TextAlignment="Center" TextChanged="SpeedLimiterAtsBox_TextChanged"/>
-                                            </Border>
-                                        </Grid>
-                                        
-                                        <!-- Key Binding -->
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="SpeedLimiterKeyLabel" Grid.Column="0" Text="Brake Key" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <Button x:Name="BtnSpeedLimiterKey" Grid.Column="1" Content="S" Height="26" Click="BtnSpeedLimiterKey_Click" Cursor="Hand" Foreground="White">
-                                                <Button.Template>
-                                                    <ControlTemplate TargetType="Button">
-                                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
-                                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                        </Border>
-                                                        <ControlTemplate.Triggers>
-                                                            <Trigger Property="IsMouseOver" Value="True">
-                                                                <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                                            </Trigger>
-                                                        </ControlTemplate.Triggers>
-                                                    </ControlTemplate>
-                                                </Button.Template>
-                                            </Button>
-                                        </Grid>
+                                    </Popup>
+                                </StackPanel>
+
+                                <StackPanel Grid.Row="1" Grid.Column="2" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="AccentModeLabel" Text="Accent Mode" Style="{StaticResource AppearanceFieldLabelStyle}">
+                                        <TextBlock.ToolTip>
+                                            <ToolTip>
+                                                <TextBlock x:Name="AccentModeHint" Text="One accent or a color per tile." MaxWidth="260" TextWrapping="Wrap"/>
+                                            </ToolTip>
+                                        </TextBlock.ToolTip>
+                                    </TextBlock>
+                                    <ComboBox x:Name="AccentModeSelector" AutomationProperties.LabeledBy="{Binding ElementName=AccentModeLabel}" SelectionChanged="AccentMode_SelectionChanged"/>
+                                </StackPanel>
+
+                                <StackPanel x:Name="CardStylePanel" Grid.Row="2" Grid.Column="0" Margin="{StaticResource RowSpacing}">
+                                    <TextBlock x:Name="CardStyleLabel" Text="Card Style" Style="{StaticResource AppearanceFieldLabelStyle}"/>
+                                    <ComboBox x:Name="CardStyleSelector" AutomationProperties.LabeledBy="{Binding ElementName=CardStyleLabel}" SelectionChanged="AppearanceSetting_SelectionChanged"/>
+                                </StackPanel>
+
+
+                                <Grid Grid.Row="2" Grid.Column="2">
+                                    <StackPanel x:Name="GlobalAccentPanel" Margin="{StaticResource RowSpacing}">
+                                        <TextBlock x:Name="GlobalAccentLabel" Text="Global Accent" Style="{StaticResource AppearanceFieldLabelStyle}"/>
+                                        <ComboBox x:Name="GlobalAccentSelector" AutomationProperties.LabeledBy="{Binding ElementName=GlobalAccentLabel}" SelectionChanged="AppearanceSetting_SelectionChanged"/>
                                     </StackPanel>
-                                </Border>
-                            </Popup>
+                                    <StackPanel x:Name="CustomAccentsPanel" Margin="{StaticResource RowSpacing}" Visibility="Collapsed">
+                                        <TextBlock x:Name="CustomAccentsTitle" Text="Tile Colors" Style="{StaticResource AppearanceFieldLabelStyle}"/>
+                                        <Button x:Name="BtnCustomizeTileColors" Content="Customize Tile Colors" Style="{StaticResource ActionButtonStyle}" Click="BtnCustomizeTileColors_Click"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- ===== Cloud ===== -->
+                    <ScrollViewer x:Name="TabCloudContent" Visibility="Collapsed" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" Margin="0,0,-12,0" Focusable="False">
+                        <StackPanel Margin="0,0,12,0">
+                            <TextBlock x:Name="CloudSyncTitle" Text="CLOUD SYNC" Style="{StaticResource FirstGroupHeaderStyle}"/>
+
+                            <Grid Margin="{StaticResource RowSpacing}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="CloudStatusLabel" Text="Status:" Style="{StaticResource SettingLabelStyle}" Foreground="{DynamicResource MutedTextBrush}" FontWeight="Normal" Margin="0,0,6,0"/>
+                                <TextBlock x:Name="CloudStatusValue" Grid.Column="1" Text="Not available" Style="{StaticResource SettingLabelStyle}"/>
+                            </Grid>
+
+                            <Grid Margin="{StaticResource RowSpacing}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" Margin="0,0,12,0">
+                                    <TextBlock x:Name="CloudEnableLabel" Text="Enable Cloud Sync" Style="{StaticResource SettingLabelStyle}"/>
+                                    <TextBlock x:Name="CloudSyncHint" Text="When enabled, widget settings are saved to your TruckSim Cloud profile." Style="{StaticResource HintStyle}"/>
+                                </StackPanel>
+                                <ToggleButton x:Name="CloudSyncToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" AutomationProperties.LabeledBy="{Binding ElementName=CloudEnableLabel}" Checked="CloudSyncToggle_Checked" Unchecked="CloudSyncToggle_Unchecked" VerticalAlignment="Top"/>
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="12"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Button x:Name="BtnCloudSyncNow" Grid.Row="0" Grid.Column="0" Content="Sync now" Style="{StaticResource ActionButtonStyle}" Tag="#4CAE50" Click="BtnCloudSyncNow_Click"/>
+                                <Button x:Name="BtnCloudDownload" Grid.Row="0" Grid.Column="2" Content="Download from cloud" Style="{StaticResource ActionButtonStyle}" Tag="#1976D2" Click="BtnCloudDownload_Click"/>
+                                <Button x:Name="BtnCloudUpload" Grid.Row="2" Grid.Column="0" Content="Upload this PC" Style="{StaticResource ActionButtonStyle}" Tag="#1976D2" Click="BtnCloudUpload_Click"/>
+                                <Button x:Name="BtnCloudDelete" Grid.Row="2" Grid.Column="2" Content="Delete cloud backup" Style="{StaticResource ActionButtonStyle}" Foreground="#E57373" Tag="#D32F2F" Click="BtnCloudDelete_Click"/>
+                            </Grid>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- ===== Logbook ===== -->
+                    <Grid x:Name="TabLogbookContent" Visibility="Collapsed">
+                        <!-- List -->
+                        <Grid x:Name="LogbookListView" Visibility="Visible">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" x:Name="LogbookTitleLabel" Text="RECENT TRIPS (0)" Style="{StaticResource FirstGroupHeaderStyle}"/>
+                            <ScrollViewer Grid.Row="1" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="320" Margin="0,0,-12,0">
+                                <StackPanel x:Name="LogbookTripsList" Margin="0,0,12,0"/>
+                            </ScrollViewer>
+                            <TextBlock x:Name="LogbookEmptyText" Grid.Row="1" Text="No trips recorded yet." Foreground="{DynamicResource MutedTextBrush}" FontSize="13" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,24" TextWrapping="Wrap" TextAlignment="Center" Visibility="Collapsed"/>
+                            <TextBlock x:Name="LogbookFreeLimitText" Grid.Row="2" Text="Showing last 5 trips. Supporter unlocks full history." Foreground="#EABF20" FontSize="12" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="0,12,0,0" Visibility="Collapsed"/>
                         </Grid>
-                    </StackPanel>
-                    <!-- Opacity -->
-                    <Grid VerticalAlignment="Center" Margin="0,0,0,16">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="OpacityLabel" Grid.Column="0" Text="Opacity" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center" TextWrapping="Wrap"/>
-                        
-                        <ToggleButton x:Name="BtnOpacityConfig" Grid.Column="1" HorizontalAlignment="Right" Width="28" Height="28" Cursor="Hand" ToolTip="Configure">
-                            <ToggleButton.Template>
-                                <ControlTemplate TargetType="ToggleButton">
-                                    <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="6">
-                                        <Path Data="M19.4,13C19.4,12.6 19.5,12.3 19.5,12C19.5,11.7 19.4,11.4 19.4,11L21.5,9.3C21.7,9.1 21.8,8.9 21.7,8.6L19.7,5.1C19.6,4.9 19.3,4.8 19,4.9L16.5,5.9C16,5.5 15.4,5.2 14.8,4.9L14.4,2.3C14.4,2 14.2,1.8 13.9,1.8L9.9,1.8C9.7,1.8 9.4,2 9.4,2.3L9,4.9C8.4,5.2 7.9,5.5 7.4,5.9L4.9,4.9C4.6,4.8 4.3,4.9 4.2,5.1L2.2,8.6C2.1,8.9 2.2,9.1 2.4,9.3L4.5,11C4.4,11.4 4.4,11.7 4.4,12C4.4,12.3 4.4,12.6 4.5,13L2.4,14.7C2.2,14.9 2.1,15.1 2.2,15.4L4.2,18.9C4.3,19.1 4.6,19.2 4.9,19.1L7.4,18.1C7.9,18.5 8.4,18.8 9,19.1L9.4,21.7C9.4,22 9.7,22.2 9.9,22.2L13.9,22.2C14.2,22.2 14.4,22 14.4,21.7L14.8,19.1C15.4,18.8 16,18.5 16.5,18.1L19,19.1C19.3,19.2 19.6,19.1 19.7,18.9L21.7,15.4C21.8,15.1 21.7,14.9 21.5,14.7L19.4,13M11.9,15.5C10,15.5 8.4,13.9 8.4,12C8.4,10.1 10,8.5 11.9,8.5C13.8,8.5 15.4,10.1 15.4,12C15.4,13.9 13.8,15.5 11.9,15.5Z" Fill="White" Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                        </Trigger>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </ToggleButton.Template>
-                        </ToggleButton>
-                        
-                        <Popup x:Name="OpacityPopup" PlacementTarget="{Binding ElementName=BtnOpacityConfig}" Placement="Bottom" HorizontalOffset="-192" AllowsTransparency="True" StaysOpen="False" IsOpen="{Binding IsChecked, ElementName=BtnOpacityConfig, Mode=TwoWay}">
-                            <Border Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="6" Margin="0,4,0,0" Padding="12" Width="220">
-                                <Border.Effect>
-                                    <DropShadowEffect Color="Black" BlurRadius="10" Opacity="0.5" Direction="270" ShadowDepth="4"/>
-                                </Border.Effect>
-                                <StackPanel>
-                                    <!-- Toggle -->
-                                    <Grid Margin="0,0,0,10">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock x:Name="SplitOpacityModeLabel" Grid.Column="0" Text="Split mode" Foreground="White" FontSize="12" VerticalAlignment="Center"/>
-                                        <ToggleButton x:Name="SplitOpacityToggle" Grid.Column="1" Style="{StaticResource ModernSwitchToggleStyle}" Checked="SplitOpacityToggle_Checked" Unchecked="SplitOpacityToggle_Unchecked" VerticalAlignment="Center"/>
-                                    </Grid>
-                                    
-                                    <!-- Global Opacity -->
-                                    <StackPanel x:Name="GlobalOpacityPanel" Margin="0,0,0,10">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="GlobalOpacityLabel" Grid.Column="0" Text="Global Opacity" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock x:Name="OpacityValue" Grid.Column="1" Text="85%" Foreground="White" FontSize="12" Width="30" TextAlignment="Right" VerticalAlignment="Center"/>
-                                        </Grid>
-                                        <Slider x:Name="OpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="OpacitySlider_ValueChanged"/>
-                                    </StackPanel>
-                                    
-                                    <!-- Background Opacity -->
-                                    <StackPanel x:Name="BackgroundOpacityPanel" Margin="0,0,0,10" IsEnabled="False" Opacity="0.5">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="BackgroundOpacityLabel" Grid.Column="0" Text="Background Opacity" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock x:Name="BackgroundOpacityValue" Grid.Column="1" Text="85%" Foreground="White" FontSize="12" Width="30" TextAlignment="Right" VerticalAlignment="Center"/>
-                                        </Grid>
-                                        <Slider x:Name="BackgroundOpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="85" VerticalAlignment="Center" ValueChanged="BackgroundOpacitySlider_ValueChanged"/>
-                                    </StackPanel>
 
-                                    <!-- Text Opacity -->
-                                    <StackPanel x:Name="TextOpacityPanel" Margin="0,0,0,0" IsEnabled="False" Opacity="0.5">
-                                        <Grid>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="Auto"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock x:Name="TextOpacityLabel" Grid.Column="0" Text="Text Opacity" Foreground="White" FontSize="12" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <TextBlock x:Name="TextOpacityValue" Grid.Column="1" Text="100%" Foreground="White" FontSize="12" Width="30" TextAlignment="Right" VerticalAlignment="Center"/>
-                                        </Grid>
-                                        <Slider x:Name="TextOpacitySlider" Style="{StaticResource ModernSliderStyle}" Minimum="40" Maximum="100" Value="100" VerticalAlignment="Center" ValueChanged="TextOpacitySlider_ValueChanged"/>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                        </Popup>
-                    </Grid>
-                </StackPanel>
-            </Grid>
-
-            <!-- Tab: Appearance Content -->
-            <Grid x:Name="TabAppearanceContent" Margin="0,0,0,16" Visibility="Collapsed">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="20"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-                
-                <StackPanel Grid.Column="0">
-                    <!-- Theme -->
-                    <StackPanel Margin="0,0,0,16">
-                        <TextBlock x:Name="ThemeLabel" Text="Theme" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="ThemeSelector" SelectionChanged="AppearanceSetting_SelectionChanged" />
-                    </StackPanel>
-                    
-                    <!-- Card Style -->
-                    <StackPanel x:Name="CardStylePanel" Margin="0,0,0,16">
-                        <TextBlock x:Name="CardStyleLabel" Text="Card Style" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="CardStyleSelector" SelectionChanged="AppearanceSetting_SelectionChanged" />
-                    </StackPanel>
-                    
-                    <!-- Global Accent Color -->
-                    <StackPanel x:Name="GlobalAccentPanel" Margin="0,0,0,16">
-                        <TextBlock x:Name="GlobalAccentLabel" Text="Global Accent" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="GlobalAccentSelector" SelectionChanged="AppearanceSetting_SelectionChanged" />
-                    </StackPanel>
-                </StackPanel>
-                
-                <StackPanel Grid.Column="2">
-                    <!-- Accent Coloring Mode -->
-                    <StackPanel Margin="0,0,0,4">
-                        <TextBlock x:Name="AccentModeLabel" Text="Accent Mode" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,0,4"/>
-                        <ComboBox x:Name="AccentModeSelector" SelectionChanged="AccentMode_SelectionChanged" />
-                    </StackPanel>
-                    <TextBlock x:Name="AccentModeHint" Text="Uniform applies your accent everywhere. Custom allows picking per tile." Foreground="#8A8F98" FontSize="11" Margin="0,0,0,16" TextWrapping="Wrap"/>
-                    
-                    <StackPanel x:Name="CustomAccentsPanel" Visibility="Collapsed">
-                        <TextBlock x:Name="CustomAccentsTitle" Text="Tile Colors" Foreground="{DynamicResource MainTextBrush}" FontSize="12" FontWeight="Bold" Margin="0,0,0,8"/>
-                        <Button x:Name="BtnCustomizeTileColors" Content="Customize Tile Colors" Click="BtnCustomizeTileColors_Click" Height="28" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Cursor="Hand">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </StackPanel>
-                </StackPanel>
-            </Grid>
-
-            <!-- Tab: Cloud Content -->
-            <Grid x:Name="TabCloudContent" Margin="0,0,0,16" Visibility="Collapsed">
-                <StackPanel>
-                    <TextBlock x:Name="CloudSyncTitle" Text="Cloud Sync" Foreground="White" FontSize="13" FontWeight="Bold" Margin="0,0,0,8"/>
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <TextBlock x:Name="CloudStatusLabel" Text="Status:" Foreground="#8A8F98" FontSize="12" Margin="0,0,5,0" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="CloudStatusValue" Text="Not available" Foreground="White" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    
-                    <StackPanel Margin="0,0,0,16">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock x:Name="CloudEnableLabel" Text="Enable Cloud Sync" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                            <ToggleButton x:Name="CloudSyncToggle" Style="{StaticResource ModernSwitchToggleStyle}" Checked="CloudSyncToggle_Checked" Unchecked="CloudSyncToggle_Unchecked" VerticalAlignment="Center"/>
-                        </StackPanel>
-                        <TextBlock x:Name="CloudSyncHint" Text="When enabled, widget settings are saved to your TruckSim Cloud profile." Foreground="#8A8F98" FontSize="11" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                    </StackPanel>
-
-                    <Grid Margin="0,10,0,0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="10"/>
-                            <RowDefinition Height="Auto"/>
-                        </Grid.RowDefinitions>
-
-                        <Button x:Name="BtnCloudSyncNow" Grid.Row="0" Grid.Column="0" Content="Sync now" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnCloudSyncNow_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#4CAE50"/></Trigger>
-                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <Button x:Name="BtnCloudDownload" Grid.Row="0" Grid.Column="2" Content="Download from cloud" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnCloudDownload_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#1976D2"/></Trigger>
-                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <Button x:Name="BtnCloudUpload" Grid.Row="2" Grid.Column="0" Content="Upload this PC" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnCloudUpload_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#1976D2"/></Trigger>
-                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <Button x:Name="BtnCloudDelete" Grid.Row="2" Grid.Column="2" Content="Delete cloud backup" Height="30" Background="{DynamicResource CardBackgroundBrush}" Foreground="#E57373" BorderThickness="0" Cursor="Hand" Click="BtnCloudDelete_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="#D32F2F"/><Setter Property="Foreground" Value="White"/></Trigger>
-                                        <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </Grid>
-                </StackPanel>
-            </Grid>
-
-            <!-- Tab: Logbook Content -->
-            <Grid x:Name="TabLogbookContent" Margin="0,0,0,16" Visibility="Collapsed">
-                <!-- Logbook List View -->
-                <Grid x:Name="LogbookListView" Visibility="Visible">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    
-                    <TextBlock Grid.Row="0" x:Name="LogbookTitleLabel" Text="Recent Trips (0)" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
-                    
-                    <!-- Scrolling List -->
-                    <ScrollViewer Grid.Row="2" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="320" Margin="0,0,-10,0">
-                        <StackPanel x:Name="LogbookTripsList" Margin="0,0,10,0">
-                            <!-- Cards added programmatically -->
-                        </StackPanel>
-                    </ScrollViewer>
-
-                    <TextBlock x:Name="LogbookEmptyText" Grid.Row="2" Text="No trips recorded yet." Foreground="#8A8F98" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
-                    <TextBlock x:Name="LogbookFreeLimitText" Grid.Row="4" Text="Showing last 5 trips. Supporter unlocks full history." Foreground="#EABF20" FontSize="12" HorizontalAlignment="Center" Visibility="Collapsed"/>
-                </Grid>
-
-                <!-- Logbook Detail View -->
-                <Grid x:Name="LogbookDetailView" Visibility="Collapsed">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="*"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-                    
-                    <!-- Detail Header with Back Button -->
-                    <Grid Grid.Row="0">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="Auto"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <Button x:Name="BtnLogbookBack" Grid.Column="0" Width="30" Height="30" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" FontSize="16" FontWeight="Bold" Cursor="Hand" Click="BtnLogbookBack_Click">
-                            <Button.Content>
-                                <TextBlock Text="←" Margin="0,-2,0,0"/>
-                            </Button.Content>
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                        <TextBlock Grid.Column="2" x:Name="LogbookDetailTitle" Text="Trip Details" Foreground="White" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                    </Grid>
-                    
-                    <!-- Details Scroll -->
-                    <ScrollViewer Grid.Row="2" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="320" Margin="0,0,-10,0">
-                        <StackPanel x:Name="LogbookDetailPanel" Margin="0,0,10,0">
-                            <!-- Detail rows added programmatically -->
-                        </StackPanel>
-                    </ScrollViewer>
-                    
-                    <!-- Export Buttons -->
-                    <Grid Grid.Row="4" x:Name="LogbookExportGrid" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-                        
-                        <Button x:Name="BtnExportCsv" Grid.Column="0" Content="Export CSV" Height="30" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Cursor="Hand" Click="BtnExportCsv_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                        
-                        <Button x:Name="BtnExportJson" Grid.Column="2" Content="Export JSON" Height="30" Background="{DynamicResource InputBackgroundBrush}" Foreground="{DynamicResource MainTextBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" Cursor="Hand" Click="BtnExportJson_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="4">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="border" Property="Background" Value="{DynamicResource InputHoverBrush}"/></Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                        <!-- Detail -->
+                        <Grid x:Name="LogbookDetailView" Visibility="Collapsed">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Grid Grid.Row="0" Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="BtnLogbookBack" Grid.Column="0" Width="32" Style="{StaticResource ActionButtonStyle}" Padding="0" FontSize="16" FontWeight="Bold" AutomationProperties.Name="Back" Click="BtnLogbookBack_Click">
+                                    <TextBlock Text="←" Margin="0,-2,0,0"/>
+                                </Button>
+                                <TextBlock Grid.Column="1" x:Name="LogbookDetailTitle" Text="Trip Details" Style="{StaticResource SettingLabelStyle}" FontSize="15" Margin="12,0,0,0"/>
+                            </Grid>
+                            <ScrollViewer Grid.Row="1" Style="{StaticResource ModernScrollViewer}" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" MaxHeight="320" Margin="0,0,-12,0">
+                                <StackPanel x:Name="LogbookDetailPanel" Margin="0,0,12,0"/>
+                            </ScrollViewer>
+                            <Grid Grid.Row="2" x:Name="LogbookExportGrid" Margin="0,12,0,0" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="16"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <Button x:Name="BtnExportCsv" Grid.Column="0" Content="Export CSV" Style="{StaticResource ActionButtonStyle}" Click="BtnExportCsv_Click"/>
+                                <Button x:Name="BtnExportJson" Grid.Column="2" Content="Export JSON" Style="{StaticResource ActionButtonStyle}" Click="BtnExportJson_Click"/>
+                            </Grid>
+                        </Grid>
                     </Grid>
                 </Grid>
-            </Grid>
 
-            <!-- Bottom Section -->
-            <Border Background="{DynamicResource CardBackgroundBrush}" CornerRadius="8" Padding="16">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="12"/>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Supporter Banner -->
-                    <Grid Grid.Row="0">
+                <!-- Common part: subscription and support -->
+                <Border x:Name="SubscriptionFooter" Grid.Row="3" Height="72" Background="{DynamicResource CardBackgroundBrush}" CornerRadius="8" Padding="10">
+                    <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
                             <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="Auto"/>
                         </Grid.ColumnDefinitions>
-
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock x:Name="LicenseSectionTitle" Foreground="White" FontWeight="Bold" Margin="0,0,0,4">
-                                <Run Text="⭐ " FontSize="18" Foreground="#F5C542"/>
-                                <Run x:Name="LicenseSectionText" Text="Стати Supporter" FontSize="14"/>
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center" Margin="0,0,12,0">
+                            <TextBlock x:Name="LicenseSectionTitle" Foreground="{DynamicResource MainTextBrush}" FontWeight="Bold" TextWrapping="Wrap" Margin="0,0,0,2">
+                                <Run Text="⭐ " FontSize="15" Foreground="#F5C542"/><Run x:Name="LicenseSectionText" Text="Become a Supporter" FontSize="14"/>
                             </TextBlock>
-                            <TextBlock x:Name="LicenseStatusText" Text="Free" Foreground="#A0A0A0" FontSize="13"/>
+                            <TextBlock x:Name="LicenseStatusText" Text="Free" Foreground="{DynamicResource MutedTextBrush}" FontSize="12" TextWrapping="Wrap"/>
                         </StackPanel>
-
-                        <Button x:Name="BtnManageLicense" Grid.Column="1" Content="Стати Supporter" Width="130" Height="32" Background="#4CAF50" Foreground="White" BorderThickness="0" Cursor="Hand" Click="BtnManageLicense_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="4">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="border" Property="Opacity" Value="0.9"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
+                        <Button x:Name="BtnManageLicense" Grid.Column="1" Width="160" Height="32" Content="Become a Supporter" Margin="0,0,6,0" Padding="10,0" Style="{StaticResource ActionButtonStyle}" Background="#4CAF50" BorderBrush="#4CAF50" Foreground="White" Tag="#5DBB61" VerticalAlignment="Center" Click="BtnManageLicense_Click"/>
+                        <Button x:Name="BtnDonate" Grid.Column="2" Width="112" Height="32" Padding="10,0" VerticalAlignment="Center" Content="💛 Donate" Style="{StaticResource ActionButtonStyle}" Background="#EABF20" BorderBrush="#EABF20" Foreground="Black" FontWeight="Bold" Tag="#F5CB32" Click="BtnDonate_Click"/>
                     </Grid>
+                </Border>
 
-                    <!-- Beta Updates Toggle -->
-                    <Grid x:Name="BetaUpdatesContainer" Grid.Row="2" Margin="0,0,0,15" Visibility="Collapsed">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="Auto"/>
-                        </Grid.ColumnDefinitions>
-                        <TextBlock x:Name="BetaUpdatesLabel" Grid.Column="0" Text="Отримувати бета-оновлення" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        
-                        <CheckBox x:Name="BetaUpdatesToggle" Grid.Column="1" VerticalAlignment="Center" Checked="BetaUpdatesToggle_Checked" Unchecked="BetaUpdatesToggle_Unchecked">
-                            <CheckBox.Template>
-                                <ControlTemplate TargetType="CheckBox">
-                                    <Grid Width="40" Height="22" Cursor="Hand">
-                                        <Border x:Name="border" Background="{DynamicResource InputBackgroundBrush}" BorderBrush="{DynamicResource InputBorderBrush}" BorderThickness="1" CornerRadius="11">
-                                            <Ellipse x:Name="knob" Width="16" Height="16" Fill="#8A8F98" HorizontalAlignment="Left" Margin="2,0,0,0">
-                                                <Ellipse.RenderTransform>
-                                                    <TranslateTransform x:Name="knobTransform" X="0"/>
-                                                </Ellipse.RenderTransform>
-                                            </Ellipse>
-                                        </Border>
-                                    </Grid>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="#4CAE50"/>
-                                            <Setter TargetName="border" Property="BorderBrush" Value="#4CAE50"/>
-                                            <Setter TargetName="knob" Property="Fill" Value="White"/>
-                                            <Trigger.EnterActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="knobTransform" Storyboard.TargetProperty="X" To="18" Duration="0:0:0.15"/>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.EnterActions>
-                                            <Trigger.ExitActions>
-                                                <BeginStoryboard>
-                                                    <Storyboard>
-                                                        <DoubleAnimation Storyboard.TargetName="knobTransform" Storyboard.TargetProperty="X" To="0" Duration="0:0:0.15"/>
-                                                    </Storyboard>
-                                                </BeginStoryboard>
-                                            </Trigger.ExitActions>
-                                        </Trigger>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="border" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </CheckBox.Template>
-                        </CheckBox>
-                    </Grid>
+                <!-- Version -->
+                <TextBlock Grid.Row="4" x:Name="VersionLabel" Text="v1.0.0" Foreground="{DynamicResource MutedTextBrush}" Opacity="0.7" FontSize="11" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                <TextBlock Grid.Row="5" x:Name="UpdateStatusText" Text="" Foreground="#B0B0B0" FontSize="11" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+            </Grid>
 
-                    <!-- Action Buttons -->
-                    <Grid Grid.Row="3">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*"/>
-                            <ColumnDefinition Width="10"/>
-                            <ColumnDefinition Width="*"/>
-                        </Grid.ColumnDefinitions>
-
-                        <Button x:Name="BtnCheckUpdate" Grid.Column="0" Content="🔄 Перевірити оновлення" Height="36" Background="#3F9843" Foreground="White" FontWeight="SemiBold" BorderThickness="0" Cursor="Hand" Click="BtnCheckUpdate_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="#4CAE50"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-
-                        <Button x:Name="BtnDonate" Grid.Column="2" Content="💛 Підтримати" Height="36" Background="#EABF20" Foreground="Black" FontWeight="Bold" BorderThickness="0" Cursor="Hand" Click="BtnDonate_Click">
-                            <Button.Template>
-                                <ControlTemplate TargetType="Button">
-                                    <Border x:Name="border" Background="{TemplateBinding Background}" CornerRadius="6">
-                                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="border" Property="Background" Value="#F5CB32"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </Button.Template>
-                        </Button>
-                    </Grid>
-                </Grid>
-            </Border>
-
-            <!-- Version -->
-            <TextBlock x:Name="VersionLabel" Text="v1.0.0" Foreground="#555555" FontSize="11" HorizontalAlignment="Center" Margin="0,12,0,0"/>
-            <TextBlock x:Name="UpdateStatusText" Text="" Foreground="#B0B0B0" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,0"/>
-
-            </StackPanel>
-            
             <!-- Toast Notification -->
             <Border x:Name="ToastOverlay" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,32"
                     Background="{DynamicResource CardBackgroundBrush}" BorderBrush="{DynamicResource CardBorderBrush}" BorderThickness="1" CornerRadius="8" Padding="16,10"
@@ -1236,7 +1178,7 @@
                 </Border.RenderTransform>
                 <StackPanel Orientation="Horizontal">
                     <TextBlock x:Name="ToastIcon" Text="⭐" FontSize="18" Margin="0,0,8,0" VerticalAlignment="Center" Foreground="#F5C542"/>
-                    <TextBlock x:Name="ToastText" Text="Requires Supporter subscription" Foreground="White" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="ToastText" Text="Requires Supporter subscription" Foreground="{DynamicResource MainTextBrush}" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center" TextWrapping="Wrap" MaxWidth="440"/>
                 </StackPanel>
             </Border>
         </Grid>

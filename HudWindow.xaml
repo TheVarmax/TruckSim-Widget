@@ -139,6 +139,9 @@
                     <Button x:Name="BtnTopmost" Click="BtnTopmost_Click" Style="{StaticResource HudBtnStyle}" ToolTip="Pin" Margin="0,0,4,0">
                         <Path x:Name="PinIcon" Data="M16,12V4H17V2H7V4H8V12L6,14V16H11V22H13V16H18V14L16,12Z" Fill="{DynamicResource HeaderIconBrush}" Stretch="Uniform" Width="10" Height="10"/>
                     </Button>
+                    <Button x:Name="BtnTray" Click="BtnTray_Click" Style="{StaticResource HudBtnStyle}" ToolTip="Minimize to tray" AutomationProperties.Name="Minimize to tray" Margin="0,0,4,0">
+                        <Path Data="M5,3 L19,3 M12,6 L12,16 M8,12 L12,16 L16,12 M5,20 L19,20" Stroke="{DynamicResource HeaderIconBrush}" StrokeThickness="2" Stretch="Uniform" Width="10" Height="10" VerticalAlignment="Center"/>
+                        </Button>
                     <Button Click="BtnMinimize_Click" Style="{StaticResource HudBtnStyle}" Margin="0,0,4,0">
                         <Path Data="M0,0 L12,0" Stroke="{DynamicResource HeaderIconBrush}" StrokeThickness="2" Stretch="Uniform" Width="10" VerticalAlignment="Center"/>
                     </Button>

@@ -176,7 +176,8 @@ public class TransactionJournal
                 if (step.Status != "STEP_COMPLETED" &&
                     !(step.Status == "STEP_PENDING" && step.Operation is
                         "CopyFile" or "CopyPlugin" or "ReplaceFile" or "DeleteFile" or
-                        "CreateDir" or "SaveStateFile" or "SaveManifestFile" or "CreateThirdPartyBackup"))
+                        "CreateDir" or "SaveStateFile" or "SaveManifestFile" or "CreateThirdPartyBackup" or
+                        AutostartRegistration.StepChange or AutostartRegistration.StepRemove))
                     continue;
 
                 try
@@ -380,6 +381,11 @@ public class TransactionJournal
             case "RegisterWindowsUninstall":
                 WindowsRegistration.Unregister();
                 return true;
+
+            case AutostartRegistration.StepChange:
+            case AutostartRegistration.StepRemove:
+                // The startup entry returns to the value recorded before the step.
+                return AutostartRegistration.Rollback(step);
 
             case "CreateThirdPartyBackup":
                 if (!string.IsNullOrEmpty(step.BackupPath) && File.Exists(step.BackupPath))

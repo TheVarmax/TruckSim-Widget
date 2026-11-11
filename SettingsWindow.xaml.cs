@@ -24,7 +24,47 @@ namespace ETSOverlay
             _suppressEvents = false;
 
             UpdateLicenseUI();
+            IsVisibleChanged += (_, _) =>
+            {
+                if (IsVisible) SyncAutostartPanel();
+            };
             LicenseManager.Instance.OnLicenseChanged += LicenseManager_OnLicenseChanged;
+
+            // Every panel opens under its button, right edges aligned, and above it when there
+            // is no room below (small screens, high Windows scaling).
+            foreach (var popup in new[] { SpeedWarningPopup, SpeedLimiterPopup, OpacityPopup, HudModePopup })
+            {
+                popup.Placement = System.Windows.Controls.Primitives.PlacementMode.Custom;
+                popup.CustomPopupPlacementCallback = PlaceUnderTargetRightAligned;
+            }
+
+            // The window never grows past the screen it is on: the tab content scrolls instead.
+            Loaded += (s, e) => FitHeightToScreen();
+            LocationChanged += (s, e) => FitHeightToScreen();
+            DpiChanged += (s, e) => FitHeightToScreen();
+        }
+
+        internal static System.Windows.Controls.Primitives.CustomPopupPlacement[] PlaceUnderTargetRightAligned(Size popupSize, Size targetSize, Point offset)
+        {
+            double x = targetSize.Width - popupSize.Width;
+            return new[]
+            {
+                new System.Windows.Controls.Primitives.CustomPopupPlacement(new Point(x, targetSize.Height), System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal),
+                new System.Windows.Controls.Primitives.CustomPopupPlacement(new Point(x, -popupSize.Height), System.Windows.Controls.Primitives.PopupPrimaryAxis.Horizontal)
+            };
+        }
+
+        /// <summary>Keeps the visible card inside the work area of its monitor.</summary>
+        internal void FitHeightToScreen()
+        {
+            try
+            {
+                Rect workArea = WindowGuard.GetWorkArea(this);
+                // The window has a transparent 20 px margin around the card for its shadow.
+                double max = Math.Max(360, workArea.Height + 40 - 16);
+                if (Math.Abs(MaxHeight - max) > 0.5) MaxHeight = max;
+            }
+            catch { }
         }
 
         private void LicenseManager_OnLicenseChanged()
@@ -64,6 +104,7 @@ namespace ETSOverlay
             if (TabGeneralContent != null && TabAppearanceContent != null && TabCloudContent != null && TabLogbookContent != null)
             {
                 TabGeneralContent.Visibility = Visibility.Visible;
+                SyncAutostartPanel();
                 TabAppearanceContent.Visibility = Visibility.Collapsed;
                 TabCloudContent.Visibility = Visibility.Collapsed;
                 TabLogbookContent.Visibility = Visibility.Collapsed;
@@ -386,6 +427,7 @@ namespace ETSOverlay
                 LicenseStatusText.Text = statusText;
                 LicenseStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#43A047")); // Green
                 BtnManageLicense.Content = _isUk ? "Керувати" : "Manage";
+                BtnManageLicense.Width = 88;
             }
             else
             {
@@ -394,6 +436,7 @@ namespace ETSOverlay
                 LicenseStatusText.Text = "Free";
                 LicenseStatusText.Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#A0A0A0"));
                 BtnManageLicense.Content = _isUk ? "Стати Supporter" : "Become a Supporter";
+                BtnManageLicense.Width = 160;
             }
             
 
@@ -505,6 +548,132 @@ namespace ETSOverlay
             if (HudToggleType != null) HudToggleType.IsChecked = _mainWindow.GetHudShowDeliveryType();
 
             _suppressEvents = false;
+            SyncAutostartPanel();
+        }
+
+        // --- Autostart and tray ---
+
+        /// <summary>
+        /// Shows the saved choices and the real state of the Windows entry. Child options keep
+        /// their values while a parent is off or the licence right is missing; they are only
+        /// disabled. Refreshed when the settings are shown or the licence changes.
+        /// </summary>
+        public void SyncAutostartPanel()
+        {
+            if (_mainWindow == null || AutostartRunToggle == null) return;
+            bool previous = _suppressEvents;
+            _suppressEvents = true;
+            try
+            {
+                var status = _mainWindow.GetStartupStatus();
+                bool wanted = _mainWindow.AutostartEnabled;
+                bool entitled = _mainWindow.CanUseGameTrayAutomation;
+
+                AutostartRunToggle.IsChecked = wanted;
+                AutostartTrayToggle.IsChecked = _mainWindow.StartInTray;
+                AutostartShowToggle.IsChecked = _mainWindow.ShowOnGameStart;
+                AutostartHideToggle.IsChecked = _mainWindow.HideOnGameExit;
+
+                SetAutostartRowEnabled(AutostartTrayRow, AutostartTrayToggle, wanted);
+                SetAutostartRowEnabled(AutostartShowRow, AutostartShowToggle, entitled);
+                SetAutostartRowEnabled(AutostartHideRow, AutostartHideToggle, entitled);
+
+                AutostartShowBadge.Text = _isUk ? "Ігрові опції доступні з Supporter" : "Game options require Supporter";
+                AutostartShowBadge.Visibility = entitled ? Visibility.Collapsed : Visibility.Visible;
+
+                // What Windows will really do, when it differs from the choice.
+                string problem = "";
+                bool canRetry = false;
+                if (wanted)
+                {
+                    if (!string.IsNullOrEmpty(status.Error))
+                    {
+                        problem = _isUk ? "Не вдалося зареєструвати автозапуск у Windows." : "Could not register the start with Windows.";
+                        canRetry = true;
+                    }
+                    else if (status.State == StartupEntryState.Missing)
+                    {
+                        problem = _isUk ? "Запис автозапуску відсутній у Windows." : "The startup entry is missing in Windows.";
+                        canRetry = true;
+                    }
+                    else if (status.State == StartupEntryState.DisabledByWindows)
+                    {
+                        problem = _isUk
+                            ? "Вимкнено в Windows (Диспетчер завдань → Автозавантаження). Увімкніть запис там."
+                            : "Switched off in Windows (Task Manager → Startup apps). Switch it on there.";
+                    }
+                    else if (status.State == StartupEntryState.BlockedByPolicy)
+                    {
+                        problem = _isUk ? "Автозапуск заблоковано політикою Windows." : "Start with Windows is blocked by a Windows policy.";
+                    }
+                    else if (!status.PointsToThisExecutable)
+                    {
+                        problem = _isUk ? "Запис автозапуску вказує на інший файл." : "The startup entry points to another file.";
+                        canRetry = true;
+                    }
+                }
+                AutostartStateText.Text = problem;
+                AutostartStateRow.Visibility = problem.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
+                BtnAutostartRetry.Visibility = canRetry ? Visibility.Visible : Visibility.Collapsed;
+                BtnAutostartRetry.Content = _isUk ? "Повторити" : "Try again";
+            }
+            finally
+            {
+                _suppressEvents = previous;
+            }
+        }
+
+        private static void SetAutostartRowEnabled(FrameworkElement row, System.Windows.Controls.Primitives.ToggleButton toggle, bool enabled)
+        {
+            toggle.IsEnabled = enabled;
+            row.Opacity = enabled ? 1.0 : 0.5;
+        }
+
+        private void AutostartRunToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            _mainWindow.SetAutostartEnabled(AutostartRunToggle.IsChecked == true);
+            SyncAutostartPanel();
+        }
+
+        private void AutostartTrayToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            _mainWindow.SetStartInTray(AutostartTrayToggle.IsChecked == true);
+            SyncAutostartPanel();
+        }
+
+        private void AutostartShowToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            // The right is checked again here, not only when the panel was built.
+            if (!_mainWindow.CanUseGameTrayAutomation) { SyncAutostartPanel(); return; }
+            _mainWindow.SetShowOnGameStart(AutostartShowToggle.IsChecked == true);
+            SyncAutostartPanel();
+        }
+
+        private void AutostartHideToggle_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressEvents || _mainWindow == null) return;
+            if (!_mainWindow.CanUseGameTrayAutomation) { SyncAutostartPanel(); return; }
+            _mainWindow.SetHideOnGameExit(AutostartHideToggle.IsChecked == true);
+            SyncAutostartPanel();
+        }
+
+        private void BtnAutostartRetry_Click(object sender, RoutedEventArgs e)
+        {
+            if (_mainWindow == null) return;
+            _mainWindow.SetAutostartEnabled(true);
+            SyncAutostartPanel();
+        }
+
+        /// <summary>Closes every open settings panel (used when the widget goes to the tray).</summary>
+        public void CloseTransientPanels()
+        {
+            if (OpacityPopup != null) OpacityPopup.IsOpen = false;
+            if (SpeedWarningPopup != null) SpeedWarningPopup.IsOpen = false;
+            if (SpeedLimiterPopup != null) SpeedLimiterPopup.IsOpen = false;
+            if (HudModePopup != null) HudModePopup.IsOpen = false;
         }
 
         private void HudToggle_Changed(object sender, RoutedEventArgs e)
@@ -822,10 +991,18 @@ namespace ETSOverlay
                     : "When enabled, visually and audibly warns you if your speed is higher than the specified threshold.";
             }
             ScaleLabel.Text = isUk ? "Масштаб" : "Scale";
+            UpdatesLabel.Text = isUk ? "Оновлення" : "Updates";
+            HudMoveToTopBtn.Content = isUk ? "Перемістити вгору" : "Move to Top";
+            HudResetPositionBtn.Content = isUk ? "Скинути позицію" : "Reset Position";
+            string configure = isUk ? "Налаштувати" : "Configure";
+            BtnSpeedWarningConfig.ToolTip = configure;
+            BtnSpeedLimiterConfig.ToolTip = configure;
+            BtnOpacityConfig.ToolTip = configure;
+            BtnOpacityConfig.Content = configure;
             AutoHideLabel.Text = isUk ? "Автоскривання" : "Auto-hide";
             AutoHideHint.Text = isUk
-                ? "Використовує лише статус TruckBook. Тимчасово приховує вибраний режим інтерфейсу, коли статус спокійний."
-                : "Uses TruckBook status only. Temporarily hides the selected UI mode when status is calm.";
+                ? "Приховує віджет, коли статус TruckBook спокійний."
+                : "Hides the widget while TrucksBook is idle.";
                 
             if (HudToggleSpeedLabel != null) HudToggleSpeedLabel.Text = isUk ? "Поточна швидкість" : "Current Speed";
             if (HudToggleMaxSpeedLabel != null) HudToggleMaxSpeedLabel.Text = isUk ? "Макс. швидкість" : "Max Speed";
@@ -843,6 +1020,22 @@ namespace ETSOverlay
             TabGeneralBtn.Content = isUk ? "Загальні" : "General";
             TabAppearanceBtn.Content = isUk ? "Вигляд" : "Appearance";
 
+            // Groups inside the tabs
+            GroupStartupTitle.Text = isUk ? "ЗАПУСК І ТРЕЙ" : "STARTUP AND TRAY";
+            GroupAssistTitle.Text = isUk ? "ДОПОМОГА У ГРІ" : "IN-GAME ASSISTANCE";
+            GroupAppTitle.Text = isUk ? "ПРОГРАМА" : "APPLICATION";
+            GroupModeTitle.Text = isUk ? "РЕЖИМ ВІДЖЕТА" : "WIDGET MODE";
+            GroupLookTitle.Text = isUk ? "ОФОРМЛЕННЯ" : "LOOK";
+
+            // Startup and tray
+            AutostartRunLabel.Text = isUk ? "Запускати з Windows" : "Start with Windows";
+            AutostartTrayLabel.Text = isUk ? "Запускати в треї" : "Start in the tray";
+            AutostartTrayRow.ToolTip = isUk
+                ? "Застосовується лише до запуску з Windows. Показ і приховування з грою налаштовуються окремо."
+                : "Applies only when starting with Windows. Showing and hiding with a game are separate options.";
+            AutostartShowLabel.Text = isUk ? "Показувати при запуску ETS2 або ATS" : "Show when ETS2 or ATS starts";
+            AutostartHideLabel.Text = isUk ? "Ховати, коли ігри закриті" : "Hide when the last game closes";
+
             // Appearance labels localization
             ThemeLabel.Text = isUk ? "Тема" : "Theme";
             CardStyleLabel.Text = isUk ? "Стиль карток" : "Card Style";
@@ -850,8 +1043,8 @@ namespace ETSOverlay
             GlobalAccentLabel.Text = isUk ? "Загальний колір" : "Global Accent";
             CustomAccentsTitle.Text = isUk ? "Кольори плиток" : "Tile Colors";
             AccentModeHint.Text = isUk 
-                ? "Однаковий застосовує акцент всюди. Користувацький дозволяє вибрати колір для кожної плитки." 
-                : "Uniform applies your accent everywhere. Custom allows picking per tile.";
+                ? "Один акцент або окремий колір для кожної плитки."
+                : "One accent or a color per tile.";
 
             if (SpeedLimiterTitle != null)
             {
@@ -872,7 +1065,7 @@ namespace ETSOverlay
             TabCloudBtn.Content = isUk ? "Хмара" : "Cloud";
             TabLogbookBtn.Content = isUk ? "Журнал" : "Logbook";
             
-            CloudSyncTitle.Text = isUk ? "Хмарна Синхронізація" : "Cloud Sync";
+            CloudSyncTitle.Text = isUk ? "ХМАРНА СИНХРОНІЗАЦІЯ" : "CLOUD SYNC";
             CloudStatusLabel.Text = isUk ? "Статус:" : "Status:";
             CloudEnableLabel.Text = isUk ? "Увімкнути хмарну синхронізацію" : "Enable Cloud Sync";
             CloudSyncHint.Text = isUk
@@ -1181,13 +1374,13 @@ namespace ETSOverlay
             var license = LicenseManager.Instance;
             bool isSupporter = license.Status == "active";
 
-            _currentTrips = TripLogbookService.Instance.LoadTrips(isSupporter ? null : 5);
+            _currentTrips = _mainWindow.TripLog.LoadTrips(isSupporter ? null : 5);
 
             LogbookTripsList.Children.Clear();
             LogbookDetailView.Visibility = Visibility.Collapsed;
             LogbookListView.Visibility = Visibility.Visible;
 
-            LogbookTitleLabel.Text = _isUk ? $"Останні рейси ({_currentTrips.Count})" : $"Recent Trips ({_currentTrips.Count})";
+            LogbookTitleLabel.Text = _isUk ? $"ОСТАННІ РЕЙСИ ({_currentTrips.Count})" : $"RECENT TRIPS ({_currentTrips.Count})";
 
             if (_currentTrips.Count == 0)
             {
@@ -1222,8 +1415,8 @@ namespace ETSOverlay
             {
                 Background = (Brush)FindResource("CardBackgroundBrush"),
                 CornerRadius = new CornerRadius(6),
-                Padding = new Thickness(12),
-                Margin = new Thickness(0, 0, 0, 8),
+                Padding = new Thickness(10, 7, 10, 7),
+                Margin = new Thickness(0, 0, 0, 5),
                 Cursor = System.Windows.Input.Cursors.Hand
             };
 
@@ -1232,7 +1425,7 @@ namespace ETSOverlay
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
-            var routePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+            var routePanel = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
             if (trip.HasLocationWarning)
             {
                 var warningBorder = new Border { CornerRadius = new CornerRadius(8), Background = Brushes.Orange, Width = 16, Height = 16, Margin = new Thickness(0, 0, 6, 0) };
@@ -1259,7 +1452,7 @@ namespace ETSOverlay
                 Text = string.IsNullOrEmpty(trip.CargoName) ? (_isUk ? "Вантаж відсутній" : "No cargo") : trip.CargoName,
                 Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#B0B0B0")),
                 FontSize = 12,
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0, 0, 0, 3)
             };
             Grid.SetRow(cargoBlock, 1);
             grid.Children.Add(cargoBlock);

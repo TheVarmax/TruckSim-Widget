@@ -352,6 +352,15 @@ namespace ETSOverlay
         private void BtnSettings_Click(object sender, RoutedEventArgs e) => _mainWindow.BtnSettings_Click(sender, e);
         private void BtnTopmost_Click(object sender, RoutedEventArgs e) => _mainWindow.BtnTopmost_Click(sender, e);
         private void BtnMinimize_Click(object sender, RoutedEventArgs e) => _mainWindow.BtnMinimize_Click(sender, e);
+        private void BtnTray_Click(object sender, RoutedEventArgs e) => _mainWindow.BtnTray_Click(sender, e);
+
+        /// <summary>Localized name of the "Minimize to tray" command (tooltip and screen readers).</summary>
+        public void SetTrayCommandText(string text)
+        {
+            if (BtnTray == null) return;
+            BtnTray.ToolTip = text;
+            System.Windows.Automation.AutomationProperties.SetName(BtnTray, text);
+        }
         private void BtnClose_Click(object sender, RoutedEventArgs e) => _mainWindow.BtnClose_Click(sender, e);
 
         private bool _isClosingFromMainWindow = false;

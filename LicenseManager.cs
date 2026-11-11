@@ -111,6 +111,26 @@ namespace ETSOverlay
             return _features.ContainsKey(feature);
         }
 
+        /// <summary>
+        /// True when the feature may be used right now: the licence is active, belongs to this
+        /// device (token present), was confirmed by the server at least once, has not expired and
+        /// lists the feature. Without a network this holds only for such a confirmed licence;
+        /// a licence that was never confirmed or has run out gives no right.
+        /// </summary>
+        public bool HasEntitlement(string feature)
+        {
+            return IsEntitled(Status, HasValidToken, LastValidationTime, ExpiresAt, _features.ContainsKey(feature), DateTime.UtcNow);
+        }
+
+        internal static bool IsEntitled(string? status, bool hasToken, DateTime lastValidation, DateTime? expiresAt, bool hasFeature, DateTime utcNow)
+        {
+            if (!hasFeature || !hasToken) return false;
+            if (!string.Equals(status, "active", StringComparison.Ordinal)) return false;
+            if (lastValidation == DateTime.MinValue) return false;
+            if (expiresAt.HasValue && expiresAt.Value.ToUniversalTime() <= utcNow) return false;
+            return true;
+        }
+
         public List<string> GetFeaturesList()
         {
             return new List<string>(_features.Keys);

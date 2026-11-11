@@ -191,6 +191,11 @@ public class InstallerService
             }
             journal.CompleteStep(regStep);
 
+            // 9a. Start at Windows sign-in for the installing user. A step of this transaction,
+            // made before the commit: if the install or update fails later, is rolled back or is
+            // interrupted and recovered, the entry returns to its previous value and path.
+            AutostartRegistration.ApplyDuringInstall(journal, targetDir, cleanInstall: !installInfo.IsInstalled);
+
             // 10. Create Shortcuts
             ShellHelper.CreateAppShortcuts(targetDir, options.CreateDesktopShortcut);
 
@@ -308,6 +313,10 @@ public class InstallerService
             // 4. Remove Windows Uninstall registration
             statusText?.Report("Removing Windows registration...");
             WindowsRegistration.Unregister();
+
+            // 4a. The product's own startup entry goes with the product, also when user data is
+            // kept. Inside the transaction: a failed uninstall puts it back.
+            AutostartRegistration.RemoveDuringUninstall(journal);
 
             // 5. Clean only empty directories in appDir
             DirectoryCleaner.CleanEmptyDirectories(appDir);

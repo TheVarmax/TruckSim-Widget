@@ -695,30 +695,53 @@ public class InstallerTests : IDisposable
         Assert.True(File.Exists(license));
     }
 
+    /// <summary>In-memory stand-in for the "Apps &amp; features" registry entry.</summary>
+    private sealed class FakeUninstallRegistry : IUninstallRegistry
+    {
+        public Dictionary<string, object>? Values;
+        public bool Write(IReadOnlyList<KeyValuePair<string, object>> values)
+        {
+            Values = values.ToDictionary(v => v.Key, v => v.Value);
+            return true;
+        }
+        public void Delete() => Values = null;
+    }
+
+    // Runs against a stand-in registry: the registration of a widget that is really installed
+    // on this machine is never written or removed, and no registry access is needed.
     [Fact]
     public void TransactionRollback_UnregistersWindowsRegistration()
     {
-        var journal = TransactionJournal.StartNew("Install", "1.6.4", Path.Combine(_testDir, "tx_reg.json"), Path.Combine(_testDir, "staging_reg"));
-
-        int step = journal.BeginStep("RegisterWindowsUninstall", string.Empty, Constants.UninstallRegSubKey, string.Empty, string.Empty);
-        bool registered = WindowsRegistration.Register(_testDir, "1.6.4");
-        Assert.True(registered);
-        journal.CompleteStep(step);
-
-        // Verify key exists
-        using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Constants.UninstallRegSubKey))
+        var registry = new FakeUninstallRegistry();
+        var previous = WindowsRegistration.Registry;
+        WindowsRegistration.Registry = registry;
+        try
         {
-            Assert.NotNull(key);
+            var journal = TransactionJournal.StartNew("Install", "1.6.4", Path.Combine(_testDir, "tx_reg.json"), Path.Combine(_testDir, "staging_reg"));
+
+            int step = journal.BeginStep("RegisterWindowsUninstall", string.Empty, Constants.UninstallRegSubKey, string.Empty, string.Empty);
+            bool registered = WindowsRegistration.Register(_testDir, "1.6.4");
+            Assert.True(registered);
+            journal.CompleteStep(step);
+
+            // Verify the entry exists with the values Windows shows and uses
+            Assert.NotNull(registry.Values);
+            Assert.Equal(Constants.AppName, registry.Values!["DisplayName"]);
+            Assert.Equal("1.6.4", registry.Values["DisplayVersion"]);
+            Assert.Equal(_testDir, registry.Values["InstallLocation"]);
+            Assert.Equal($"\"{Path.Combine(_testDir, Constants.InstallerExeName)}\" --uninstall", registry.Values["UninstallString"]);
+            Assert.Equal(1, registry.Values["NoModify"]);
+
+            // Rollback should unregister
+            bool success = journal.Rollback();
+            Assert.True(success);
+
+            // Verify the entry no longer exists
+            Assert.Null(registry.Values);
         }
-
-        // Rollback should unregister
-        bool success = journal.Rollback();
-        Assert.True(success);
-
-        // Verify key no longer exists
-        using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(Constants.UninstallRegSubKey))
+        finally
         {
-            Assert.Null(key);
+            WindowsRegistration.Registry = previous;
         }
     }
 }
